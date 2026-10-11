@@ -36,8 +36,8 @@ struct RetailStoreSetupView: View {
         ("AED", "AED · UAE Dirham"),
     ]
     private let policies = [
-        ("NONE", "No approval required"),
-        ("APPROVAL_REQUIRED", "Approval required"),
+        ("NONE", "No approval needed"),
+        ("APPROVAL_REQUIRED", "Someone must approve"),
     ]
     private var owner: String { PersonLabel.personName(ownerName, fallback: "You") }
     private var needsApprover: Bool { policy == "APPROVAL_REQUIRED" && !invites.contains { $0.role == "APPROVER" } }
@@ -66,20 +66,23 @@ struct RetailStoreSetupView: View {
                 people
                 plan
                 review
-                if ready { pill("Ready to activate · Still a draft", fill: spec.statusFill, ink: spec.statusInk) }
-                Text("Name, currency, Owner and channels checked. Positive Budget and Sales Target validated.")
-                    .font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
-                if let message = localError ?? createModel.state.error {
+                if ready {
+                    pill("Ready to start", fill: spec.statusFill, ink: spec.statusInk)
+                    Text("Name, currency, owner, and sales channels are set. Budget and sales target are filled in.")
+                        .font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
+                }
+                if let message = plainSetupError(localError ?? createModel.state.error) {
                     Text(message).font(.plusJakarta(size: 13)).foregroundStyle(Color(hex: "#F87171"))
                 }
-                Button(createModel.state.submitting ? "Activating…" : spec.activate, action: activate)
-                    .font(.plusJakarta(size: 15, weight: .semibold))
-                    .foregroundStyle(spec.actionInk.opacity(ready ? 1 : 0.45))
+                Button(createModel.state.submitting ? "Starting…" : spec.activate, action: activate)
+                    .buttonStyle(.plain)
+                    .font(.plusJakarta(size: 16, weight: .semibold))
+                    .foregroundStyle(spec.actionInk)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background(spec.brand)
+                    .frame(height: 56)
+                    .background(spec.brand.opacity(createModel.state.submitting ? 0.45 : 1))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .disabled(!ready)
+                    .disabled(createModel.state.submitting)
                     .accessibilityIdentifier("business.setup.submit")
                 Text(spec.footer)
                     .font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
@@ -126,18 +129,18 @@ struct RetailStoreSetupView: View {
                 .font(.plusJakarta(size: 32, weight: .semibold))
                 .foregroundStyle(spec.text)
                 .multilineTextAlignment(.center)
-            Text("Bring your business, people and monthly plan together. Make it yours before you activate.")
+            Text("Bring your business, people, and monthly plan together before you start.")
                 .font(.plusJakarta(size: 14))
                 .foregroundStyle(spec.secondary)
                 .multilineTextAlignment(.center)
-            pill("Setup draft · Not active", fill: spec.draftFill, ink: spec.draftInk)
+            pill("Not started yet", fill: spec.draftFill, ink: spec.draftInk)
         }
         .frame(maxWidth: .infinity)
     }
 
     private var modelSelector: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("OPERATING MODEL").font(.plusJakarta(size: 10, weight: .semibold)).foregroundStyle(spec.secondary)
+            Text("Kind of business").font(.plusJakarta(size: 10, weight: .semibold)).foregroundStyle(spec.secondary)
             HStack(spacing: 6) {
                 ForEach(subtypes) { item in
                     let on = item.code == subtype.code
@@ -165,8 +168,8 @@ struct RetailStoreSetupView: View {
     private var basics: some View {
         section("01", "Business Basics") {
             Text(spec.basicsLine).font(.plusJakarta(size: 14)).foregroundStyle(spec.secondary)
-            editor("Business name · Required", text: $name, placeholder: spec.nameHint, icon: "rs_setup_pencil")
-            choice("Currency · Required", currencies.first { $0.0 == currency }?.1 ?? currency, icon: "rs_setup_chevron") { currencyOpen.toggle() }
+            editor(spec.nameHint, text: $name, placeholder: spec.nameHint, icon: "rs_setup_pencil")
+            choice("Currency", currencies.first { $0.0 == currency }?.1 ?? currency, icon: "rs_setup_chevron") { currencyOpen.toggle() }
             if currencyOpen {
                 ForEach(currencies, id: \.0) { item in
                     Button(item.1) { currency = item.0; currencyOpen = false }
@@ -174,10 +177,10 @@ struct RetailStoreSetupView: View {
                         .foregroundStyle(item.0 == currency ? spec.accent : .white)
                 }
             }
-            choice("Tracking start", dayLabel(start), icon: "rs_setup_calendar") { dateOpen = true }
-            editor("Description · Optional", text: $details, placeholder: spec.descriptionHint, icon: "rs_setup_pencil")
-            editor("Location · Optional", text: $location, placeholder: spec.locationHint, icon: "rs_setup_pin")
-            Text("Required fields are marked. Refine optional details later.")
+            choice("Start date", dayLabel(start), icon: "rs_setup_calendar") { dateOpen = true }
+            editor("Description", text: $details, placeholder: spec.descriptionHint, icon: "rs_setup_pencil")
+            editor("Location", text: $location, placeholder: spec.locationHint, icon: "rs_setup_pin")
+            Text("You can fill in the extra details later.")
                 .font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
         }
     }
@@ -187,12 +190,12 @@ struct RetailStoreSetupView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(owner) · You").font(.plusJakarta(size: 14)).foregroundStyle(spec.text)
-                    Text("Creator · Owner / Admin").font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
+                    Text("Owner").font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
                 }
                 Spacer()
                 Text(initials(owner)).font(.plusJakarta(size: 14, weight: .semibold)).foregroundStyle(spec.accent)
             }
-            pill("Required Owner assigned", fill: spec.statusFill, ink: spec.statusInk)
+            pill("You are the owner", fill: spec.statusFill, ink: spec.statusInk)
             ForEach(invites) { person in
                 Text("\(person.name) · \(roleLabel(person.role))").font(.plusJakarta(size: 14)).foregroundStyle(spec.text)
             }
@@ -222,7 +225,7 @@ struct RetailStoreSetupView: View {
             }
             Text(spec.peopleNote)
                 .font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
-            Text("Role & access preview").font(.plusJakarta(size: 16)).foregroundStyle(spec.text)
+            Text("Who can do what").font(.plusJakarta(size: 16)).foregroundStyle(spec.text)
             ForEach(spec.roles, id: \.0) { row in
                 VStack(alignment: .leading, spacing: 4) {
                     Text(row.0).font(.plusJakarta(size: 14)).foregroundStyle(spec.text)
@@ -230,7 +233,7 @@ struct RetailStoreSetupView: View {
                 }
                 .padding(.vertical, 8)
             }
-            choice("Initial activation policy", policies.first { $0.0 == policy }?.1 ?? policy, icon: "rs_setup_chevron") { policyOpen.toggle() }
+            choice("Who needs to approve before this starts", policies.first { $0.0 == policy }?.1 ?? policy, icon: "rs_setup_chevron") { policyOpen.toggle() }
             if policyOpen {
                 ForEach(policies, id: \.0) { item in
                     Button(item.1) { policy = item.0; policyOpen = false }
@@ -239,18 +242,18 @@ struct RetailStoreSetupView: View {
                 }
             }
             VStack(alignment: .leading, spacing: 6) {
-                Text(needsApprover ? "A checker is required" : "\(owner) alone can activate")
+                Text(needsApprover ? "Someone needs to approve" : "\(owner) can start this")
                     .font(.plusJakarta(size: 13, weight: .semibold)).foregroundStyle(spec.accent)
                 Text(needsApprover
-                     ? "Add a person with the Approver role, or choose no approval required."
-                     : "A separate checker is needed only if you enable an activation approval policy. Manager and Finance are not basic activation requirements.")
+                     ? "Add a person who can approve, or choose no approval needed."
+                     : "You only need someone else to approve if you turn that on. A manager or finance person is not required to start.")
                     .font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(spec.notice)
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            Text("Only the Owner changes roles. Actions also depend on scope, policy and the source’s current state — not membership alone.")
+            Text("Only the owner can change who has access.")
                 .font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
         }
     }
@@ -274,22 +277,22 @@ struct RetailStoreSetupView: View {
                 }
             }
             Text(selectedChannels.isEmpty
-                 ? "Choose at least one channel."
-                 : "\(selectedChannels.count) channels selected. Channels describe where you sell, not a different business type.")
+                 ? "Choose at least one."
+                 : "\(selectedChannels.count) selected. These are the places you sell or serve. They are not a different kind of business.")
                 .font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
-            choice("Monthly period", "\(monthLabel(start)) · Plan v1", icon: "rs_setup_calendar") { dateOpen = true }
-            editor("Monthly Budget · Required, positive", text: $budget, placeholder: "Amount", icon: "rs_setup_pencil")
-            editor("Monthly Sales Target · Required, positive", text: $target, placeholder: "Amount", icon: "rs_setup_pencil")
+            choice("Month", monthLabel(start), icon: "rs_setup_calendar") { dateOpen = true }
+            editor("Monthly budget", text: $budget, placeholder: "Amount", icon: "rs_setup_pencil")
+            editor("Monthly sales target", text: $target, placeholder: "Amount", icon: "rs_setup_pencil")
             VStack(alignment: .leading, spacing: 6) {
-                Text("Measured against recorded Sales").font(.plusJakarta(size: 13, weight: .semibold)).foregroundStyle(spec.accent)
-                Text("Validated Sales count toward the target, not cash Collected. Eligible Purchase and Expense facts count once toward Budget.")
+                Text("How your target is counted").font(.plusJakarta(size: 13, weight: .semibold)).foregroundStyle(spec.accent)
+                Text("Sales you record count toward the target. Money already collected does not. Purchases and expenses count once toward the budget.")
                     .font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(spec.notice)
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            if ready { pill("Both plan amounts are positive", fill: spec.statusFill, ink: spec.statusInk) }
+            if ready { pill("Budget and sales target look good", fill: spec.statusFill, ink: spec.statusInk) }
         }
     }
 
@@ -297,14 +300,14 @@ struct RetailStoreSetupView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Review your setup").font(.plusJakarta(size: 20, weight: .semibold)).foregroundStyle(spec.text)
             VStack(alignment: .leading, spacing: 4) {
-                Text(name.isEmpty ? "Business name" : name).font(.plusJakarta(size: 14)).foregroundStyle(spec.text)
+                Text(name.isEmpty ? spec.nameHint : name).font(.plusJakarta(size: 14)).foregroundStyle(spec.text)
                 Text("\(spec.reviewKind) · \(currency) · From \(dayLabel(start))").font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
             }
             reviewLine("People", ([ "\(owner) · Owner" ] + invites.map { "\($0.name) · \(roleLabel($0.role))" }).joined(separator: ", "))
-            Text("Channels · \(selectedChannels.sorted().joined(separator: ", ").isEmpty ? "None yet" : selectedChannels.sorted().joined(separator: ", "))")
+            Text("Sales channels · \(selectedChannels.sorted().joined(separator: ", ").isEmpty ? "None yet" : selectedChannels.sorted().joined(separator: ", "))")
                 .font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
-            reviewLine("\(monthLabel(start)) Budget", money(budget))
-            reviewLine("\(monthLabel(start)) Sales Target", money(target))
+            reviewLine("\(monthLabel(start)) budget", money(budget))
+            reviewLine("\(monthLabel(start)) sales target", money(target))
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -382,11 +385,11 @@ struct RetailStoreSetupView: View {
 
     private func activate() {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty { localError = "Business name is required."; return }
-        if selectedChannels.isEmpty { localError = "Choose at least one channel."; return }
-        if (Double(budget) ?? 0) <= 0 { localError = "Monthly budget must be a positive amount."; return }
-        if (Double(target) ?? 0) <= 0 { localError = "Monthly target must be a positive amount."; return }
-        if needsApprover { localError = "Add an Approver, or choose no approval required."; return }
+        if trimmed.isEmpty { localError = "Add a name."; return }
+        if selectedChannels.isEmpty { localError = "Choose at least one."; return }
+        if (Double(budget) ?? 0) <= 0 { localError = "Enter a monthly budget above zero."; return }
+        if (Double(target) ?? 0) <= 0 { localError = "Enter a monthly sales target above zero."; return }
+        if needsApprover { localError = "Add someone who can approve, or choose no approval needed."; return }
         localError = nil
         let participants: [[String: String]] = invites.map { ["displayName": $0.name, "role": $0.role] }
         let prefs: [String: Any] = [
@@ -414,6 +417,15 @@ struct RetailStoreSetupView: View {
         case "CONSUMER_SERVICE": return "rs_setup_handshake"
         default: return "rs_setup_store_chip"
         }
+    }
+
+    private func plainSetupError(_ message: String?) -> String? {
+        guard let message, !message.isEmpty else { return nil }
+        let hasCode = message.range(of: #"\b[A-Z][A-Z0-9_]{2,}\b"#, options: .regularExpression) != nil
+        if message.contains("\\n") || message.contains("{") || message.contains("/") || hasCode {
+            return "We couldn't start this yet. Check the name, budget, and sales target, then try again."
+        }
+        return message
     }
 
     private func roleLabel(_ code: String) -> String {
@@ -504,11 +516,11 @@ private struct SetupSpec {
         [
             ("Owner / Admin", ownerAccess),
             (leadTitle, leadBody),
-            ("Finance / Accounts", "Financial records · No approval by default; grants possible"),
-            ("Approver", "Assigned checker · not payer by default"),
-            ("Contributor", "Contribute facts and evidence in assigned scope"),
-            ("Team Member", "Assigned work updates · protected amounts hidden"),
-            ("Observer", "Read-only scoped sources · no protected financial values"),
+            ("Finance", "Can see money records. Cannot approve unless you allow it."),
+            ("Approver", "Can review and approve. Does not pay unless you allow it."),
+            ("Contributor", "Can add updates for the work you assign."),
+            ("Team member", "Can post updates. Money totals stay hidden."),
+            ("Observer", "Can view what you assign. Money totals stay hidden."),
         ]
     }
 
@@ -527,17 +539,17 @@ private struct SetupSpec {
                 chipOnFill: Color(hex: "#202A24"), chipOnBorder: Color(hex: "#F2B544"), chipOnLabel: Color(hex: "#F4F3EB"),
                 chipOffFill: Color(hex: "#1A211D"), chipOffLabel: Color(hex: "#B9C5BA"),
                 channelOnFill: Color(hex: "#F2B544"), channelOnLabel: Color(hex: "#101412"), channelOffLabel: Color(hex: "#F4F3EB"),
-                hero: "rs_setup_restaurant", mode: "RESTAURANT MODE", title: "Restaurant / Food Setup",
-                badge: "Restaurant / Food · Setup draft", basicsLine: "A home for this restaurant.",
+                hero: "rs_setup_restaurant", mode: "Restaurant", title: "Restaurant / Food Setup",
+                badge: "Not started yet", basicsLine: "A home for this restaurant.",
                 nameHint: "Restaurant name", descriptionHint: "Everyday notes about this restaurant",
                 locationHint: "Add your restaurant location",
-                ownerAccess: "Full restaurant access · only Owner changes roles",
-                leadTitle: "Restaurant Manager", leadBody: "Operations Lead · no full Finance by default",
-                peopleNote: "Start on your own. Managers, Finance and other roles are optional; invitations can follow activation. Suppliers are added through Quick Adds after activation.",
-                channelPrompt: "Where do you sell? · Choose at least one",
+                ownerAccess: "Only the owner can change who has access.",
+                leadTitle: "Restaurant manager", leadBody: "Runs day-to-day work. Does not see full money records unless you allow it.",
+                peopleNote: "You can start on your own. You can invite people and add suppliers after this starts.",
+                channelPrompt: "Where do you sell? Choose at least one.",
                 channels: ["Dine-in", "Direct", "Zomato", "Takeaway", "Swiggy"],
-                activate: "Activate Restaurant Moment",
-                footer: "Private to your business. Only the Owner can change roles and access. No activity counts until the restaurant is active.",
+                activate: "Start this restaurant",
+                footer: "This stays private to your business. Only the owner can change who has access. Nothing is counted until you start.",
                 reviewKind: "Restaurant / Food"
             )
         case "CONSUMER_SERVICE":
@@ -553,17 +565,17 @@ private struct SetupSpec {
                 chipOnFill: Color(hex: "#0ECBB0"), chipOnBorder: Color(hex: "#0ECBB0"), chipOnLabel: Color(hex: "#080F0E"),
                 chipOffFill: Color(hex: "#0B1917"), chipOffLabel: Color(hex: "#8FBFBA"),
                 channelOnFill: Color(hex: "#0ECBB0"), channelOnLabel: Color(hex: "#080F0E"), channelOffLabel: Color(hex: "#8FBFBA"),
-                hero: "rs_setup_service", mode: "SERVICE MODE", title: "Consumer Service Setup",
-                badge: "Consumer Service · Setup draft", basicsLine: "A home for this service.",
+                hero: "rs_setup_service", mode: "Service", title: "Consumer Service Setup",
+                badge: "Not started yet", basicsLine: "A home for this service.",
                 nameHint: "Service name", descriptionHint: "Everyday notes about this service",
                 locationHint: "Add your service location",
-                ownerAccess: "Full service business access · only Owner changes roles",
-                leadTitle: "Service Manager", leadBody: "Operations Lead · no full Finance by default",
-                peopleNote: "Start on your own. Managers, Finance and other roles are optional; invitations can follow activation.",
-                channelPrompt: "How do customers reach you? · Choose at least one",
+                ownerAccess: "Only the owner can change who has access.",
+                leadTitle: "Service manager", leadBody: "Runs day-to-day work. Does not see full money records unless you allow it.",
+                peopleNote: "You can start on your own. Managers and finance people are optional. You can invite them after this starts.",
+                channelPrompt: "How do customers reach you? Choose at least one.",
                 channels: ["Walk-in", "Direct booking", "Platform", "Home service"],
-                activate: "Activate Service Moment",
-                footer: "Private to your business. Only the Owner can change roles and access. No activity counts until the service business is active.",
+                activate: "Start this service",
+                footer: "This stays private to your business. Only the owner can change who has access. Nothing is counted until you start.",
                 reviewKind: "Consumer Service"
             )
         default:
@@ -579,17 +591,17 @@ private struct SetupSpec {
                 chipOnFill: Color(hex: "#252654"), chipOnBorder: Color(hex: "#5B5CEB"), chipOnLabel: Color(hex: "#A5A7FF"),
                 chipOffFill: Color(hex: "#1A2036"), chipOffLabel: Color(hex: "#A1A7C1"),
                 channelOnFill: Color(hex: "#252654"), channelOnLabel: Color(hex: "#A5A7FF"), channelOffLabel: Color(hex: "#A1A7C1"),
-                hero: "rs_setup_store", mode: "BUSINESS MODE", title: "Retail Store Setup",
-                badge: "Retail Store · Setup draft", basicsLine: "A home for this store.",
+                hero: "rs_setup_store", mode: "Retail store", title: "Retail Store Setup",
+                badge: "Not started yet", basicsLine: "A home for this store.",
                 nameHint: "Store name", descriptionHint: "Everyday notes about this store",
                 locationHint: "Add your store location",
-                ownerAccess: "Full store access · only Owner changes roles",
-                leadTitle: "Store Manager", leadBody: "Operations Lead · no full Finance by default",
-                peopleNote: "Start on your own. Managers, Finance and other roles are optional; invitations can follow activation.",
-                channelPrompt: "Where do you sell? · Choose at least one",
+                ownerAccess: "Only the owner can change who has access.",
+                leadTitle: "Store manager", leadBody: "Runs day-to-day work. Does not see full money records unless you allow it.",
+                peopleNote: "You can start on your own. Managers and finance people are optional. You can invite them after this starts.",
+                channelPrompt: "Where do you sell? Choose at least one.",
                 channels: ["Store", "Website", "Marketplace", "Social", "Direct"],
-                activate: "Activate Retail Moment",
-                footer: "Private to your business. Only the Owner can change roles and access. No activity counts until the store is active.",
+                activate: "Start this store",
+                footer: "This stays private to your business. Only the owner can change who has access. Nothing is counted until you start.",
                 reviewKind: "Retail Store"
             )
         }

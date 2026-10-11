@@ -1291,12 +1291,22 @@ struct AppShellView: View {
                 ownerName: model.identity?.displayName ?? "",
                 onBack: { newMomentOpen = false },
                 onCreated: { outcome in
-                    pendingActivation = PendingBusinessActivation(
-                        momentId: outcome.momentId,
-                        title: outcome.title,
-                        momentTypeCode: outcome.momentTypeCode,
-                        status: outcome.status
-                    )
+                    if outcome.momentTypeCode == "RETAIL_STORE" {
+                        newMomentOpen = false
+                        model.onMomentCreated(
+                            momentId: outcome.momentId,
+                            title: outcome.title,
+                            momentTypeCode: outcome.momentTypeCode,
+                            status: outcome.status
+                        )
+                    } else {
+                        pendingActivation = PendingBusinessActivation(
+                            momentId: outcome.momentId,
+                            title: outcome.title,
+                            momentTypeCode: outcome.momentTypeCode,
+                            status: outcome.status
+                        )
+                    }
                 }
             )
         } else {

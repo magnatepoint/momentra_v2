@@ -323,8 +323,8 @@ class AppShellViewModel(
         selectMoment(preferred.momentId)
     }
 
-    fun reloadCurrentContext() {
-        refreshBootstrap()
+    fun reloadCurrentContext(preserveMomentId: String? = null) {
+        refreshBootstrap(preserveMomentId)
     }
 
     /** After leaving a Group/Business moment or company, drop selection and reload inventory. */
@@ -342,7 +342,7 @@ class AppShellViewModel(
         refreshBootstrap()
     }
 
-    private fun refreshBootstrap() {
+    private fun refreshBootstrap(preserveMomentId: String? = null) {
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             val hadCache = bootstrap != null
@@ -360,7 +360,7 @@ class AppShellViewModel(
             meRepository.getBootstrap().fold(
                 onSuccess = { boot ->
                     bootstrap = boot
-                    applyBootstrapInventory(boot, networkRefresh = true)
+                    applyBootstrapInventory(boot, networkRefresh = true, preserveMomentId = preserveMomentId)
                     _state.update { it.copy(bootstrapStatus = BootstrapStatus.READY) }
                     publishOfflineNotice(networkDown = false)
                 },
@@ -854,7 +854,7 @@ class AppShellViewModel(
                 groupMomentDirectoryHome = false,
             )
         }
-        reloadCurrentContext()
+        reloadCurrentContext(preserveMomentId = momentId)
         when (ctx) {
             AppContext.GROUP -> refreshVisibleGroupTab()
             AppContext.BUSINESS -> refreshVisibleBusinessTab()

@@ -2072,7 +2072,7 @@ export async function listBusinessMoments(
   cursor: string | undefined,
   limit: number
 ): Promise<
-  CursorPage<{ momentId: string; title: string; status: string; businessFamily: string; companyId: string }>
+  CursorPage<{ momentId: string; title: string; status: string; businessFamily: string; companyId: string | null }>
 > {
   const safeLimit = Math.min(Math.max(limit, 1), 100);
   const params: unknown[] = [ctx.userId, safeLimit + 1];
@@ -2086,14 +2086,23 @@ export async function listBusinessMoments(
     title: string;
     status: string;
     business_family: string;
-    company_id: string;
+    company_id: string | null;
     updated_at: Date;
   }>(
     `SELECT m.moment_id, m.title, m.status, bmc.business_family, bmc.company_id, m.updated_at
      FROM business.business_moment_context bmc
      JOIN core.moment m ON m.moment_id = bmc.moment_id
-     JOIN business.company_membership cm ON cm.company_id = bmc.company_id AND cm.user_id = $1
-     WHERE cm.status = 'ACTIVE'
+     LEFT JOIN business.company_membership cm
+       ON cm.company_id = bmc.company_id AND cm.user_id = $1 AND cm.status = 'ACTIVE'
+     LEFT JOIN collaboration.moment_participant mp
+       ON mp.moment_id = bmc.moment_id AND mp.user_id = $1 AND mp.status = 'ACTIVE'
+     WHERE (
+         cm.company_membership_id IS NOT NULL
+         OR (
+           bmc.company_id IS NULL
+           AND (mp.participant_id IS NOT NULL OR m.created_by_user_id = $1)
+         )
+       )
        AND (
          m.status = 'ACTIVE'
          OR (m.status = 'DRAFT' AND m.created_by_user_id = $1)

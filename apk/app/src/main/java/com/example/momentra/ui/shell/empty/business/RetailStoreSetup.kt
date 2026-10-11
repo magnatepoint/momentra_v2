@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -105,11 +105,11 @@ private data class SetupLook(
 )
 
 private val sharedRoles = listOf(
-    "Finance / Accounts" to "Financial records · No approval by default; grants possible",
-    "Approver" to "Assigned checker · not payer by default",
-    "Contributor" to "Contribute facts and evidence in assigned scope",
-    "Team Member" to "Assigned work updates · protected amounts hidden",
-    "Observer" to "Read-only scoped sources · no protected financial values",
+    "Finance" to "Can see money records. Cannot approve unless you allow it.",
+    "Approver" to "Can review and approve. Does not pay unless you allow it.",
+    "Contributor" to "Can add updates for the work you assign.",
+    "Team member" to "Can post updates. Money totals stay hidden.",
+    "Observer" to "Can view what you assign. Money totals stay hidden.",
 )
 
 private fun setupLook(code: String): SetupLook = when (code) {
@@ -142,21 +142,21 @@ private fun setupLook(code: String): SetupLook = when (code) {
         channelOnLabel = Color(0xFF101412),
         channelOffLabel = Color(0xFFF4F3EB),
         hero = R.drawable.rs_setup_restaurant,
-        mode = "RESTAURANT MODE",
+        mode = "Restaurant",
         title = "Restaurant / Food Setup",
-        badge = "Restaurant / Food · Setup draft",
+        badge = "Not started yet",
         basicsLine = "A home for this restaurant.",
         nameHint = "Restaurant name",
         descriptionHint = "Everyday notes about this restaurant",
         locationHint = "Add your restaurant location",
-        ownerAccess = "Full restaurant access · only Owner changes roles",
-        leadTitle = "Restaurant Manager",
-        leadBody = "Operations Lead · no full Finance by default",
-        peopleNote = "Start on your own. Managers, Finance and other roles are optional; invitations can follow activation. Suppliers are added through Quick Adds after activation.",
-        channelPrompt = "Where do you sell? · Choose at least one",
+        ownerAccess = "Only the owner can change who has access.",
+        leadTitle = "Restaurant manager",
+        leadBody = "Runs day-to-day work. Does not see full money records unless you allow it.",
+        peopleNote = "You can start on your own. You can invite people and add suppliers after this starts.",
+        channelPrompt = "Where do you sell? Choose at least one.",
         channels = listOf("Dine-in", "Direct", "Zomato", "Takeaway", "Swiggy"),
-        activate = "Activate Restaurant Moment",
-        footer = "Private to your business. Only the Owner can change roles and access. No activity counts until the restaurant is active.",
+        activate = "Start this restaurant",
+        footer = "This stays private to your business. Only the owner can change who has access. Nothing is counted until you start.",
         reviewKind = "Restaurant / Food",
     )
     "CONSUMER_SERVICE" -> SetupLook(
@@ -188,21 +188,21 @@ private fun setupLook(code: String): SetupLook = when (code) {
         channelOnLabel = Color(0xFF080F0E),
         channelOffLabel = Color(0xFF8FBFBA),
         hero = R.drawable.rs_setup_service,
-        mode = "SERVICE MODE",
+        mode = "Service",
         title = "Consumer Service Setup",
-        badge = "Consumer Service · Setup draft",
+        badge = "Not started yet",
         basicsLine = "A home for this service.",
         nameHint = "Service name",
         descriptionHint = "Everyday notes about this service",
         locationHint = "Add your service location",
-        ownerAccess = "Full service business access · only Owner changes roles",
-        leadTitle = "Service Manager",
-        leadBody = "Operations Lead · no full Finance by default",
-        peopleNote = "Start on your own. Managers, Finance and other roles are optional; invitations can follow activation.",
-        channelPrompt = "How do customers reach you? · Choose at least one",
+        ownerAccess = "Only the owner can change who has access.",
+        leadTitle = "Service manager",
+        leadBody = "Runs day-to-day work. Does not see full money records unless you allow it.",
+        peopleNote = "You can start on your own. Managers and finance people are optional. You can invite them after this starts.",
+        channelPrompt = "How do customers reach you? Choose at least one.",
         channels = listOf("Walk-in", "Direct booking", "Platform", "Home service"),
-        activate = "Activate Service Moment",
-        footer = "Private to your business. Only the Owner can change roles and access. No activity counts until the service business is active.",
+        activate = "Start this service",
+        footer = "This stays private to your business. Only the owner can change who has access. Nothing is counted until you start.",
         reviewKind = "Consumer Service",
     )
     else -> SetupLook(
@@ -234,21 +234,21 @@ private fun setupLook(code: String): SetupLook = when (code) {
         channelOnLabel = Color(0xFFA5A7FF),
         channelOffLabel = Color(0xFFA1A7C1),
         hero = R.drawable.rs_setup_store,
-        mode = "BUSINESS MODE",
+        mode = "Retail store",
         title = "Retail Store Setup",
-        badge = "Retail Store · Setup draft",
+        badge = "Not started yet",
         basicsLine = "A home for this store.",
         nameHint = "Store name",
         descriptionHint = "Everyday notes about this store",
         locationHint = "Add your store location",
-        ownerAccess = "Full store access · only Owner changes roles",
-        leadTitle = "Store Manager",
-        leadBody = "Operations Lead · no full Finance by default",
-        peopleNote = "Start on your own. Managers, Finance and other roles are optional; invitations can follow activation.",
-        channelPrompt = "Where do you sell? · Choose at least one",
+        ownerAccess = "Only the owner can change who has access.",
+        leadTitle = "Store manager",
+        leadBody = "Runs day-to-day work. Does not see full money records unless you allow it.",
+        peopleNote = "You can start on your own. Managers and finance people are optional. You can invite them after this starts.",
+        channelPrompt = "Where do you sell? Choose at least one.",
         channels = listOf("Store", "Website", "Marketplace", "Social", "Direct"),
-        activate = "Activate Retail Moment",
-        footer = "Private to your business. Only the Owner can change roles and access. No activity counts until the store is active.",
+        activate = "Start this store",
+        footer = "This stays private to your business. Only the owner can change who has access. Nothing is counted until you start.",
         reviewKind = "Retail Store",
     )
 }
@@ -288,8 +288,8 @@ private val currencies = listOf(
     "AED" to "AED · UAE Dirham",
 )
 private val policies = listOf(
-    "NONE" to "No approval required",
-    "APPROVAL_REQUIRED" to "Approval required",
+    "NONE" to "No approval needed",
+    "APPROVAL_REQUIRED" to "Someone must approve",
 )
 private val dayFormat = DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale.ENGLISH)
 private val monthFormat = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
@@ -358,20 +358,20 @@ fun RetailStoreSetup(
             BoxEmblem()
             Text(look.title, color = Ink, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 32.sp, lineHeight = 40.sp, textAlign = TextAlign.Center)
             Text(
-                "Bring your business, people and monthly plan together. Make it yours before you activate.",
+                "Bring your business, people, and monthly plan together before you start.",
                 color = Secondary,
                 fontFamily = PlusJakartaSans,
                 fontSize = 14.sp,
                 lineHeight = 22.sp,
                 textAlign = TextAlign.Center,
             )
-            Pill("Setup draft · Not active", DraftFill, DraftInk)
+            Pill("Not started yet", DraftFill, DraftInk)
         }
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Card).border(1.dp, Border, RoundedCornerShape(18.dp)).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("OPERATING MODEL", color = Secondary, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 10.sp)
+            Text("Kind of business", color = Secondary, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 10.sp)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 subtypes.forEach { item ->
                     val on = item.code == subtype.code
@@ -400,27 +400,27 @@ fun RetailStoreSetup(
         Pill(look.badge, DraftFill, DraftInk)
         SectionCard("01", "Business Basics") {
             Text(look.basicsLine, color = Secondary, fontFamily = PlusJakartaSans, fontSize = 14.sp, lineHeight = 22.sp)
-            FieldEditor("Business name · Required", name, look.nameHint, R.drawable.rs_setup_pencil) { name = it }
-            ChoiceRow("Currency · Required", currencies.firstOrNull { it.first == currency }?.second ?: currency, R.drawable.rs_setup_chevron) { currencyOpen = !currencyOpen }
+            FieldEditor(look.nameHint, name, look.nameHint, R.drawable.rs_setup_pencil) { name = it }
+            ChoiceRow("Currency", currencies.firstOrNull { it.first == currency }?.second ?: currency, R.drawable.rs_setup_chevron) { currencyOpen = !currencyOpen }
             if (currencyOpen) {
                 currencies.forEach { (code, label) ->
                     Text(label, color = if (code == currency) Accent else Ink, fontFamily = PlusJakartaSans, fontSize = 14.sp, modifier = Modifier.clickable { currency = code; currencyOpen = false }.padding(vertical = 6.dp))
                 }
             }
-            ChoiceRow("Tracking start", start.format(dayFormat), R.drawable.rs_setup_calendar) { dateOpen = true }
-            FieldEditor("Description · Optional", description, look.descriptionHint, R.drawable.rs_setup_pencil) { description = it }
-            FieldEditor("Location · Optional", location, look.locationHint, R.drawable.rs_setup_pin) { location = it }
-            Text("Required fields are marked. Refine optional details later.", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp, lineHeight = 18.sp)
+            ChoiceRow("Start date", start.format(dayFormat), R.drawable.rs_setup_calendar) { dateOpen = true }
+            FieldEditor("Description", description, look.descriptionHint, R.drawable.rs_setup_pencil) { description = it }
+            FieldEditor("Location", location, look.locationHint, R.drawable.rs_setup_pin) { location = it }
+            Text("You can fill in the extra details later.", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp, lineHeight = 18.sp)
         }
         SectionCard("02", "People & Roles") {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column {
                     Text("$owner · You", color = Ink, fontFamily = PlusJakartaSans, fontSize = 14.sp, lineHeight = 22.sp)
-                    Text("Creator · Owner / Admin", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
+                    Text("Owner", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
                 }
                 Text(initials(owner), color = Accent, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
             }
-            Pill("Required Owner assigned", SuccessBg, Success)
+            Pill("You are the owner", SuccessBg, Success)
             invites.forEach { person ->
                 Text("${person.name} · ${roleLabel(person.role)}", color = Ink, fontFamily = PlusJakartaSans, fontSize = 14.sp)
             }
@@ -451,14 +451,14 @@ fun RetailStoreSetup(
                 })
             }
             Text(look.peopleNote, color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp, lineHeight = 18.sp)
-            Text("Role & access preview", color = Ink, fontFamily = PlusJakartaSans, fontSize = 16.sp, lineHeight = 24.sp)
+            Text("Who can do what", color = Ink, fontFamily = PlusJakartaSans, fontSize = 16.sp, lineHeight = 24.sp)
             roleCopy.forEach { (title, body) ->
                 Column(Modifier.padding(vertical = 8.dp)) {
                     Text(title, color = Ink, fontFamily = PlusJakartaSans, fontSize = 14.sp)
                     Text(body, color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
                 }
             }
-            ChoiceRow("Initial activation policy", policies.first { it.first == policy }.second, R.drawable.rs_setup_chevron) { policyOpen = !policyOpen }
+            ChoiceRow("Who needs to approve before this starts", policies.first { it.first == policy }.second, R.drawable.rs_setup_chevron) { policyOpen = !policyOpen }
             if (policyOpen) {
                 policies.forEach { (code, label) ->
                     Text(label, color = if (code == policy) Accent else Ink, fontFamily = PlusJakartaSans, fontSize = 14.sp, modifier = Modifier.clickable { policy = code; policyOpen = false }.padding(vertical = 6.dp))
@@ -466,22 +466,22 @@ fun RetailStoreSetup(
             }
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Selected).padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    if (needsApprover) "A checker is required" else "$owner alone can activate",
+                    if (needsApprover) "Someone needs to approve" else "$owner can start this",
                     color = Accent,
                     fontFamily = PlusJakartaSans,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 13.sp,
                 )
                 Text(
-                    if (needsApprover) "Add a person with the Approver role, or choose no approval required."
-                    else "A separate checker is needed only if you enable an activation approval policy. Manager and Finance are not basic activation requirements.",
+                    if (needsApprover) "Add a person who can approve, or choose no approval needed."
+                    else "You only need someone else to approve if you turn that on. A manager or finance person is not required to start.",
                     color = Secondary,
                     fontFamily = PlusJakartaSans,
                     fontSize = 12.sp,
                     lineHeight = 18.sp,
                 )
             }
-            Text("Only the Owner changes roles. Actions also depend on scope, policy and the source’s current state — not membership alone.", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp, lineHeight = 18.sp)
+            Text("Only the owner can change who has access.", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp, lineHeight = 18.sp)
         }
         SectionCard("03", "Channels & Monthly Plan") {
             Text(look.channelPrompt, color = Ink, fontFamily = PlusJakartaSans, fontSize = 14.sp, lineHeight = 22.sp)
@@ -501,56 +501,51 @@ fun RetailStoreSetup(
                 }
             }
             Text(
-                if (selectedChannels.isEmpty()) "Choose at least one channel." else "${selectedChannels.size} channels selected. Channels describe where you sell, not a different business type.",
+                if (selectedChannels.isEmpty()) "Choose at least one." else "${selectedChannels.size} selected. These are the places you sell or serve. They are not a different kind of business.",
                 color = Secondary,
                 fontFamily = PlusJakartaSans,
                 fontSize = 12.sp,
             )
-            ChoiceRow("Monthly period", "${start.format(monthFormat)} · Plan v1", R.drawable.rs_setup_calendar) { dateOpen = true }
-            FieldEditor("Monthly Budget · Required, positive", budget, "Amount", R.drawable.rs_setup_pencil) { budget = it.filter { ch -> ch.isDigit() || ch == '.' } }
-            FieldEditor("Monthly Sales Target · Required, positive", target, "Amount", R.drawable.rs_setup_pencil) { target = it.filter { ch -> ch.isDigit() || ch == '.' } }
+            ChoiceRow("Month", start.format(monthFormat), R.drawable.rs_setup_calendar) { dateOpen = true }
+            FieldEditor("Monthly budget", budget, "Amount", R.drawable.rs_setup_pencil) { budget = it.filter { ch -> ch.isDigit() || ch == '.' } }
+            FieldEditor("Monthly sales target", target, "Amount", R.drawable.rs_setup_pencil) { target = it.filter { ch -> ch.isDigit() || ch == '.' } }
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Selected).padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Measured against recorded Sales", color = Accent, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                Text("Validated Sales count toward the target, not cash Collected. Eligible Purchase and Expense facts count once toward Budget.", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp, lineHeight = 18.sp)
+                Text("How your target is counted", color = Accent, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Text("Sales you record count toward the target. Money already collected does not. Purchases and expenses count once toward the budget.", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp, lineHeight = 18.sp)
             }
-            if (ready) Pill("Both plan amounts are positive", SuccessBg, Success)
+            if (ready) Pill("Budget and sales target look good", SuccessBg, Success)
         }
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Selected).border(1.dp, Border, RoundedCornerShape(18.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Review your setup", color = Ink, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp)
             Column {
-                Text(name.ifBlank { "Business name" }, color = Ink, fontFamily = PlusJakartaSans, fontSize = 14.sp)
+                Text(name.ifBlank { look.nameHint }, color = Ink, fontFamily = PlusJakartaSans, fontSize = 14.sp)
                 Text("${look.reviewKind} · $currency · From ${start.format(dayFormat)}", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
             }
             ReviewLine("People", (listOf("$owner · Owner") + invites.map { "${it.name} · ${roleLabel(it.role)}" }).joinToString(", "))
-            Text("Channels · ${selectedChannels.joinToString().ifBlank { "None yet" }}", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
-            ReviewLine("${start.format(monthFormat)} Budget", money(currency, budget))
-            ReviewLine("${start.format(monthFormat)} Sales Target", money(currency, target))
+            Text("Sales channels · ${selectedChannels.joinToString().ifBlank { "None yet" }}", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
+            ReviewLine("${start.format(monthFormat)} budget", money(currency, budget))
+            ReviewLine("${start.format(monthFormat)} sales target", money(currency, target))
         }
-        if (ready) Pill("Ready to activate · Still a draft", SuccessBg, Success)
-        Text("Name, currency, Owner and channels checked. Positive Budget and Sales Target validated.", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
-        val shown = localError ?: error
+        if (ready) {
+            Pill("Ready to start", SuccessBg, Success)
+            Text("Name, currency, owner, and sales channels are set. Budget and sales target are filled in.", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
+        }
+        val shown = plainSetupError(localError ?: error)
         if (!shown.isNullOrBlank()) Text(shown, color = Color(0xFFF87171), fontFamily = PlusJakartaSans, fontSize = 13.sp)
-        Text(
-            if (submitting) "Activating…" else look.activate,
-            color = look.actionInk.copy(alpha = if (ready && !submitting) 1f else 0.45f),
-            fontFamily = PlusJakartaSans,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 15.sp,
-            textAlign = TextAlign.Center,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp)
-                .wrapContentHeight(Alignment.CenterVertically)
+                .height(56.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .background(look.activateFill)
+                .background(look.activateFill.copy(alpha = if (submitting) 0.45f else 1f))
                 .testTag(MaestroIds.BUSINESS_SETUP_SUBMIT)
-                .clickable(enabled = ready && !submitting) {
+                .clickable(enabled = !submitting) {
                     val problem = when {
-                        name.isBlank() -> "Business name is required."
-                        selectedChannels.isEmpty() -> "Choose at least one channel."
-                        budget.toDoubleOrNull()?.let { it > 0 } != true -> "Monthly budget must be a positive amount."
-                        target.toDoubleOrNull()?.let { it > 0 } != true -> "Monthly target must be a positive amount."
-                        needsApprover -> "Add an Approver, or choose no approval required."
+                        name.isBlank() -> "Add a name."
+                        selectedChannels.isEmpty() -> "Choose at least one."
+                        budget.toDoubleOrNull()?.let { it > 0 } != true -> "Enter a monthly budget above zero."
+                        target.toDoubleOrNull()?.let { it > 0 } != true -> "Enter a monthly sales target above zero."
+                        needsApprover -> "Add someone who can approve, or choose no approval needed."
                         else -> null
                     }
                     localError = problem
@@ -576,7 +571,16 @@ fun RetailStoreSetup(
                         trimmed,
                     )
                 },
-        )
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                if (submitting) "Starting…" else look.activate,
+                color = look.actionInk,
+                fontFamily = PlusJakartaSans,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp,
+            )
+        }
         Text(look.footer, color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp, lineHeight = 18.sp)
     }
 
@@ -705,6 +709,16 @@ private fun initials(name: String): String {
 }
 
 private fun roleLabel(code: String): String = OperatingMomentCatalog.roles.firstOrNull { it.first == code }?.second ?: code
+
+private fun plainSetupError(message: String?): String? {
+    if (message.isNullOrBlank()) return null
+    val hasCode = Regex("\\b[A-Z][A-Z0-9_]{2,}\\b").containsMatchIn(message)
+    return if (message.contains("\\n") || message.contains("{") || message.contains("/") || hasCode) {
+        "We couldn't start this yet. Check the name, budget, and sales target, then try again."
+    } else {
+        message
+    }
+}
 
 private fun money(currency: String, amount: String): String {
     if (amount.isBlank()) return "—"
