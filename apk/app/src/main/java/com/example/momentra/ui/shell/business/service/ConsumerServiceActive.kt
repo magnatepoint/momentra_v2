@@ -60,8 +60,9 @@ fun ConsumerServiceActive(
     modifier: Modifier = Modifier,
 ) {
     var activityOpen by remember { mutableStateOf(false) }
+    Box(modifier.fillMaxSize()) {
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .background(SvcBg)
             .verticalScroll(rememberScrollState())
@@ -78,6 +79,7 @@ fun ConsumerServiceActive(
     }
     if (activityOpen) {
         ActivitySheet(model, onClose = { activityOpen = false })
+    }
     }
 }
 
@@ -97,7 +99,7 @@ private fun ServicePulse(model: OperatingProjectionDto, onViewAll: () -> Unit) {
             Line("Budget remaining", money(model, budget?.remaining), SvcSuccess)
             Text("Validated sales count toward the target. Eligible purchase and expense facts count once toward budget.", color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
         }
-        SectionTitle("Needs attention")
+        SectionTitle("Needs Attention")
         if (model.attention.isEmpty()) {
             SvcCard { Text("Nothing is waiting.", color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 14.sp) }
         }
@@ -107,7 +109,7 @@ private fun ServicePulse(model: OperatingProjectionDto, onViewAll: () -> Unit) {
                 Text(item.title, color = SvcInk, fontFamily = PlusJakartaSans, fontSize = 15.sp)
             }
         }
-        SectionTitle("Payment readiness")
+        SectionTitle("Payment Readiness")
         val ready = model.paymentReadiness.filter { it.status == "READY" }
         val expected = model.paymentReadiness.filter { it.status == "PENDING" }
         ReadinessGroup("Ready", ready, model)

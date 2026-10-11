@@ -93,7 +93,11 @@ fun BusinessSetupWizardContent(
         onDispose { MomentraAnalytics.get().onScreenExit(kind.analyticsScreen) }
     }
 
-    if (kind == BusinessSetupKind.RETAIL_CONSUMER && subtype.code in setOf("RETAIL_STORE", "RESTAURANT_FOOD", "CONSUMER_SERVICE")) {
+    val dedicatedSetup = (kind == BusinessSetupKind.RETAIL_CONSUMER && subtype.code in setOf("RETAIL_STORE", "RESTAURANT_FOOD", "CONSUMER_SERVICE")) ||
+        (kind == BusinessSetupKind.TRADING_DISTRIBUTION && subtype.code in setOf("TRADING_WHOLESALE", "DISTRIBUTION_DEALERSHIP")) ||
+        (kind == BusinessSetupKind.MARKETING_CAMPAIGNS && subtype.code in setOf("CLIENT_CAMPAIGN", "OWN_BUSINESS_CAMPAIGN")) ||
+        (kind == BusinessSetupKind.MANUFACTURING_PRODUCTION && subtype.code in setOf("STANDARD_PRODUCTION", "MADE_TO_ORDER"))
+    if (dedicatedSetup) {
         RetailStoreSetup(
             subtypes = subtypes,
             subtype = subtype,

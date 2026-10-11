@@ -102,6 +102,16 @@ private data class SetupLook(
     val activate: String,
     val footer: String,
     val reviewKind: String,
+    val tradeReach: List<String> = emptyList(),
+    val partySection: String = "",
+    val partyKinds: List<Pair<String, String>> = emptyList(),
+    val steps: String = "3 steps · One simple setup",
+    val intro: String = "Bring your business, people, and monthly plan together before you start.",
+    val partyNote: String = "Optional. These are counterparties, not people who can sign in.",
+    val channelHelp: String = "These are the places you sell or serve. They are not a different kind of business.",
+    val targetNote: String = "Sales you record count toward the target. Money already collected does not. Purchases and expenses count once toward the budget.",
+    val targetMetrics: List<String> = listOf("REVENUE"),
+    val channelsOptional: Boolean = false,
 )
 
 private val sharedRoles = listOf(
@@ -112,7 +122,309 @@ private val sharedRoles = listOf(
     "Observer" to "Can view what you assign. Money totals stay hidden.",
 )
 
+private fun campaignLook(
+    code: String,
+    title: String,
+    badge: String,
+    intro: String,
+    basicsLine: String,
+    channels: List<String>,
+    partyKinds: List<Pair<String, String>>,
+    partyNote: String,
+    targetMetrics: List<String>,
+    reviewKind: String,
+) = SetupLook(
+    code = code,
+    bg = Color(0xFF09121F),
+    card = Color(0xFF122235),
+    field = Color(0xFF09121F),
+    border = Color(0xFF2B4B63),
+    notice = Color(0xFF16405C),
+    brand = Color(0xFF6DDCFF),
+    accent = Color(0xFF6DDCFF),
+    number = Color(0xFF406582),
+    secondary = Color(0xFFA5BBCE),
+    text = Color(0xFFE5E0EE),
+    statusFill = Color(0xFF16405C),
+    statusInk = Color(0xFF6DDCFF),
+    draftFill = Color(0xFF16405C),
+    draftInk = Color(0xFF6DDCFF),
+    inviteFill = Color(0xFF6DDCFF),
+    actionInk = Color(0xFF09121F),
+    activateFill = Color(0xFF6DDCFF),
+    pillBorder = Color(0xFF2B4B63),
+    chipOnFill = Color(0xFF16405C),
+    chipOnBorder = Color(0xFF6DDCFF),
+    chipOnLabel = Color(0xFFE5E0EE),
+    chipOffFill = Color(0xFF09121F),
+    chipOffLabel = Color(0xFFA5BBCE),
+    channelOnFill = Color(0xFF16405C),
+    channelOnLabel = Color(0xFF6DDCFF),
+    channelOffLabel = Color(0xFFA5BBCE),
+    hero = R.drawable.rs_setup_campaign,
+    mode = "Marketing",
+    title = title,
+    badge = badge,
+    basicsLine = basicsLine,
+    nameHint = "Campaign name",
+    descriptionHint = "Everyday notes about this campaign",
+    locationHint = "Where this campaign runs",
+    ownerAccess = "Full campaign access. Only the owner changes roles.",
+    leadTitle = "Campaign lead",
+    leadBody = "Runs day-to-day campaign work. Does not see full money records unless you allow it.",
+    peopleNote = "You can start on your own. A campaign lead and finance person are optional.",
+    channelPrompt = "Where does this campaign run? Choose at least one.",
+    channels = channels,
+    activate = "Activate campaign",
+    footer = "This stays private to your business. Only the owner can change who has access. Nothing is counted until the campaign is active.",
+    reviewKind = reviewKind,
+    partySection = "Network / Counterparties",
+    partyKinds = partyKinds,
+    steps = "4 steps · One simple setup",
+    intro = intro,
+    partyNote = partyNote,
+    channelHelp = "These are the places this campaign runs. They are not a different kind of business.",
+    targetNote = "Accepted results count toward the target. Money collected does not. Spend and vendor costs count once toward the budget.",
+    targetMetrics = targetMetrics,
+)
+
+private fun productionLook(
+    code: String,
+    mint: Boolean,
+    title: String,
+    intro: String,
+    basicsLine: String,
+    partySection: String,
+    partyKinds: List<Pair<String, String>>,
+    partyNote: String,
+    targetMetrics: List<String>,
+    reviewKind: String,
+    steps: String,
+    tradeReach: List<String> = emptyList(),
+) = SetupLook(
+    code = code,
+    bg = if (mint) Color(0xFF071014) else Color(0xFF09121F),
+    card = if (mint) Color(0xFF15262C) else Color(0xFF122235),
+    field = if (mint) Color(0xFF071014) else Color(0xFF09121F),
+    border = if (mint) Color(0xFF345058) else Color(0xFF2B4B63),
+    notice = Color(0xFF15262C).let { if (mint) it else Color(0xFF16405C) },
+    brand = if (mint) Color(0xFF66C7A4) else Color(0xFF6DDCFF),
+    accent = if (mint) Color(0xFF66C7A4) else Color(0xFF6DDCFF),
+    number = if (mint) Color(0xFF66C7A4) else Color(0xFF406582),
+    secondary = if (mint) Color(0xFFAFC1C3) else Color(0xFFA5BBCE),
+    text = if (mint) Color(0xFFEFF5F2) else Color(0xFFE5E0EE),
+    statusFill = if (mint) Color(0xFF15262C) else Color(0xFF16405C),
+    statusInk = if (mint) Color(0xFF66C7A4) else Color(0xFF6DDCFF),
+    draftFill = if (mint) Color(0xFF15262C) else Color(0xFF16405C),
+    draftInk = if (mint) Color(0xFF66C7A4) else Color(0xFF6DDCFF),
+    inviteFill = if (mint) Color(0xFF66C7A4) else Color(0xFF6DDCFF),
+    actionInk = if (mint) Color(0xFF071014) else Color(0xFF09121F),
+    activateFill = if (mint) Color(0xFF66C7A4) else Color(0xFF6DDCFF),
+    pillBorder = if (mint) Color(0xFF345058) else Color(0xFF2B4B63),
+    chipOnFill = if (mint) Color(0xFF15262C) else Color(0xFF16405C),
+    chipOnBorder = if (mint) Color(0xFF66C7A4) else Color(0xFF6DDCFF),
+    chipOnLabel = if (mint) Color(0xFFEFF5F2) else Color(0xFFE5E0EE),
+    chipOffFill = if (mint) Color(0xFF071014) else Color(0xFF09121F),
+    chipOffLabel = if (mint) Color(0xFFAFC1C3) else Color(0xFFA5BBCE),
+    channelOnFill = if (mint) Color(0xFF15262C) else Color(0xFF16405C),
+    channelOnLabel = if (mint) Color(0xFF66C7A4) else Color(0xFF6DDCFF),
+    channelOffLabel = if (mint) Color(0xFFAFC1C3) else Color(0xFFA5BBCE),
+    hero = if (mint) R.drawable.rs_setup_jobwork else R.drawable.rs_setup_standard,
+    mode = "Manufacturing",
+    title = title,
+    badge = "Setup draft · Not active",
+    basicsLine = basicsLine,
+    nameHint = "Factory name",
+    descriptionHint = "Everyday notes about this factory",
+    locationHint = "Factory location",
+    ownerAccess = "Full manufacturing access. Only the owner changes roles.",
+    leadTitle = "Production / Order Lead",
+    leadBody = "Runs day-to-day production. Does not see full money records unless you allow it.",
+    peopleNote = "You can start on your own. A production lead and finance person are optional.",
+    channelPrompt = "Channels are optional.",
+    channels = emptyList(),
+    activate = "Activate Manufacturing Moment",
+    footer = "This stays private to your business. Only the owner can change who has access. Nothing is counted until the manufacturing business is active.",
+    reviewKind = reviewKind,
+    tradeReach = tradeReach,
+    partySection = partySection,
+    partyKinds = partyKinds,
+    steps = steps,
+    intro = intro,
+    partyNote = partyNote,
+    channelHelp = "Channels are optional. They are the places finished goods leave the factory.",
+    targetNote = "Validated sales count toward a revenue target. Money collected does not. Production, orders, and deliveries count only for the measure you choose. Purchases and expenses count once toward the budget.",
+    targetMetrics = targetMetrics,
+    channelsOptional = true,
+)
+
+private fun metricLabel(code: String, metrics: List<String> = emptyList()): String = when (code) {
+    "REVENUE" -> if ("VALUE_DISPATCHED" in metrics) "Sales / Revenue" else "Revenue"
+    "LEADS" -> "Leads"
+    "ORDERS" -> if ("DELIVERY_COUNT" in metrics) "Order count" else "Orders"
+    "CUSTOM_COUNT" -> if ("DELIVERY_COUNT" in metrics) "Compatible units" else "Custom count"
+    "CLIENT_BILLING" -> "Client billing"
+    "PRODUCTION_OUTPUT" -> "Production output"
+    "UNITS_PRODUCED" -> "Units Produced"
+    "VALUE_DISPATCHED" -> "Value Dispatched"
+    "DELIVERY_COUNT" -> "Delivery count"
+    else -> code
+}
+
 private fun setupLook(code: String): SetupLook = when (code) {
+    "CLIENT_CAMPAIGN" -> campaignLook(
+        code = code,
+        title = "Marketing Campaign Setup",
+        badge = "Campaign draft · Not active",
+        intro = "Run a marketing campaign with clear roles, counterparties and measurable targets before you activate.",
+        basicsLine = "A home for this client campaign.",
+        channels = listOf("Social", "Email", "Search", "Influencer", "Events", "Other"),
+        partyKinds = listOf("CLIENT" to "Client contact", "VENDOR" to "Vendor, creator, agency, or platform"),
+        partyNote = "Client identity and optional vendors, creators, agencies, and platforms are separate from invited team roles.",
+        targetMetrics = listOf("REVENUE", "LEADS", "ORDERS", "CUSTOM_COUNT", "CLIENT_BILLING"),
+        reviewKind = "Client Campaign",
+    )
+    "OWN_BUSINESS_CAMPAIGN" -> campaignLook(
+        code = code,
+        title = "Own Business Campaign Setup",
+        badge = "Draft · Not active",
+        intro = "You run campaigns for your own business or brand",
+        basicsLine = "A home for this brand campaign.",
+        channels = listOf("Instagram", "Google Search", "Email", "Influencer", "Events", "Other"),
+        partyKinds = listOf("VENDOR" to "Vendor, creator, agency, or platform"),
+        partyNote = "Vendors, creators, agencies and platforms are separate from invited team roles. No client is required.",
+        targetMetrics = listOf("REVENUE", "LEADS", "ORDERS", "CUSTOM_COUNT"),
+        reviewKind = "Own Business Campaign",
+    )
+    "STANDARD_PRODUCTION" -> productionLook(
+        code = code,
+        mint = false,
+        title = "Standard Production Setup",
+        intro = "Set up your manufacturing business, people, suppliers, buyers and monthly plan before activation.",
+        basicsLine = "A home for this factory.",
+        partySection = "Material Suppliers & Buyers",
+        partyKinds = listOf("SUPPLIER" to "Material supplier", "BUYER" to "Buyer or group"),
+        partyNote = "Material suppliers and buyers are optional. Counterparties stay separate from invited team roles.",
+        targetMetrics = listOf("REVENUE", "PRODUCTION_OUTPUT", "UNITS_PRODUCED", "VALUE_DISPATCHED"),
+        reviewKind = "Standard Production",
+        steps = "4 steps · Factory, people, suppliers, buyers and monthly plan",
+    )
+    "MADE_TO_ORDER" -> productionLook(
+        code = code,
+        mint = true,
+        title = "Made-to-Order Production Setup",
+        intro = "Set up your job-work business, people, suppliers, customers and monthly plan.",
+        basicsLine = "A home for this workshop.",
+        partySection = "Material Suppliers & Customers",
+        partyKinds = listOf("SUPPLIER" to "Material supplier", "CUSTOMER" to "Customer"),
+        partyNote = "Material suppliers and customers are optional. They are counterparties, not people who can sign in.",
+        targetMetrics = listOf("REVENUE", "ORDERS", "DELIVERY_COUNT", "PRODUCTION_OUTPUT", "CUSTOM_COUNT"),
+        reviewKind = "Made-to-Order Production",
+        steps = "4 steps · Factory, people, suppliers, customers and monthly plan",
+        tradeReach = listOf("Local", "Domestic", "International"),
+    )
+    "TRADING_WHOLESALE" -> SetupLook(
+        code = code,
+        bg = Color(0xFF09121F),
+        card = Color(0xFF122235),
+        field = Color(0xFF09121F),
+        border = Color(0xFF2B4B63),
+        notice = Color(0xFF16405C),
+        brand = Color(0xFF6DDCFF),
+        accent = Color(0xFF6DDCFF),
+        number = Color(0xFF406582),
+        secondary = Color(0xFFA5BBCE),
+        text = Color(0xFFE5E0EE),
+        statusFill = Color(0xFF16405C),
+        statusInk = Color(0xFF6DDCFF),
+        draftFill = Color(0xFF16405C),
+        draftInk = Color(0xFF6DDCFF),
+        inviteFill = Color(0xFF6DDCFF),
+        actionInk = Color(0xFF09121F),
+        activateFill = Color(0xFF6DDCFF),
+        pillBorder = Color(0xFF2B4B63),
+        chipOnFill = Color(0xFF16405C),
+        chipOnBorder = Color(0xFF6DDCFF),
+        chipOnLabel = Color(0xFFE5E0EE),
+        chipOffFill = Color(0xFF09121F),
+        chipOffLabel = Color(0xFFA5BBCE),
+        channelOnFill = Color(0xFF16405C),
+        channelOnLabel = Color(0xFF6DDCFF),
+        channelOffLabel = Color(0xFFA5BBCE),
+        hero = R.drawable.rs_setup_trading,
+        mode = "Trading",
+        title = "Trading / Wholesale Setup",
+        badge = "Not started yet",
+        basicsLine = "A home for this trading business.",
+        nameHint = "Business name",
+        descriptionHint = "Everyday notes about this trade",
+        locationHint = "Warehouse or business location",
+        ownerAccess = "Full trading business access. Only the owner changes roles.",
+        leadTitle = "Trading manager",
+        leadBody = "Runs day-to-day work. Does not see full money records unless you allow it.",
+        peopleNote = "You can start on your own. You can invite people after this starts.",
+        channelPrompt = "Where do you sell? Choose at least one.",
+        channels = listOf("Wholesale", "Direct", "Dealer", "Marketplace", "Export", "Other"),
+        activate = "Activate trading moment",
+        footer = "This stays private to your business. Only the owner can change who has access. Nothing is counted until you start.",
+        reviewKind = "Trading / Wholesale",
+        tradeReach = listOf("Local", "Domestic", "International"),
+        partySection = "Suppliers, Buyers & Channels",
+        partyKinds = listOf("SUPPLIER" to "Supplier", "BUYER" to "Buyer"),
+        steps = "4 steps · One simple setup",
+        intro = "Bring your business, people and monthly plan together. Make it yours before you activate.",
+    )
+    "DISTRIBUTION_DEALERSHIP" -> SetupLook(
+        code = code,
+        bg = Color(0xFF071014),
+        card = Color(0xFF0C171B),
+        field = Color(0xFF0C171B),
+        border = Color(0xFF345058),
+        notice = Color(0xFF15262C),
+        brand = Color(0xFF66C7A4),
+        accent = Color(0xFF66C7A4),
+        number = Color(0xFF66C7A4),
+        secondary = Color(0xFF66C7A4),
+        text = Color(0xFFEFF5F2),
+        statusFill = Color(0xFF15262C),
+        statusInk = Color(0xFF66C7A4),
+        draftFill = Color(0xFF15262C),
+        draftInk = Color(0xFF66C7A4),
+        inviteFill = Color(0xFF66C7A4),
+        actionInk = Color(0xFF071014),
+        activateFill = Color(0xFF66C7A4),
+        pillBorder = Color(0xFF345058),
+        chipOnFill = Color(0xFF15262C),
+        chipOnBorder = Color(0xFF66C7A4),
+        chipOnLabel = Color(0xFFEFF5F2),
+        chipOffFill = Color(0xFF0C171B),
+        chipOffLabel = Color(0xFF66C7A4),
+        channelOnFill = Color(0xFF15262C),
+        channelOnLabel = Color(0xFF66C7A4),
+        channelOffLabel = Color(0xFF66C7A4),
+        hero = R.drawable.rs_setup_distribution,
+        mode = "Distribution",
+        title = "Distribution / Dealership Setup",
+        badge = "Not started yet",
+        basicsLine = "A home for this distribution business.",
+        nameHint = "Business name",
+        descriptionHint = "Everyday notes about this distribution",
+        locationHint = "Depot or service territory",
+        ownerAccess = "Full distribution business access. Only the owner changes roles.",
+        leadTitle = "Distribution manager",
+        leadBody = "Operations lead. Does not see full money records unless you allow it.",
+        peopleNote = "You can start on your own. A distribution manager and finance person are optional.",
+        channelPrompt = "Where do you sell? Choose at least one.",
+        channels = listOf("Retailer", "Dealer", "Sub-distributor", "Institutional", "Direct", "Other"),
+        activate = "Activate distribution moment",
+        footer = "This stays private to your business. Only the owner can change who has access. Nothing is counted until the distribution business is active.",
+        reviewKind = "Distribution / Dealership",
+        tradeReach = listOf("Local", "Domestic", "International"),
+        partySection = "Principals & Counterparties",
+        partyKinds = listOf("PRINCIPAL" to "Principal or supplier", "DEALER" to "Dealer or buyer group"),
+        steps = "4 steps · One simple setup",
+        intro = "Bring your business, people and key counterparties together. Make it yours before you activate.",
+    )
     "RESTAURANT_FOOD" -> SetupLook(
         code = code,
         bg = Color(0xFF101412),
@@ -330,17 +642,23 @@ fun RetailStoreSetup(
     var policy by remember { mutableStateOf("NONE") }
     var policyOpen by remember { mutableStateOf(false) }
     var selectedChannels by remember { mutableStateOf(setOf<String>()) }
+    var tradeReach by remember { mutableStateOf(setOf<String>()) }
+    var parties by remember { mutableStateOf(listOf<Pair<String, String>>()) }
+    var partyName by remember { mutableStateOf("") }
+    var partyKind by remember { mutableStateOf("SUPPLIER") }
+    val look = setupLook(subtype.code)
     var budget by remember { mutableStateOf("") }
     var target by remember { mutableStateOf("") }
+    var metric by remember { mutableStateOf(subtype.targetMetrics.firstOrNull() ?: "REVENUE") }
+    var metricOpen by remember { mutableStateOf(false) }
     var localError by remember { mutableStateOf<String?>(null) }
     val needsApprover = policy == "APPROVAL_REQUIRED" && invites.none { it.role == "APPROVER" }
     val ready = name.isNotBlank() &&
         companyName.isNotBlank() &&
-        selectedChannels.isNotEmpty() &&
+        (look.channelsOptional || selectedChannels.isNotEmpty()) &&
         budget.toDoubleOrNull()?.let { it > 0 } == true &&
         target.toDoubleOrNull()?.let { it > 0 } == true &&
         !needsApprover
-    val look = setupLook(subtype.code)
     LaunchedEffect(name) {
         if (!companyEdited) companyName = name
     }
@@ -354,6 +672,11 @@ fun RetailStoreSetup(
     }
     LaunchedEffect(subtype.code) {
         selectedChannels = selectedChannels.intersect(look.channels.toSet())
+        tradeReach = tradeReach.intersect(look.tradeReach.toSet())
+        if (look.partyKinds.none { it.first == partyKind }) {
+            partyKind = look.partyKinds.firstOrNull()?.first ?: "SUPPLIER"
+        }
+        if (metric !in look.targetMetrics) metric = look.targetMetrics.firstOrNull() ?: "REVENUE"
     }
 
     CompositionLocalProvider(LocalLook provides look) {
@@ -376,14 +699,14 @@ fun RetailStoreSetup(
             BoxEmblem()
             Text(look.title, color = Ink, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 32.sp, lineHeight = 40.sp, textAlign = TextAlign.Center)
             Text(
-                "Bring your business, people, and monthly plan together before you start.",
+                look.intro,
                 color = Secondary,
                 fontFamily = PlusJakartaSans,
                 fontSize = 14.sp,
                 lineHeight = 22.sp,
                 textAlign = TextAlign.Center,
             )
-            Pill("Not started yet", DraftFill, DraftInk)
+            Pill(look.badge, DraftFill, DraftInk)
         }
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Card).border(1.dp, Border, RoundedCornerShape(18.dp)).padding(12.dp),
@@ -412,7 +735,7 @@ fun RetailStoreSetup(
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("3 steps · One simple setup", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
+            Text(look.steps, color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
             SetupIcon(R.drawable.rs_setup_arrow_down, 16.dp)
         }
         Pill(look.badge, DraftFill, DraftInk)
@@ -435,7 +758,47 @@ fun RetailStoreSetup(
             ChoiceRow("Start date", start.format(dayFormat), R.drawable.rs_setup_calendar) { dateOpen = true }
             FieldEditor("Description", description, look.descriptionHint, R.drawable.rs_setup_pencil) { description = it }
             FieldEditor("Location", location, look.locationHint, R.drawable.rs_setup_pin) { location = it }
+            if (look.tradeReach.isNotEmpty()) {
+                Text("Trade reach", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    look.tradeReach.forEach { reach ->
+                        val on = reach in tradeReach
+                        Text(
+                            if (on) "✓ $reach" else reach,
+                            color = if (on) look.channelOnLabel else look.channelOffLabel,
+                            fontFamily = PlusJakartaSans,
+                            fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                            fontSize = 11.sp,
+                            modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (on) look.channelOnFill else Color.Transparent).border(1.dp, if (on) look.chipOnBorder else Border, RoundedCornerShape(8.dp)).clickable {
+                                tradeReach = if (on) tradeReach - reach else tradeReach + reach
+                            }.padding(horizontal = 10.dp, vertical = 6.dp),
+                        )
+                    }
+                }
+            }
             Text("You can fill in the extra details later.", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp, lineHeight = 18.sp)
+        }
+        if (look.partySection.isNotBlank()) {
+            SectionCard("03", look.partySection) {
+                Text(look.partyNote, color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp, lineHeight = 18.sp)
+                parties.forEach { (kind, label) ->
+                    Text("$label · ${look.partyKinds.firstOrNull { it.first == kind }?.second ?: kind}", color = Ink, fontFamily = PlusJakartaSans, fontSize = 14.sp)
+                }
+                FieldEditor("Name", partyName, "Counterparty name", R.drawable.rs_setup_pencil) { partyName = it }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    look.partyKinds.forEach { (code, label) ->
+                        val on = code == partyKind
+                        Text(label, color = if (on) look.channelOnLabel else look.channelOffLabel, fontFamily = PlusJakartaSans, fontSize = 11.sp, modifier = Modifier.clip(RoundedCornerShape(999.dp)).background(if (on) look.channelOnFill else Color.Transparent).border(1.dp, if (on) look.chipOnBorder else Border, RoundedCornerShape(999.dp)).clickable { partyKind = code }.padding(horizontal = 10.dp, vertical = 6.dp))
+                    }
+                }
+                Text("Add", color = Ink, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable {
+                    val trimmed = partyName.trim()
+                    if (trimmed.isNotEmpty()) {
+                        parties = parties + (partyKind to trimmed)
+                        partyName = ""
+                    }
+                })
+            }
         }
         SectionCard("02", "People & Roles") {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -508,7 +871,7 @@ fun RetailStoreSetup(
             }
             Text("Only the owner can change who has access.", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp, lineHeight = 18.sp)
         }
-        SectionCard("03", "Channels & Monthly Plan") {
+        SectionCard(if (look.partySection.isBlank()) "03" else "04", "Channels & Monthly Plan") {
             Text(look.channelPrompt, color = Ink, fontFamily = PlusJakartaSans, fontSize = 14.sp, lineHeight = 22.sp)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 channels.forEach { channel ->
@@ -526,7 +889,11 @@ fun RetailStoreSetup(
                 }
             }
             Text(
-                if (selectedChannels.isEmpty()) "Choose at least one." else "${selectedChannels.size} selected. These are the places you sell or serve. They are not a different kind of business.",
+                when {
+                    look.channelsOptional && selectedChannels.isEmpty() -> look.channelHelp
+                    selectedChannels.isEmpty() -> "Choose at least one."
+                    else -> "${selectedChannels.size} selected. ${look.channelHelp}"
+                },
                 color = Secondary,
                 fontFamily = PlusJakartaSans,
                 fontSize = 12.sp,
@@ -534,9 +901,17 @@ fun RetailStoreSetup(
             ChoiceRow("Month", start.format(monthFormat), R.drawable.rs_setup_calendar) { dateOpen = true }
             FieldEditor("Monthly budget", budget, "Amount", R.drawable.rs_setup_pencil) { budget = it.filter { ch -> ch.isDigit() || ch == '.' } }
             FieldEditor("Monthly sales target", target, "Amount", R.drawable.rs_setup_pencil) { target = it.filter { ch -> ch.isDigit() || ch == '.' } }
+            if (look.targetMetrics.size > 1) {
+                ChoiceRow("How the target is measured", metricLabel(metric, look.targetMetrics), R.drawable.rs_setup_chevron) { metricOpen = !metricOpen }
+                if (metricOpen) {
+                    look.targetMetrics.forEach { code ->
+                        Text(metricLabel(code, look.targetMetrics), color = if (code == metric) Accent else Ink, fontFamily = PlusJakartaSans, fontSize = 14.sp, modifier = Modifier.clickable { metric = code; metricOpen = false }.padding(vertical = 6.dp))
+                    }
+                }
+            }
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Selected).padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("How your target is counted", color = Accent, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                Text("Sales you record count toward the target. Money already collected does not. Purchases and expenses count once toward the budget.", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp, lineHeight = 18.sp)
+                Text(look.targetNote, color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp, lineHeight = 18.sp)
             }
             if (ready) Pill("Budget and sales target look good", SuccessBg, Success)
         }
@@ -548,10 +923,13 @@ fun RetailStoreSetup(
             }
             ReviewLine("Company", companyName.ifBlank { "Not set" })
             ReviewLine("GSTIN", gstin.ifBlank { "Not added" })
+            if (tradeReach.isNotEmpty()) ReviewLine("Trade reach", tradeReach.joinToString())
+            if (parties.isNotEmpty()) ReviewLine("Counterparties", parties.joinToString { it.second })
             ReviewLine("People", (listOf("$owner · Owner") + invites.map { "${it.name} · ${roleLabel(it.role)}" }).joinToString(", "))
             Text("Sales channels · ${selectedChannels.joinToString().ifBlank { "None yet" }}", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
             ReviewLine("${start.format(monthFormat)} budget", money(currency, budget))
             ReviewLine("${start.format(monthFormat)} sales target", money(currency, target))
+            if (look.targetMetrics.size > 1) ReviewLine("Target measure", metricLabel(metric, look.targetMetrics))
         }
         if (ready) {
             Pill("Ready to start", SuccessBg, Success)
@@ -570,7 +948,7 @@ fun RetailStoreSetup(
                     val problem = when {
                         name.isBlank() -> "Add a name."
                         companyName.isBlank() -> "Add a company name."
-                        selectedChannels.isEmpty() -> "Choose at least one."
+                        !look.channelsOptional && selectedChannels.isEmpty() -> "Choose at least one."
                         budget.toDoubleOrNull()?.let { it > 0 } != true -> "Enter a monthly budget above zero."
                         target.toDoubleOrNull()?.let { it > 0 } != true -> "Enter a monthly sales target above zero."
                         needsApprover -> "Add someone who can approve, or choose no approval needed."
@@ -590,11 +968,12 @@ fun RetailStoreSetup(
                             "location" to location.trim(),
                             "activationPolicy" to policy,
                             "participants" to invites.map { mapOf("displayName" to it.name, "role" to it.role) },
-                            "counterparties" to emptyList<Map<String, String>>(),
+                            "counterparties" to parties.map { mapOf("name" to it.second, "kind" to it.first) },
                             "channels" to selectedChannels.toList(),
+                            "tradeReach" to tradeReach.toList(),
                             "monthlyBudget" to budget.trim(),
                             "monthlyTarget" to target.trim(),
-                            "targetMetric" to "REVENUE",
+                            "targetMetric" to metric,
                             "companyName" to companyName.trim(),
                             "gstin" to gstin.trim(),
                         ),
@@ -729,6 +1108,11 @@ private fun SetupIcon(res: Int, size: Dp) {
 private fun modelIcon(code: String): Int = when (code) {
     "RESTAURANT_FOOD" -> R.drawable.rs_setup_utensils
     "CONSUMER_SERVICE" -> R.drawable.rs_setup_handshake
+    "TRADING_WHOLESALE" -> R.drawable.rs_setup_trading
+    "DISTRIBUTION_DEALERSHIP" -> R.drawable.rs_setup_distribution
+    "CLIENT_CAMPAIGN", "OWN_BUSINESS_CAMPAIGN" -> R.drawable.rs_setup_campaign
+    "STANDARD_PRODUCTION" -> R.drawable.rs_setup_standard
+    "MADE_TO_ORDER" -> R.drawable.rs_setup_jobwork
     else -> R.drawable.rs_setup_store_chip
 }
 

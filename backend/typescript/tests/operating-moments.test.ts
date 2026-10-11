@@ -63,8 +63,10 @@ describe('operating moment catalog', () => {
     assert.equal(finance.budget?.spent, '2500.0000');
     assert.equal(finance.budget?.remaining, '7500.0000');
     assert.equal(finance.paymentReadiness.length, 1);
-    assert.equal(staff.boards.moments.find((section) => section.code === 'spend')?.rows[0]?.amount, null);
-    assert.equal(finance.boards.moments.find((section) => section.code === 'spend')?.rows[0]?.amount, '2500.0000');
+    assert.equal(staff.boards.life.find((section) => section.code === 'L3')?.rows[0]?.amount, null);
+    assert.equal(finance.boards.life.find((section) => section.code === 'L3')?.rows[0]?.amount, '2500.0000');
+    assert.equal(staff.boards.memory.find((section) => section.code === 'ME2')?.rows[0]?.amount, null);
+    assert.equal(finance.boards.memory.find((section) => section.code === 'ME2')?.rows[0]?.amount, '2500.0000');
     assert.equal(staff.quickAdds.some((q) => q.code === 'PAYMENT'), false);
     assert.equal(finance.quickAdds.some((q) => q.code === 'PAYMENT'), true);
   });
@@ -192,7 +194,7 @@ describe('operating moment catalog', () => {
     ];
     const finance = projectOperatingMoment({ familyCode: 'RETAIL_CONSUMER', prefs, role: 'FINANCE', events });
     const staff = projectOperatingMoment({ familyCode: 'RETAIL_CONSUMER', prefs, role: 'TEAM_MEMBER', events });
-    const sale = finance.boards.moments.find((section) => section.code === 'sales')?.rows[0];
+    const sale = finance.boards.life.find((section) => section.code === 'L3')?.rows[0];
     assert.equal(sale?.channelName, 'Store');
     assert.equal(sale?.amount, '1800.0000');
     assert.equal(finance.finance?.sales, '1800.0000');
@@ -200,7 +202,7 @@ describe('operating moment catalog', () => {
     assert.equal(finance.attention.some((item) => item.id === 'issue-1' && item.kind === 'APPROVAL'), true);
     assert.equal(staff.finance, null);
     assert.equal(staff.activity.find((row) => row.id === 'sale-1')?.amount, null);
-    assert.equal(staff.boards.moments.find((section) => section.code === 'sales')?.rows[0]?.amount, null);
+    assert.equal(staff.boards.life.find((section) => section.code === 'L3')?.rows[0]?.amount, null);
   });
 
   it('counts a recorded service in sales and a collected service in received', () => {
@@ -256,7 +258,7 @@ describe('operating moment catalog', () => {
     assert.equal(finance.finance?.sales, '1300.0000');
     assert.equal(finance.finance?.received, '900.0000');
     assert.equal(finance.target?.progress, '1300.0000');
-    assert.equal(finance.boards.moments.find((section) => section.code === 'services')?.rows.length, 2);
+    assert.equal(finance.boards.life.find((section) => section.code === 'L4')?.rows.length, 2);
     assert.equal(finance.boards.moments.some((section) => section.code === 'purchases'), false);
   });
 
@@ -277,6 +279,179 @@ describe('operating moment catalog', () => {
         ),
       /Monthly budget/
     );
+  });
+
+  it('keeps trade reach and shows a trading shipment on the dispatches board', () => {
+    const prefs = normalizeOperatingPreferences(
+      'TRADING_DISTRIBUTION',
+      {
+        subtype: 'TRADING_WHOLESALE',
+        identityName: 'Trade',
+        partyName: 'Trade',
+        monthlyBudget: '5000',
+        monthlyTarget: '12000',
+        targetMetric: 'REVENUE',
+        channels: ['Wholesale'],
+        tradeReach: ['Domestic', 'Moon', 'Domestic'],
+        counterparties: [{ name: 'Harbor', kind: 'BUYER' }],
+      },
+      { userId: 'u', displayName: 'Asha' }
+    );
+    assert.deepEqual(prefs.tradeReach, ['Domestic']);
+    const events: OperatingEventRow[] = [
+      {
+        operatingEventId: 'ship-1',
+        eventType: 'SHIPMENT',
+        title: 'Dispatch',
+        note: null,
+        amount: null,
+        currencyCode: 'INR',
+        counterpartyName: null,
+        channelName: 'Wholesale',
+        paymentRelevance: 'NONE',
+        paymentStatus: 'NONE',
+        approvalStatus: 'NONE',
+        submittedByUserId: 'u',
+        decidedByUserId: null,
+        occurredAt: '2026-10-04T00:00:00.000Z',
+      },
+    ];
+    const view = projectOperatingMoment({ familyCode: 'TRADING_DISTRIBUTION', prefs, role: 'OWNER_ADMIN', events });
+    assert.equal(view.quickAdds.some((item) => item.code === 'SHIPMENT'), true);
+    const dispatches = view.boards.moments.find((section) => section.code === 'M4');
+    assert.equal(dispatches?.title, 'Open Commitments');
+    assert.equal(dispatches?.rows.length, 1);
+    assert.equal(dispatches?.rows[0]?.title, 'Dispatch');
+  });
+
+  it('counts only campaign results toward the marketing target and offers collection on an own-business campaign', () => {
+    const prefs = normalizeOperatingPreferences(
+      'MARKETING_CAMPAIGNS',
+      {
+        subtype: 'CLIENT_CAMPAIGN',
+        identityName: 'Launch',
+        partyName: 'Client',
+        channels: ['Email'],
+        monthlyBudget: '8000',
+        monthlyTarget: '1000',
+        targetMetric: 'REVENUE',
+      },
+      { userId: 'u', displayName: 'Asha' }
+    );
+    const events: OperatingEventRow[] = [
+      {
+        operatingEventId: 'result-1',
+        eventType: 'RESULT',
+        title: 'Accepted result',
+        note: null,
+        amount: '100.0000',
+        currencyCode: 'INR',
+        counterpartyName: null,
+        channelName: 'Email',
+        paymentRelevance: 'NONE',
+        paymentStatus: 'NONE',
+        approvalStatus: 'NONE',
+        submittedByUserId: 'u',
+        decidedByUserId: null,
+        occurredAt: '2026-10-04T00:00:00.000Z',
+      },
+      {
+        operatingEventId: 'collect-1',
+        eventType: 'COLLECTION',
+        title: 'Cash received',
+        note: null,
+        amount: '50.0000',
+        currencyCode: 'INR',
+        counterpartyName: null,
+        channelName: 'Email',
+        paymentRelevance: 'COLLECT',
+        paymentStatus: 'COLLECTED',
+        approvalStatus: 'NONE',
+        submittedByUserId: 'u',
+        decidedByUserId: null,
+        occurredAt: '2026-10-05T00:00:00.000Z',
+      },
+    ];
+    const view = projectOperatingMoment({ familyCode: 'MARKETING_CAMPAIGNS', prefs, role: 'OWNER_ADMIN', events });
+    assert.equal(view.target?.progress, '100.0000');
+    assert.notEqual(view.finance.sales, '100.0000');
+    const own = normalizeOperatingPreferences(
+      'MARKETING_CAMPAIGNS',
+      {
+        subtype: 'OWN_BUSINESS_CAMPAIGN',
+        identityName: 'Brand',
+        partyName: 'Brand',
+        channels: ['Instagram'],
+        monthlyBudget: '8000',
+        monthlyTarget: '1000',
+        targetMetric: 'REVENUE',
+      },
+      { userId: 'u', displayName: 'Asha' }
+    );
+    const ownView = projectOperatingMoment({ familyCode: 'MARKETING_CAMPAIGNS', prefs: own, role: 'OWNER_ADMIN', events: [] });
+    assert.equal(ownView.quickAdds.some((item) => item.code === 'COLLECTION'), true);
+  });
+
+  it('counts manufacturing progress from the selected metric and keeps collections out of revenue', () => {
+    const row = (id: string, eventType: string, amount: string): OperatingEventRow => ({
+      operatingEventId: id,
+      eventType,
+      title: eventType,
+      note: null,
+      amount,
+      currencyCode: 'INR',
+      counterpartyName: null,
+      channelName: null,
+      paymentRelevance: 'NONE',
+      paymentStatus: 'NONE',
+      approvalStatus: 'NONE',
+      submittedByUserId: 'u',
+      decidedByUserId: null,
+      occurredAt: '2026-10-04T00:00:00.000Z',
+    });
+    const base = {
+      subtype: 'STANDARD_PRODUCTION',
+      identityName: 'Factory',
+      partyName: 'Plant',
+      monthlyBudget: '8000',
+      monthlyTarget: '1000',
+      targetMetric: 'REVENUE',
+    };
+    const events = [row('sale', 'SALE', '100.0000'), row('collect', 'COLLECTION', '50.0000'), row('made', 'PRODUCTION', '40.0000')];
+    const revenue = normalizeOperatingPreferences('MANUFACTURING_PRODUCTION', base, { userId: 'u', displayName: 'Asha' });
+    const revenueView = projectOperatingMoment({ familyCode: 'MANUFACTURING_PRODUCTION', prefs: revenue, role: 'OWNER_ADMIN', events });
+    assert.equal(revenueView.target?.progress, '100.0000');
+    assert.equal(revenueView.finance.sales, '100.0000');
+    const output = normalizeOperatingPreferences(
+      'MANUFACTURING_PRODUCTION',
+      { ...base, targetMetric: 'PRODUCTION_OUTPUT' },
+      { userId: 'u', displayName: 'Asha' }
+    );
+    const outputView = projectOperatingMoment({ familyCode: 'MANUFACTURING_PRODUCTION', prefs: output, role: 'OWNER_ADMIN', events });
+    assert.equal(outputView.target?.progress, '40.0000');
+    assert.equal(outputView.finance.sales, '100.0000');
+    assert.equal(revenueView.quickAdds.some((item) => item.code === 'CUSTOMER_ORDER'), true);
+    assert.equal(revenueView.quickAdds.some((item) => item.code === 'STOCK'), true);
+    const orders = normalizeOperatingPreferences(
+      'MANUFACTURING_PRODUCTION',
+      {
+        subtype: 'MADE_TO_ORDER',
+        identityName: 'Workshop',
+        partyName: 'Workshop',
+        monthlyBudget: '8000',
+        monthlyTarget: '10',
+        targetMetric: 'ORDERS',
+      },
+      { userId: 'u', displayName: 'Asha' }
+    );
+    const orderView = projectOperatingMoment({
+      familyCode: 'MANUFACTURING_PRODUCTION',
+      prefs: orders,
+      role: 'OWNER_ADMIN',
+      events: [row('order', 'CUSTOMER_ORDER', '250.0000')],
+    });
+    assert.equal(orderView.target?.progress, '1.0000');
+    assert.equal(orderView.quickAdds.some((item) => item.code === 'STOCK'), true);
   });
 
   it('rejects a client campaign without a channel', () => {

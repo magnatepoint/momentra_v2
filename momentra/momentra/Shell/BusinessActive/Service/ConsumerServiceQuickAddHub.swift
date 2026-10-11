@@ -27,35 +27,48 @@ struct ServiceQuickAddHub: View {
                 Text("Capture a service, a cost, or a note while it is still clear.")
                     .font(.plusJakarta(size: 13)).foregroundStyle(ServiceChrome.secondary)
                 if allowed.contains("SERVICE") {
-                    Button("+ Record Service") { sheet = .service }
-                        .font(.plusJakarta(size: 14, weight: .semibold))
-                        .foregroundStyle(ServiceChrome.bg)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(ServiceChrome.brand)
-                        .clipShape(Capsule())
+                    Button { sheet = .service } label: {
+                        HStack(spacing: 6) {
+                            Image("qa_plus").renderingMode(.template).resizable().scaledToFit().frame(width: 14, height: 14)
+                            Text("Record Service")
+                        }
+                    }
+                    .font(.plusJakarta(size: 14, weight: .semibold))
+                    .foregroundStyle(ServiceChrome.bg)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(ServiceChrome.brand)
+                    .clipShape(Capsule())
                 }
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(ServiceChrome.notice)
             .clipShape(RoundedRectangle(cornerRadius: 18))
-            TextField("Search actions", text: $query)
-                .font(.plusJakarta(size: 14))
-                .padding(14)
-                .background(ServiceChrome.field)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+            HStack(spacing: 10) {
+                Image("qa_search").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
+                    .foregroundStyle(ServiceChrome.secondary)
+                TextField("Search actions", text: $query).font(.plusJakarta(size: 14))
+            }
+            .padding(14)
+            .background(ServiceChrome.field)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
             let core = ServiceSheetKind.core.filter { allowed.contains($0.eventType) && matches($0.label) }
             Text("Core actions · \(core.count)").font(.plusJakarta(size: 12)).foregroundStyle(ServiceChrome.secondary)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 ForEach(core) { kind in
-                    Button(kind.label) { sheet = kind }
-                        .font(.plusJakarta(size: 13, weight: .semibold))
+                    Button { sheet = kind } label: {
+                        VStack(spacing: 8) {
+                            Image(kind.icon).renderingMode(.template).resizable().scaledToFit().frame(width: 28, height: 28)
+                            Text(kind.label).font(.plusJakarta(size: 13, weight: .semibold)).multilineTextAlignment(.center)
+                        }
                         .foregroundStyle(ServiceChrome.ink)
-                        .frame(maxWidth: .infinity, minHeight: 72)
+                        .frame(maxWidth: .infinity, minHeight: 104)
+                        .padding(12)
                         .background(ServiceChrome.card)
                         .overlay(RoundedRectangle(cornerRadius: 14).stroke(ServiceChrome.border, lineWidth: 1))
                         .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
                 }
             }
             Text("Support & management").font(.plusJakarta(size: 12)).foregroundStyle(ServiceChrome.secondary)
@@ -87,14 +100,17 @@ struct ServiceQuickAddHub: View {
                     if item.0 == "Approval review", item.2 == nil { approvalOpen = true }
                     else if let kind = item.1, item.2 == nil { sheet = kind }
                 } label: {
-                    VStack(spacing: 4) {
-                        Text(item.0).font(.plusJakarta(size: 12, weight: .semibold))
+                    VStack(spacing: 8) {
+                        Image(item.0 == "Approval review" ? "qa_shield" : (item.1?.icon ?? "qa_shield"))
+                            .renderingMode(.template).resizable().scaledToFit().frame(width: 28, height: 28)
+                        Text(item.0).font(.plusJakarta(size: 12, weight: .semibold)).multilineTextAlignment(.center)
                         if let lock = item.2 {
                             Text(lock).font(.plusJakarta(size: 10))
                         }
                     }
                     .foregroundStyle(item.2 == nil ? ServiceChrome.ink : ServiceChrome.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 72)
+                    .frame(maxWidth: .infinity, minHeight: 104)
+                    .padding(12)
                     .background(ServiceChrome.card)
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(ServiceChrome.border, lineWidth: 1))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -139,6 +155,23 @@ enum ServiceSheetKind: String, Identifiable {
         case .role: return "Role & access"
         case .invite: return "Invite & QR"
         case .supplier: return "Add Supplier"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .service: return "rs_setup_service"
+        case .appointment: return "qa_calendar"
+        case .sale, .spend: return "qa_receipt"
+        case .payment: return "qa_credit_card"
+        case .collection: return "qa_arrow_left_right"
+        case .budget: return "qa_budget"
+        case .update: return "qa_message"
+        case .issue: return "qa_alert"
+        case .reimburse: return "qa_wallet"
+        case .person: return "qa_user_plus"
+        case .role: return "qa_users"
+        case .invite: return "qa_qr"
+        case .supplier: return "qa_network"
         }
     }
     var title: String {

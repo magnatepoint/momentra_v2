@@ -38,8 +38,8 @@ export interface LifeExpenseFact {
   currencyCode: string;
   merchantName: string | null;
   note: string | null;
-  areaCode: string;
-  subcategoryCode: string;
+  areaCode: string | null;
+  subcategoryCode: string | null;
   moodCode: string | null;
   classificationSource: string | null;
   effectiveAt: string;
@@ -324,6 +324,40 @@ interface NetExpense extends LifeExpenseFact {
   net: number;
 }
 
+function hasLifeContext(row: NetExpense): row is ClassifiedExpense {
+  return Boolean(row.areaCode && row.subcategoryCode);
+}
+
+function attentionState(classifiedCount: number, inferred: number, missingContext: number) {
+  const issueCount = inferred + missingContext;
+  if (issueCount === 0) {
+    return {
+      quiet: true,
+      issueCount: 0,
+      message: 'Nothing waiting for review.',
+      title: `All ${classifiedCount} classified. You're clear.`,
+      body: 'Every expense has a Life Area and subcategory. No issues to review.',
+    };
+  }
+  if (missingContext === 0) {
+    return {
+      quiet: false,
+      issueCount,
+      message: `${inferred} expenses need a life context.`,
+      title: `${inferred} need a life context.`,
+      body: `${inferred} expenses need a Life Area and subcategory.`,
+    };
+  }
+  const review = inferred > 0 ? ` ${inferred} more need review.` : '';
+  return {
+    quiet: false,
+    issueCount,
+    message: `${missingContext} expenses need a Life Area.${review}`,
+    title: `${missingContext} need a Life Area.`,
+    body: `${missingContext} expenses have no Life Area or subcategory.${review}`,
+  };
+}
+
 function economicExpenses(facts: LifeExpenseFact[], currency: string | null): NetExpense[] {
   const posted = facts.filter((f) => f.status === 'POSTED' && (currency == null || f.currencyCode === currency));
   const refunds = posted.filter((f) => f.economicKind === 'REFUND' && f.reversedExpenseId);
@@ -354,14 +388,16 @@ function pickCurrency(facts: LifeExpenseFact[]): string | null {
   return best;
 }
 
+type ClassifiedExpense = NetExpense & { areaCode: string; subcategoryCode: string };
+
 interface Cluster {
   subcategoryCode: string;
-  items: NetExpense[];
+  items: ClassifiedExpense[];
   state: 'candidate' | 'emerging' | 'active' | 'completed';
 }
 
-function clusterMoments(rows: NetExpense[], now: Date): Cluster[] {
-  const bySub = new Map<string, NetExpense[]>();
+function clusterMoments(rows: ClassifiedExpense[], now: Date): Cluster[] {
+  const bySub = new Map<string, ClassifiedExpense[]>();
   for (const row of rows) {
     const list = bySub.get(row.subcategoryCode) ?? [];
     list.push(row);
@@ -547,7 +583,9 @@ function dominantMerchant(items: NetExpense[]): string | null {
 
 export function projectPersonalExperience(facts: LifeExpenseFact[], now = new Date()): PersonalExperience {
   const currencyCode = pickCurrency(facts);
-  const rows = economicExpenses(facts, currencyCode).sort(
+  const economic = economicExpenses(facts, currencyCode);
+  const missingContext = economic.filter((row) => !hasLifeContext(row));
+  const rows = economic.filter(hasLifeContext).sort(
     (a, b) => +new Date(b.effectiveAt) - +new Date(a.effectiveAt)
   );
   const currentKey = monthKey(now.toISOString());
@@ -557,11 +595,11 @@ export function projectPersonalExperience(facts: LifeExpenseFact[], now = new Da
   const previousRows = inMonth(previousKey);
   const sum = (list: NetExpense[]) => list.reduce((s, r) => s + r.net, 0);
   const day = now.getUTCDate();
-  const inWindow = (list: NetExpense[]) => list.filter((r) => new Date(r.effectiveAt).getUTCDate() <= day);
+  const inWindow = (list: ClassifiedExpense[]) => list.filter((r) => new Date(r.effectiveAt).getUTCDate() <= day);
   const currentWindow = inWindow(currentRows);
   const previousWindow = inWindow(previousRows);
 
-  const byArea = (list: NetExpense[], code: string) => list.filter((r) => r.areaCode === code);
+  const byArea = (list: ClassifiedExpense[], code: string) => list.filter((r) => r.areaCode === code);
   const topArea = PERSONAL_LIFE_AREAS.map((a) => ({
     label: a.label,
     spend: sum(byArea(currentWindow, a.code)),
@@ -574,7 +612,8 @@ export function projectPersonalExperience(facts: LifeExpenseFact[], now = new Da
   }));
   const responseCount = moodCounts.reduce((s, m) => s + m.count, 0);
 
-  const unclassified = rows.filter((r) => r.classificationSource === 'inferred').length;
+  const inferred = rows.filter((r) => r.classificationSource === 'inferred').length;
+  const unclassified = inferred + missingContext.length;
 
   const signals = PERSONAL_LIFE_SUBCATEGORIES.flatMap((sub) => {
     const curRows = currentWindow.filter((r) => r.subcategoryCode === sub.code);
@@ -612,7 +651,7 @@ export function projectPersonalExperience(facts: LifeExpenseFact[], now = new Da
   const previousWindowTotal = sum(previousWindow);
   const comparable = previousWindow.length > 0 && currentWindow.length > 0;
   const delta = windowTotal - previousWindowTotal;
-  const cold = rows.length === 0;
+  const cold = rows.length === 0 && missingContext.length === 0;
   const monthName = monthLabel(currentKey);
   const span = daySpan(day);
   const dayWord = day === 1 ? 'day' : 'days';
@@ -737,17 +776,7 @@ export function projectPersonalExperience(facts: LifeExpenseFact[], now = new Da
         subcategoryLabel: subLabel(r.subcategoryCode),
         iconKey: iconKey(r.subcategoryCode),
       })),
-      attention: {
-        quiet: unclassified === 0,
-        issueCount: unclassified,
-        message: unclassified === 0 ? 'Nothing waiting for review.' : `${unclassified} expenses need a life context.`,
-        title: unclassified === 0
-          ? `All ${rows.length} classified. You're clear.`
-          : `${unclassified} need a life context.`,
-        body: unclassified === 0
-          ? 'Every expense has a Life Area and subcategory. No issues to review.'
-          : `${unclassified} expenses need a Life Area and subcategory.`,
-      },
+      attention: attentionState(rows.length, inferred, missingContext.length),
       snapshot: {
         periodLabel: monthName,
         rangeLabel: cold ? monthName : `${monthName.split(' ')[0]} so far · ${span} ${shortMonth(currentKey)}`,

@@ -27,35 +27,48 @@ struct RestaurantQuickAddHub: View {
                 Text("Capture a sale, a cost, or a note while it is still clear.")
                     .font(.plusJakarta(size: 13)).foregroundStyle(RestaurantChrome.secondary)
                 if allowed.contains("SALE") {
-                    Button("+ Record Sale") { sheet = .sale }
-                        .font(.plusJakarta(size: 14, weight: .semibold))
-                        .foregroundStyle(RestaurantChrome.bg)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(RestaurantChrome.brand)
-                        .clipShape(Capsule())
+                    Button { sheet = .sale } label: {
+                        HStack(spacing: 6) {
+                            Image("qa_plus").renderingMode(.template).resizable().scaledToFit().frame(width: 14, height: 14)
+                            Text("Record Sale")
+                        }
+                    }
+                    .font(.plusJakarta(size: 14, weight: .semibold))
+                    .foregroundStyle(RestaurantChrome.bg)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(RestaurantChrome.brand)
+                    .clipShape(Capsule())
                 }
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RestaurantChrome.notice)
             .clipShape(RoundedRectangle(cornerRadius: 18))
-            TextField("Search actions", text: $query)
-                .font(.plusJakarta(size: 14))
-                .padding(14)
-                .background(RestaurantChrome.field)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+            HStack(spacing: 10) {
+                Image("qa_search").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
+                    .foregroundStyle(RestaurantChrome.secondary)
+                TextField("Search actions", text: $query).font(.plusJakarta(size: 14))
+            }
+            .padding(14)
+            .background(RestaurantChrome.field)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
             let core = RestaurantSheetKind.core.filter { allowed.contains($0.eventType) && matches($0.label) }
             Text("Core actions · \(core.count)").font(.plusJakarta(size: 12)).foregroundStyle(RestaurantChrome.secondary)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 ForEach(core) { kind in
-                    Button(kind.label) { sheet = kind }
-                        .font(.plusJakarta(size: 13, weight: .semibold))
+                    Button { sheet = kind } label: {
+                        VStack(spacing: 8) {
+                            Image(kind.icon).renderingMode(.template).resizable().scaledToFit().frame(width: 28, height: 28)
+                            Text(kind.label).font(.plusJakarta(size: 13, weight: .semibold)).multilineTextAlignment(.center)
+                        }
                         .foregroundStyle(RestaurantChrome.ink)
-                        .frame(maxWidth: .infinity, minHeight: 72)
+                        .frame(maxWidth: .infinity, minHeight: 104)
+                        .padding(12)
                         .background(RestaurantChrome.card)
                         .overlay(RoundedRectangle(cornerRadius: 14).stroke(RestaurantChrome.border, lineWidth: 1))
                         .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
                 }
             }
             Text("Support & management").font(.plusJakarta(size: 12)).foregroundStyle(RestaurantChrome.secondary)
@@ -87,14 +100,17 @@ struct RestaurantQuickAddHub: View {
                     if item.0 == "Approval review", item.2 == nil { approvalOpen = true }
                     else if let kind = item.1, item.2 == nil { sheet = kind }
                 } label: {
-                    VStack(spacing: 4) {
-                        Text(item.0).font(.plusJakarta(size: 12, weight: .semibold))
+                    VStack(spacing: 8) {
+                        Image(item.0 == "Approval review" ? "qa_shield" : (item.1?.icon ?? "qa_shield"))
+                            .renderingMode(.template).resizable().scaledToFit().frame(width: 28, height: 28)
+                        Text(item.0).font(.plusJakarta(size: 12, weight: .semibold)).multilineTextAlignment(.center)
                         if let lock = item.2 {
                             Text(lock).font(.plusJakarta(size: 10))
                         }
                     }
                     .foregroundStyle(item.2 == nil ? RestaurantChrome.ink : RestaurantChrome.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 72)
+                    .frame(maxWidth: .infinity, minHeight: 104)
+                    .padding(12)
                     .background(RestaurantChrome.card)
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(RestaurantChrome.border, lineWidth: 1))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -139,6 +155,22 @@ enum RestaurantSheetKind: String, Identifiable {
         case .role: return "Role & access"
         case .invite: return "Invite & QR"
         case .supplier: return "Add Supplier"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .sale, .spend: return "qa_receipt"
+        case .purchase: return "qa_wallet"
+        case .payment, .reimburse: return "qa_credit_card"
+        case .collection: return "qa_arrow_left_right"
+        case .budget: return "qa_budget"
+        case .update: return "qa_message"
+        case .issue: return "qa_alert"
+        case .stock: return "qa_clipboard"
+        case .person: return "qa_user_plus"
+        case .role: return "qa_users"
+        case .invite: return "qa_qr"
+        case .supplier: return "qa_network"
         }
     }
     var title: String {

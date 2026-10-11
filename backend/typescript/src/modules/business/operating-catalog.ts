@@ -153,7 +153,7 @@ export const OPERATING_FAMILIES: OperatingFamily[] = [
         code: 'OWN_BUSINESS_CAMPAIGN',
         label: 'Own Business Campaign',
         partyLabel: 'Brand',
-        quickAdds: MARKETING_ADDS,
+        quickAdds: [...MARKETING_ADDS, 'COLLECTION'],
         targetMetrics: ['REVENUE', 'LEADS', 'ORDERS', 'CUSTOM_COUNT'],
         requiresChannel: true,
       },
@@ -170,7 +170,7 @@ export const OPERATING_FAMILIES: OperatingFamily[] = [
         code: 'TRADING_WHOLESALE',
         label: 'Trading / Wholesale',
         partyLabel: 'Business',
-        quickAdds: ['SALE', 'PURCHASE', 'SPEND', 'PAYMENT', 'COLLECTION', 'BUDGET', 'UPDATE', 'ISSUE', 'APPROVAL', 'STOCK', 'ORDER'],
+        quickAdds: ['SALE', 'PURCHASE', 'SPEND', 'PAYMENT', 'COLLECTION', 'BUDGET', 'UPDATE', 'ISSUE', 'APPROVAL', 'STOCK', 'ORDER', 'SHIPMENT'],
         targetMetrics: ['REVENUE', 'ORDERS', 'CUSTOM_COUNT'],
         requiresChannel: false,
       },
@@ -228,16 +228,16 @@ export const OPERATING_FAMILIES: OperatingFamily[] = [
         code: 'STANDARD_PRODUCTION',
         label: 'Standard Production',
         partyLabel: 'Plant',
-        quickAdds: ['PRODUCTION', 'PURCHASE', 'SPEND', 'SALE', 'DELIVERY', 'PAYMENT', 'COLLECTION', 'BUDGET', 'TARGET', 'UPDATE', 'ISSUE', 'APPROVAL'],
-        targetMetrics: ['REVENUE', 'ORDERS', 'CUSTOM_COUNT'],
+        quickAdds: ['PRODUCTION', 'PURCHASE', 'SPEND', 'SALE', 'CUSTOMER_ORDER', 'DELIVERY', 'PAYMENT', 'COLLECTION', 'BUDGET', 'TARGET', 'UPDATE', 'ISSUE', 'APPROVAL', 'STOCK'],
+        targetMetrics: ['REVENUE', 'PRODUCTION_OUTPUT', 'UNITS_PRODUCED', 'VALUE_DISPATCHED'],
         requiresChannel: false,
       },
       {
         code: 'MADE_TO_ORDER',
         label: 'Made-to-Order',
         partyLabel: 'Workshop',
-        quickAdds: ['PRODUCTION', 'PURCHASE', 'SPEND', 'SALE', 'CUSTOMER_ORDER', 'DELIVERY', 'PAYMENT', 'COLLECTION', 'BUDGET', 'TARGET', 'UPDATE', 'ISSUE', 'APPROVAL'],
-        targetMetrics: ['REVENUE', 'ORDERS', 'CUSTOM_COUNT'],
+        quickAdds: ['PRODUCTION', 'PURCHASE', 'SPEND', 'SALE', 'CUSTOMER_ORDER', 'DELIVERY', 'PAYMENT', 'COLLECTION', 'BUDGET', 'TARGET', 'UPDATE', 'ISSUE', 'APPROVAL', 'STOCK'],
+        targetMetrics: ['REVENUE', 'ORDERS', 'DELIVERY_COUNT', 'PRODUCTION_OUTPUT', 'CUSTOM_COUNT'],
         requiresChannel: false,
       },
     ],
@@ -336,6 +336,7 @@ export interface OperatingPreferences {
   participants: OperatingParticipant[];
   counterparties: OperatingCounterparty[];
   channels: string[];
+  tradeReach: string[];
   monthlyBudget: string;
   monthlyTarget: string;
   targetMetric: string;
@@ -380,6 +381,10 @@ export function normalizeOperatingPreferences(
   }
   const channels = Array.isArray(prefs.channels)
     ? prefs.channels.map((c) => String(c).trim()).filter(Boolean)
+    : [];
+  const reachAllowed = new Set(['Local', 'Domestic', 'International']);
+  const tradeReach = Array.isArray(prefs.tradeReach)
+    ? [...new Set(prefs.tradeReach.map((item) => String(item).trim()).filter((item) => reachAllowed.has(item)))]
     : [];
   if (sub.requiresChannel && channels.length === 0) {
     throw new Error('Select at least one channel.');
@@ -430,6 +435,7 @@ export function normalizeOperatingPreferences(
     participants,
     counterparties,
     channels,
+    tradeReach,
     monthlyBudget,
     monthlyTarget,
     targetMetric,
@@ -525,6 +531,25 @@ function num(value: string | null | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function manufacturingTargetAmount(metric: string, eventType: string, amount: number): number {
+  switch (metric) {
+    case 'REVENUE':
+      return eventType === 'SALE' ? amount : 0;
+    case 'PRODUCTION_OUTPUT':
+    case 'UNITS_PRODUCED':
+    case 'CUSTOM_COUNT':
+      return eventType === 'PRODUCTION' ? amount : 0;
+    case 'VALUE_DISPATCHED':
+      return eventType === 'DELIVERY' ? amount : 0;
+    case 'ORDERS':
+      return eventType === 'CUSTOMER_ORDER' ? 1 : 0;
+    case 'DELIVERY_COUNT':
+      return eventType === 'DELIVERY' ? 1 : 0;
+    default:
+      return 0;
+  }
+}
+
 function money(value: number): string {
   return value.toFixed(4);
 }
@@ -558,7 +583,13 @@ export function projectOperatingMoment(args: {
       revisions.push({ id: row.operatingEventId, title: row.title, occurredAt: row.occurredAt });
     }
     if (def?.consumesBudget) spent += amount;
-    if (def?.countsTarget) progress += amount;
+    if (args.familyCode === 'MARKETING_CAMPAIGNS') {
+      if (row.eventType === 'RESULT') progress += amount;
+    } else if (args.familyCode === 'MANUFACTURING_PRODUCTION') {
+      progress += manufacturingTargetAmount(args.prefs.targetMetric, row.eventType, amount);
+    } else if (def?.countsTarget) {
+      progress += amount;
+    }
   }
   const attention = args.events
     .filter((row) => row.eventType === 'ISSUE' || row.approvalStatus === 'PENDING')
@@ -731,6 +762,73 @@ function textSection(code: string, title: string, lines: string[]): OperatingBoa
   };
 }
 
+const MONEY_MOVING_TYPES = ['SALE', 'PAYMENT', 'COLLECTION', 'SPEND', 'VENDOR_COST'];
+const MONEY_HISTORY_TYPES = ['BUDGET', 'TARGET', 'SPEND', 'PAYMENT', 'COLLECTION', 'VENDOR_COST'];
+
+type WidgetLabels = {
+  m1: string;
+  m3: string;
+  l1: string;
+  l2: string;
+  l4: string;
+  me3: string;
+};
+
+function widgetLabels(familyCode: string): WidgetLabels {
+  if (familyCode === 'MARKETING_CAMPAIGNS') {
+    return {
+      m1: 'Campaign Moment',
+      m3: 'Network & Channels',
+      l1: 'Current Campaign',
+      l2: 'Channels',
+      l4: 'Execution',
+      me3: 'People & Activity History',
+    };
+  }
+  if (familyCode === 'TRADING_DISTRIBUTION') {
+    return {
+      m1: 'Business Moment',
+      m3: 'Trade Network',
+      l1: 'Current Business',
+      l2: 'Channel Activity',
+      l4: 'Operations',
+      me3: 'People & Activity',
+    };
+  }
+  if (familyCode === 'MANUFACTURING_PRODUCTION') {
+    return {
+      m1: 'My Manufacturing Business',
+      m3: 'Business Network',
+      l1: 'Current Production / Business',
+      l2: 'Orders / Buyers',
+      l4: 'Production Operations',
+      me3: 'People & Activity',
+    };
+  }
+  return {
+    m1: 'Business Moment',
+    m3: 'Business Network',
+    l1: 'Current Business',
+    l2: 'Channel Activity',
+    l4: 'Operations',
+    me3: 'People & Activity',
+  };
+}
+
+function commitmentTypes(familyCode: string): string[] {
+  if (familyCode === 'MARKETING_CAMPAIGNS') return ['DELIVERABLE', 'COMPLETE'];
+  if (familyCode === 'MANUFACTURING_PRODUCTION') return ['ORDER', 'CUSTOMER_ORDER', 'SHIPMENT'];
+  if (familyCode === 'TRADING_DISTRIBUTION') return ['ORDER', 'SHIPMENT'];
+  return ['ORDER'];
+}
+
+function executionTypes(familyCode: string): string[] {
+  if (familyCode === 'MARKETING_CAMPAIGNS') return ['RESULT', 'DELIVERABLE', 'UPDATE', 'ISSUE'];
+  if (familyCode === 'MANUFACTURING_PRODUCTION') return ['ISSUE', 'STOCK', 'UPDATE', 'PRODUCTION', 'DELIVERY'];
+  if (familyCode === 'RETAIL_CONSUMER') return ['ISSUE', 'STOCK', 'UPDATE', 'SERVICE', 'APPOINTMENT'];
+  return ['ISSUE', 'STOCK', 'UPDATE'];
+}
+
 function operatingBoards(args: {
   familyCode: string;
   subtype: string;
@@ -739,23 +837,32 @@ function operatingBoards(args: {
   visible: boolean;
   revisions: Array<{ id: string; title: string; occurredAt: string }>;
 }): OperatingProjection['boards'] {
-  const { familyCode, subtype, prefs, events, visible } = args;
+  const { familyCode, prefs, events, visible } = args;
+  const labels = widgetLabels(familyCode);
   const currency = prefs.currency;
   const section = (code: string, title: string, types: string[]) =>
     eventSection(code, title, events, types, visible, currency);
-  const people = textSection(
-    'people',
-    'People',
-    prefs.participants.map((person) => person.displayName)
-  );
-  const channels = textSection('channels', 'Channels', prefs.channels);
-  const money = section('money', 'Money moving', ['SALE', 'PAYMENT', 'COLLECTION', 'SPEND']);
-  const moments = momentSections(familyCode, subtype, prefs, events, visible, currency);
-  const life = lifeSections(familyCode, subtype, prefs, section, people, channels, money);
+  const names = prefs.participants.map((person) => person.displayName);
+  const network = [...prefs.counterparties.map((party) => party.name), ...prefs.channels];
+  const moments = [
+    textSection('M1', labels.m1, [prefs.identityName, prefs.partyName, prefs.description]),
+    textSection('M2', 'People', names),
+    textSection('M3', labels.m3, network),
+    section('M4', 'Open Commitments', commitmentTypes(familyCode)),
+  ];
+  const life = [
+    textSection('L1', labels.l1, [prefs.identityName, prefs.partyName, args.subtype]),
+    familyCode === 'MANUFACTURING_PRODUCTION'
+      ? section('L2', labels.l2, ['CUSTOMER_ORDER', 'ORDER'])
+      : textSection('L2', labels.l2, prefs.channels),
+    section('L3', 'Money Moving', MONEY_MOVING_TYPES),
+    section('L4', labels.l4, executionTypes(familyCode)),
+    textSection('L5', 'People Today', names),
+  ];
   const memory = [
     {
-      code: 'history',
-      title: 'Monthly history',
+      code: 'ME1',
+      title: 'Monthly History',
       detail: args.revisions.length > 0 ? `${args.revisions.length} recorded` : 'Nothing recorded yet.',
       rows: args.revisions.map((row) => ({
         id: row.id,
@@ -766,140 +873,11 @@ function operatingBoards(args: {
         ...emptyFacts(),
       })),
     },
-    section('money-history', 'Money history', ['BUDGET', 'TARGET', 'SPEND', 'PAYMENT', 'COLLECTION']),
-    section('activity', 'People and activity', ['UPDATE']),
-    section('decisions', 'Patterns and decisions', ['ISSUE', 'APPROVAL']),
+    section('ME2', 'Money History', MONEY_HISTORY_TYPES),
+    section('ME3', labels.me3, ['UPDATE']),
+    section('ME4', 'Patterns & Decisions', ['ISSUE', 'APPROVAL']),
   ];
   return { moments, life, memory };
-}
-
-function momentSections(
-  familyCode: string,
-  subtype: string,
-  prefs: OperatingPreferences,
-  events: OperatingEventRow[],
-  visible: boolean,
-  currency: string
-): OperatingBoardSection[] {
-  const section = (code: string, title: string, types: string[]) =>
-    eventSection(code, title, events, types, visible, currency);
-  if (familyCode === 'MARKETING_CAMPAIGNS') {
-    return [
-      textSection('identity', subtype === 'CLIENT_CAMPAIGN' ? 'Client campaign' : 'Business campaign', [
-        prefs.identityName,
-        prefs.partyName,
-        prefs.description,
-      ]),
-      textSection('team', 'Campaign team', prefs.participants.map((person) => person.displayName)),
-      textSection(
-        'network',
-        subtype === 'CLIENT_CAMPAIGN' ? 'Client, partners and channels' : 'Brand, partners and channels',
-        [...prefs.counterparties.map((party) => party.name), ...prefs.channels]
-      ),
-      section('deliverables', 'Deliverables and commitments', ['DELIVERABLE', 'COMPLETE']),
-      section('results', 'Results', ['RESULT']),
-      section('spend', 'Spend', ['SPEND', 'VENDOR_COST']),
-      section('updates', 'Updates', ['UPDATE']),
-      section('issues', 'Issues', ['ISSUE']),
-    ];
-  }
-  if (familyCode === 'MANUFACTURING_PRODUCTION') {
-    const rows = [
-      section('production', 'Production', ['PRODUCTION']),
-      section('purchases', 'Purchases', ['PURCHASE']),
-      section('sales', 'Sales', ['SALE']),
-      section('deliveries', 'Deliveries', ['DELIVERY']),
-    ];
-    if (subtype === 'MADE_TO_ORDER') rows.push(section('orders', 'Customer orders', ['CUSTOMER_ORDER']));
-    rows.push(
-      section('updates', 'Updates', ['UPDATE']),
-      section('issues', 'Issues', ['ISSUE']),
-      section('expenses', 'Expenses and budget', ['SPEND']),
-      section('payments', 'Payments and collections', ['PAYMENT', 'COLLECTION'])
-    );
-    return rows;
-  }
-  if (familyCode === 'TRADING_DISTRIBUTION') {
-    const rows = [
-      section('sales', 'Sales', ['SALE']),
-      section('purchases', 'Purchases', ['PURCHASE']),
-      section('updates', 'Updates', ['UPDATE']),
-    ];
-    if (subtype === 'DISTRIBUTION_DEALERSHIP') {
-      rows.push(section('dispatches', 'Dispatches and deliveries', ['SHIPMENT']));
-    }
-    rows.push(
-      section('availability', 'Availability', ['STOCK']),
-      section('issues', 'Issues', ['ISSUE']),
-      section('expenses', 'Expenses and budget', ['SPEND']),
-      section('payments', 'Payments and collections', ['PAYMENT', 'COLLECTION']),
-      textSection(
-        'network',
-        subtype === 'DISTRIBUTION_DEALERSHIP' ? 'Principals, dealers and channels' : 'Trade network and commitments',
-        [...prefs.counterparties.map((party) => party.name), ...prefs.channels]
-      )
-    );
-    if (subtype !== 'DISTRIBUTION_DEALERSHIP') {
-      rows.push(section('commitments', 'Open commitments', ['ORDER']));
-    }
-    return rows;
-  }
-  if (subtype === 'CONSUMER_SERVICE') {
-    return [
-      section('services', 'Services', ['SERVICE']),
-      section('appointments', 'Appointments', ['APPOINTMENT']),
-      section('sales', 'Sales', ['SALE']),
-      section('updates', 'Updates', ['UPDATE']),
-      section('issues', 'Issues', ['ISSUE']),
-      section('expenses', 'Expenses and budget', ['SPEND']),
-      section('payments', 'Payments and collections', ['PAYMENT', 'COLLECTION']),
-    ];
-  }
-  return [
-    section('sales', 'Sales', ['SALE']),
-    section('purchases', 'Purchases', ['PURCHASE']),
-    section('updates', 'Updates', ['UPDATE']),
-    section('stock', subtype === 'RESTAURANT_FOOD' ? 'Stock notes' : 'Stock notes', ['STOCK']),
-    section('issues', 'Issues', ['ISSUE']),
-    section('expenses', 'Expenses and budget', ['SPEND']),
-    section('payments', 'Payments and collections', ['PAYMENT', 'COLLECTION']),
-    textSection('channels', 'Suppliers and channels', [
-      ...prefs.counterparties.map((party) => party.name),
-      ...prefs.channels,
-    ]),
-  ];
-}
-
-function lifeSections(
-  familyCode: string,
-  subtype: string,
-  prefs: OperatingPreferences,
-  section: (code: string, title: string, types: string[]) => OperatingBoardSection,
-  people: OperatingBoardSection,
-  channels: OperatingBoardSection,
-  money: OperatingBoardSection
-): OperatingBoardSection[] {
-  const current = textSection(
-    'current',
-    familyCode === 'MARKETING_CAMPAIGNS' ? 'Current campaign' : familyCode === 'MANUFACTURING_PRODUCTION' ? 'Current production' : familyCode === 'TRADING_DISTRIBUTION' ? 'Current trade' : 'Current business',
-    [prefs.identityName, prefs.partyName, subtype]
-  );
-  if (familyCode === 'MARKETING_CAMPAIGNS') {
-    return [current, channels, section('results', 'Results', ['RESULT']), section('deliverables', 'Deliverables', ['DELIVERABLE']), people];
-  }
-  if (familyCode === 'MANUFACTURING_PRODUCTION') {
-    return [
-      current,
-      section('commitments', 'Open commitments', ['PRODUCTION', 'CUSTOMER_ORDER', 'DELIVERY', 'ORDER']),
-      money,
-      section('operations', 'Operations', ['ISSUE', 'STOCK']),
-      people,
-    ];
-  }
-  if (familyCode === 'TRADING_DISTRIBUTION') {
-    return [current, channels, money, section('commitments', 'Commitments', ['ORDER', 'SHIPMENT']), people];
-  }
-  return [current, channels, money, section('operations', 'Operations', ['STOCK', 'ORDER', 'ISSUE', 'SERVICE', 'APPOINTMENT']), people];
 }
 
 export function resolveRole(

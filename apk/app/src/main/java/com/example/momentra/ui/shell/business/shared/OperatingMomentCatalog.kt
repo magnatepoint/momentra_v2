@@ -30,10 +30,10 @@ object OperatingMomentCatalog {
     val families: Map<BusinessSetupKind, List<OperatingSubtype>> = mapOf(
         BusinessSetupKind.MARKETING_CAMPAIGNS to listOf(
             OperatingSubtype("CLIENT_CAMPAIGN", "Client Campaign", "Client", listOf("REVENUE", "LEADS", "ORDERS", "CUSTOM_COUNT", "CLIENT_BILLING"), true, marketingAdds + "COLLECTION"),
-            OperatingSubtype("OWN_BUSINESS_CAMPAIGN", "Own Business Campaign", "Brand", listOf("REVENUE", "LEADS", "ORDERS", "CUSTOM_COUNT"), true, marketingAdds),
+            OperatingSubtype("OWN_BUSINESS_CAMPAIGN", "Own Business Campaign", "Brand", listOf("REVENUE", "LEADS", "ORDERS", "CUSTOM_COUNT"), true, marketingAdds + "COLLECTION"),
         ),
         BusinessSetupKind.TRADING_DISTRIBUTION to listOf(
-            OperatingSubtype("TRADING_WHOLESALE", "Trading / Wholesale", "Business", listOf("REVENUE", "ORDERS", "CUSTOM_COUNT"), false, listOf("SALE", "PURCHASE", "SPEND", "PAYMENT", "COLLECTION", "BUDGET", "UPDATE", "ISSUE", "APPROVAL", "STOCK", "ORDER")),
+            OperatingSubtype("TRADING_WHOLESALE", "Trading / Wholesale", "Business", listOf("REVENUE", "ORDERS", "CUSTOM_COUNT"), false, listOf("SALE", "PURCHASE", "SPEND", "PAYMENT", "COLLECTION", "BUDGET", "UPDATE", "ISSUE", "APPROVAL", "STOCK", "ORDER", "SHIPMENT")),
             OperatingSubtype("DISTRIBUTION_DEALERSHIP", "Distribution / Dealership", "Principal", listOf("REVENUE", "ORDERS", "CUSTOM_COUNT"), false, listOf("SALE", "PURCHASE", "SPEND", "PAYMENT", "COLLECTION", "BUDGET", "UPDATE", "ISSUE", "APPROVAL", "STOCK", "ORDER", "SHIPMENT")),
         ),
         BusinessSetupKind.RETAIL_CONSUMER to listOf(
@@ -42,8 +42,8 @@ object OperatingMomentCatalog {
             OperatingSubtype("CONSUMER_SERVICE", "Consumer Service", "Service", listOf("REVENUE", "ORDERS", "CUSTOM_COUNT"), false, listOf("SERVICE", "APPOINTMENT", "SALE", "SPEND", "PAYMENT", "COLLECTION", "BUDGET", "UPDATE", "ISSUE", "APPROVAL")),
         ),
         BusinessSetupKind.MANUFACTURING_PRODUCTION to listOf(
-            OperatingSubtype("STANDARD_PRODUCTION", "Standard Production", "Plant", listOf("REVENUE", "ORDERS", "CUSTOM_COUNT"), false, listOf("PRODUCTION", "PURCHASE", "SPEND", "SALE", "DELIVERY", "PAYMENT", "COLLECTION", "BUDGET", "TARGET", "UPDATE", "ISSUE", "APPROVAL")),
-            OperatingSubtype("MADE_TO_ORDER", "Made-to-Order", "Workshop", listOf("REVENUE", "ORDERS", "CUSTOM_COUNT"), false, listOf("PRODUCTION", "PURCHASE", "SPEND", "SALE", "CUSTOMER_ORDER", "DELIVERY", "PAYMENT", "COLLECTION", "BUDGET", "TARGET", "UPDATE", "ISSUE", "APPROVAL")),
+            OperatingSubtype("STANDARD_PRODUCTION", "Standard Production", "Plant", listOf("REVENUE", "PRODUCTION_OUTPUT", "UNITS_PRODUCED", "VALUE_DISPATCHED"), false, listOf("PRODUCTION", "PURCHASE", "SPEND", "SALE", "CUSTOMER_ORDER", "DELIVERY", "PAYMENT", "COLLECTION", "BUDGET", "TARGET", "UPDATE", "ISSUE", "APPROVAL", "STOCK")),
+            OperatingSubtype("MADE_TO_ORDER", "Made-to-Order", "Workshop", listOf("REVENUE", "ORDERS", "DELIVERY_COUNT", "PRODUCTION_OUTPUT", "CUSTOM_COUNT"), false, listOf("PRODUCTION", "PURCHASE", "SPEND", "SALE", "CUSTOMER_ORDER", "DELIVERY", "PAYMENT", "COLLECTION", "BUDGET", "TARGET", "UPDATE", "ISSUE", "APPROVAL", "STOCK")),
         ),
     )
 
@@ -91,6 +91,6 @@ object OperatingMomentCatalog {
 
     val preferenceKeys = setOf(
         "subtype", "identityName", "partyName", "description", "currency", "startDate", "location", "activationPolicy",
-        "participants", "counterparties", "channels", "monthlyBudget", "monthlyTarget", "targetMetric",
+        "participants", "counterparties", "channels", "tradeReach", "monthlyBudget", "monthlyTarget", "targetMetric",
     )
 }

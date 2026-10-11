@@ -40,7 +40,7 @@ struct RestaurantActiveView: View {
                     meter("Budget used", fraction(model.budget?.spent, model.budget?.amount), RestaurantChrome.success)
                     line("Budget remaining", money(model.budget?.remaining), RestaurantChrome.success)
                 }
-                sectionTitle("Needs attention")
+                sectionTitle("Needs Attention")
                 if (model.attention ?? []).isEmpty {
                     card { Text("Nothing is waiting.").foregroundStyle(RestaurantChrome.secondary) }
                 }
@@ -50,7 +50,7 @@ struct RestaurantActiveView: View {
                         Text(item.title).foregroundStyle(RestaurantChrome.ink)
                     }
                 }
-                sectionTitle("Payment readiness")
+                sectionTitle("Payment Readiness")
                 readiness("Ready", (model.paymentReadiness ?? []).filter { $0.status == "READY" })
                 readiness("Expected", (model.paymentReadiness ?? []).filter { $0.status == "PENDING" })
                 readiness("Not ready", (model.paymentReadiness ?? []).filter { $0.status != "READY" && $0.status != "PENDING" })

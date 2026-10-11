@@ -17,6 +17,7 @@ import {
   type PersonalFamilyCode,
 } from '../personal/moment-family';
 import { lifeActivityCountExclusionSql } from './life-activity-count';
+import { netsAfterContributions, type ContributionNetPosition } from './contribution-net';
 
 export interface CursorPage<T> {
   items: T[];
@@ -1971,7 +1972,6 @@ export async function getGroupMomentProjection(
                  LEFT JOIN core.external_party ep ON ep.external_party_id = mp_pos.external_party_id
                  WHERE gfp.moment_id = $1
                  ORDER BY ABS(gfp.net_position) DESC, gfp.currency_code, gfp.participant_id
-                 LIMIT $3
                ) x
               ) AS positions,
               (SELECT COALESCE(jsonb_agg(v), '[]'::jsonb)
@@ -2005,29 +2005,45 @@ export async function getGroupMomentProjection(
          ON mp.moment_id = gmc.moment_id AND mp.user_id = $2 AND mp.status = 'ACTIVE'
        LEFT JOIN projection.group_pulse gp ON gp.moment_id = gmc.moment_id
        WHERE gmc.moment_id = $1`,
-      [momentId, ctx.userId, limit]
+      [momentId, ctx.userId]
     );
     if (!bundled.rows[0]) {
       throw new AppError(ErrorCode.GOVERNANCE_DENIED, 'Not an active member of this group moment.', 403);
     }
     const row = bundled.rows[0];
     const totalsRaw = (row.totals ?? []) as Array<Record<string, unknown>>;
-    const mappedPositions = (row.positions ?? []) as Array<Record<string, unknown>>;
-    const viewerRows = (row.viewer ?? []) as Array<Record<string, unknown>>;
+    const mappedPositions = netsAfterContributions(
+      ((row.positions ?? []) as Array<Record<string, unknown> & ContributionNetPosition>).map((position) => ({
+        ...position,
+        participantId: String(position.participantId ?? ''),
+        currencyCode: String(position.currencyCode ?? ''),
+        netPosition: String(position.netPosition ?? '0'),
+        contributionTotal: position.contributionTotal == null ? '0' : String(position.contributionTotal),
+      }))
+    );
+    const rankedPositions = [...mappedPositions].sort((a, b) => {
+      const byNet = Math.abs(Number(b.netPosition)) - Math.abs(Number(a.netPosition));
+      if (byNet !== 0) return byNet;
+      const byCurrency = a.currencyCode.localeCompare(b.currencyCode);
+      if (byCurrency !== 0) return byCurrency;
+      return a.participantId.localeCompare(b.participantId);
+    });
+    const visiblePositions = rankedPositions.slice(0, limit);
+    const viewerPositions = rankedPositions.filter((position) => position.participantId === row.participant_id);
     const positionTotalCount = parseInt(row.position_total_count ?? '0', 10);
     const expenseCount = totalsRaw.reduce((acc, t) => acc + Number(t.expenseCount ?? 0), 0);
     const totals = totalsRaw.map(({ expenseCount: _e, ...rest }) => rest);
     const empty = totals.length === 0 && positionTotalCount === 0;
     // viewerPosition = primary visual emphasis only (max abs net). Full positions[]/totals[] remain authoritative.
-    const viewerPosition = empty ? null : (viewerRows[0] ?? null);
+    const viewerPosition = empty ? null : (viewerPositions[0] ?? null);
     const financePayload = {
       dataQuality: empty ? ('EMPTY' as const) : ('OK' as const),
       expenseCount: empty ? 0 : expenseCount,
       totals: empty ? [] : totals,
-      positions: empty ? [] : mappedPositions,
+      positions: empty ? [] : visiblePositions,
       viewerPosition,
       positionTotalCount: empty ? 0 : positionTotalCount,
-      positionsTruncated: !empty && positionTotalCount > mappedPositions.length,
+      positionsTruncated: !empty && positionTotalCount > visiblePositions.length,
       positionsSemantics: semantics,
     };
     const title = row.title ?? '';

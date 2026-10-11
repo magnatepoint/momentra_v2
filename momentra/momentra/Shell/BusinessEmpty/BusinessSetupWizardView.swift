@@ -51,7 +51,11 @@ struct BusinessSetupWizardView: View {
     }
 
     var body: some View {
-        if kind == .retailConsumer && ["RETAIL_STORE", "RESTAURANT_FOOD", "CONSUMER_SERVICE"].contains(subtype.code) {
+        let dedicated = (kind == .retailConsumer && ["RETAIL_STORE", "RESTAURANT_FOOD", "CONSUMER_SERVICE"].contains(subtype.code))
+            || (kind == .tradingDistribution && ["TRADING_WHOLESALE", "DISTRIBUTION_DEALERSHIP"].contains(subtype.code))
+            || (kind == .marketingCampaigns && ["CLIENT_CAMPAIGN", "OWN_BUSINESS_CAMPAIGN"].contains(subtype.code))
+            || (kind == .manufacturingProduction && ["STANDARD_PRODUCTION", "MADE_TO_ORDER"].contains(subtype.code))
+        if dedicated {
             RetailStoreSetupView(
                 subtypes: OperatingMomentCatalog.subtypes(kind),
                 subtype: subtype,

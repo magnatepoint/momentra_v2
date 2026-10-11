@@ -8,10 +8,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -26,8 +27,10 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.momentra.R
 import com.example.momentra.data.api.OperatingProjectionDto
 import com.example.momentra.ui.shell.business.shared.OperatingMomentCatalog
 import com.example.momentra.ui.theme.PlusJakartaSans
@@ -97,35 +100,43 @@ fun ServiceQuickAddHub(
         Text("Every service moment counts.", color = SvcInk, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
         Text("Capture a service, a cost, or a note while it is still clear.", color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 13.sp)
         if ("SERVICE" in allowed) {
-            Text(
-                "+ Record Service",
-                color = SvcBg,
-                fontFamily = PlusJakartaSans,
-                fontWeight = FontWeight.SemiBold,
+            Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(999.dp))
                     .background(SvcBrand)
                     .clickable { sheet = ServiceSheet.SERVICE }
                     .padding(horizontal = 14.dp, vertical = 8.dp),
-            )
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(painterResource(R.drawable.qa_plus), contentDescription = null, tint = SvcBg, modifier = Modifier.size(14.dp))
+                Text("Record Service", color = SvcBg, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
-    BasicTextField(
-        value = query,
-        onValueChange = { query = it },
-        textStyle = TextStyle(color = SvcInk, fontFamily = PlusJakartaSans, fontSize = 14.sp),
-        cursorBrush = SolidColor(SvcBrand),
-        decorationBox = { inner ->
-            if (query.isEmpty()) Text("Search actions", color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 14.sp)
-            inner()
-        },
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(SvcField)
             .border(1.dp, SvcBorder, RoundedCornerShape(12.dp))
-            .padding(14.dp),
-    )
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(painterResource(R.drawable.qa_search), contentDescription = null, tint = SvcSecondary, modifier = Modifier.size(18.dp))
+        BasicTextField(
+            value = query,
+            onValueChange = { query = it },
+            textStyle = TextStyle(color = SvcInk, fontFamily = PlusJakartaSans, fontSize = 14.sp),
+            cursorBrush = SolidColor(SvcBrand),
+            decorationBox = { inner ->
+                if (query.isEmpty()) Text("Search actions", color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 14.sp)
+                inner()
+            },
+            modifier = Modifier.weight(1f),
+        )
+    }
     val core = listOf(
         ServiceSheet.SERVICE to "Service",
         ServiceSheet.APPOINTMENT to "Appointment",
@@ -143,7 +154,7 @@ fun ServiceQuickAddHub(
     core.chunked(3).forEach { row ->
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             row.forEach { (kind, label) ->
-                ActionCard(label, locked = null, modifier = Modifier.weight(1f)) { sheet = kind }
+                ActionCard(label, kind.hubIcon, locked = null, modifier = Modifier.weight(1f)) { sheet = kind }
             }
         }
     }
@@ -160,7 +171,7 @@ fun ServiceQuickAddHub(
     support.chunked(3).forEach { row ->
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             row.forEach { (kind, label, lock) ->
-                ActionCard(label, lock, Modifier.weight(1f)) {
+                ActionCard(label, if (kind == null) R.drawable.qa_shield else kind.hubIcon, lock, Modifier.weight(1f)) {
                     if (label == "Approval review" && approver) approvalOpen = true
                     else if (kind != null && lock == null) sheet = kind
                 }
@@ -189,8 +200,26 @@ fun ServiceQuickAddHub(
     }
 }
 
+private val ServiceSheet.hubIcon: Int
+    get() = when (this) {
+        ServiceSheet.SERVICE -> R.drawable.rs_setup_service
+        ServiceSheet.APPOINTMENT -> R.drawable.qa_calendar
+        ServiceSheet.SALE, ServiceSheet.SPEND -> R.drawable.qa_receipt
+        ServiceSheet.PAYMENT -> R.drawable.qa_credit_card
+        ServiceSheet.COLLECTION -> R.drawable.qa_arrow_left_right
+        ServiceSheet.BUDGET -> R.drawable.qa_budget
+        ServiceSheet.UPDATE -> R.drawable.qa_message
+        ServiceSheet.ISSUE -> R.drawable.qa_alert
+        ServiceSheet.REIMBURSE -> R.drawable.qa_wallet
+        ServiceSheet.PERSON -> R.drawable.qa_user_plus
+        ServiceSheet.ROLE -> R.drawable.qa_users
+        ServiceSheet.INVITE -> R.drawable.qa_qr
+        ServiceSheet.SUPPLIER -> R.drawable.qa_network
+    }
+
 @Composable
-private fun ActionCard(label: String, locked: String?, modifier: Modifier, onClick: () -> Unit) {
+private fun ActionCard(label: String, icon: Int, locked: String?, modifier: Modifier, onClick: () -> Unit) {
+    val ink = if (locked == null) SvcInk else SvcSecondary
     Column(
         modifier
             .clip(RoundedCornerShape(14.dp))
@@ -198,10 +227,12 @@ private fun ActionCard(label: String, locked: String?, modifier: Modifier, onCli
             .border(1.dp, SvcBorder, RoundedCornerShape(14.dp))
             .clickable(enabled = locked == null, onClick = onClick)
             .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(label, color = if (locked == null) SvcInk else SvcSecondary, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-        if (locked != null) Text(locked, color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 11.sp)
+        Icon(painterResource(icon), contentDescription = null, tint = ink, modifier = Modifier.size(28.dp))
+        Text(label, color = ink, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, textAlign = TextAlign.Center)
+        if (locked != null) Text(locked, color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 11.sp, textAlign = TextAlign.Center)
     }
 }
 
@@ -239,8 +270,7 @@ private fun ServiceEventSheet(
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .background(SvcNotice)
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

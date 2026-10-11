@@ -29,8 +29,14 @@ struct RetailStoreSetupView: View {
     @State private var policy = "NONE"
     @State private var policyOpen = false
     @State private var selectedChannels: Set<String> = []
+    @State private var tradeReach: Set<String> = []
+    @State private var parties: [(String, String)] = []
+    @State private var partyName = ""
+    @State private var partyKind = "SUPPLIER"
     @State private var budget = ""
     @State private var target = ""
+    @State private var metric = "REVENUE"
+    @State private var metricOpen = false
     @State private var localError: String?
 
     private var spec: SetupSpec { SetupSpec.forCode(subtype.code) }
@@ -50,7 +56,7 @@ struct RetailStoreSetupView: View {
     private var ready: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty &&
         !companyName.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !selectedChannels.isEmpty &&
+        (spec.channelsOptional || !selectedChannels.isEmpty) &&
         (Double(budget) ?? 0) > 0 &&
         (Double(target) ?? 0) > 0 &&
         !needsApprover &&
@@ -64,13 +70,14 @@ struct RetailStoreSetupView: View {
                 hero
                 modelSelector
                 HStack {
-                    Text("3 steps · One simple setup").font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
+                    Text(spec.steps).font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
                     Spacer()
                     Image("rs_setup_arrow_down").resizable().frame(width: 16, height: 16)
                 }
                 pill(spec.badge, fill: spec.draftFill, ink: spec.draftInk)
                 basics
                 people
+                if !spec.partySection.isEmpty { counterparties }
                 plan
                 review
                 if ready {
@@ -100,6 +107,13 @@ struct RetailStoreSetupView: View {
         .background(spec.bg)
         .onChange(of: subtype.code) { _, _ in
             selectedChannels = selectedChannels.intersection(Set(spec.channels))
+            tradeReach = tradeReach.intersection(Set(spec.tradeReach))
+            if !spec.partyKinds.contains(where: { $0.0 == partyKind }) {
+                partyKind = spec.partyKinds.first?.0 ?? "SUPPLIER"
+            }
+            if !spec.targetMetrics.contains(metric) {
+                metric = spec.targetMetrics.first ?? "REVENUE"
+            }
         }
         .onAppear { applyCompanySeed() }
         .onChange(of: initialCompanyName) { _, _ in applyCompanySeed() }
@@ -140,11 +154,11 @@ struct RetailStoreSetupView: View {
                 .font(.plusJakarta(size: 32, weight: .semibold))
                 .foregroundStyle(spec.text)
                 .multilineTextAlignment(.center)
-            Text("Bring your business, people, and monthly plan together before you start.")
+            Text(spec.intro)
                 .font(.plusJakarta(size: 14))
                 .foregroundStyle(spec.secondary)
                 .multilineTextAlignment(.center)
-            pill("Not started yet", fill: spec.draftFill, ink: spec.draftInk)
+            pill(spec.badge, fill: spec.draftFill, ink: spec.draftInk)
         }
         .frame(maxWidth: .infinity)
     }
@@ -215,6 +229,24 @@ struct RetailStoreSetupView: View {
             choice("Start date", dayLabel(start), icon: "rs_setup_calendar") { dateOpen = true }
             editor("Description", text: $details, placeholder: spec.descriptionHint, icon: "rs_setup_pencil")
             editor("Location", text: $location, placeholder: spec.locationHint, icon: "rs_setup_pin")
+            if !spec.tradeReach.isEmpty {
+                Text("Trade reach").font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
+                FlowLayout(spacing: 8) {
+                    ForEach(spec.tradeReach, id: \.self) { reach in
+                        let on = tradeReach.contains(reach)
+                        Button(on ? "✓ \(reach)" : reach) {
+                            if on { tradeReach.remove(reach) } else { tradeReach.insert(reach) }
+                        }
+                        .font(.plusJakarta(size: 11, weight: on ? .semibold : .regular))
+                        .foregroundStyle(on ? spec.channelOnLabel : spec.channelOffLabel)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(on ? spec.channelOnFill : Color.clear)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(on ? spec.chipOnBorder : spec.border, lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
             Text("You can fill in the extra details later.")
                 .font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
         }
@@ -293,8 +325,32 @@ struct RetailStoreSetupView: View {
         }
     }
 
+    private var counterparties: some View {
+        section("03", spec.partySection) {
+            Text(spec.partyNote)
+                .font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
+            ForEach(Array(parties.enumerated()), id: \.offset) { _, party in
+                Text("\(party.1) · \(spec.partyKinds.first { $0.0 == party.0 }?.1 ?? party.0)")
+                    .font(.plusJakarta(size: 14)).foregroundStyle(spec.text)
+            }
+            editor("Name", text: $partyName, placeholder: "Counterparty name", icon: "rs_setup_pencil")
+            ForEach(spec.partyKinds, id: \.0) { item in
+                Button(item.1) { partyKind = item.0 }
+                    .font(.plusJakarta(size: 11, weight: .semibold))
+                    .foregroundStyle(partyKind == item.0 ? spec.channelOnLabel : spec.channelOffLabel)
+            }
+            Button("Add") {
+                let trimmed = partyName.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.isEmpty else { return }
+                parties.append((partyKind, trimmed))
+                partyName = ""
+            }
+            .foregroundStyle(spec.text)
+        }
+    }
+
     private var plan: some View {
-        section("03", "Channels & Monthly Plan") {
+        section(spec.partySection.isEmpty ? "03" : "04", "Channels & Monthly Plan") {
             Text(spec.channelPrompt).font(.plusJakarta(size: 14)).foregroundStyle(spec.text)
             FlowLayout(spacing: 8) {
                 ForEach(spec.channels, id: \.self) { channel in
@@ -312,15 +368,25 @@ struct RetailStoreSetupView: View {
                 }
             }
             Text(selectedChannels.isEmpty
-                 ? "Choose at least one."
-                 : "\(selectedChannels.count) selected. These are the places you sell or serve. They are not a different kind of business.")
+                 ? (spec.channelsOptional ? spec.channelHelp : "Choose at least one.")
+                 : "\(selectedChannels.count) selected. \(spec.channelHelp)")
                 .font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
             choice("Month", monthLabel(start), icon: "rs_setup_calendar") { dateOpen = true }
             editor("Monthly budget", text: $budget, placeholder: "Amount", icon: "rs_setup_pencil")
             editor("Monthly sales target", text: $target, placeholder: "Amount", icon: "rs_setup_pencil")
+            if spec.targetMetrics.count > 1 {
+                choice("How the target is measured", metricLabel(metric), icon: "rs_setup_chevron") { metricOpen.toggle() }
+                if metricOpen {
+                    ForEach(spec.targetMetrics, id: \.self) { code in
+                        Button(metricLabel(code)) { metric = code; metricOpen = false }
+                            .font(.plusJakarta(size: 14))
+                            .foregroundStyle(code == metric ? spec.accent : spec.text)
+                    }
+                }
+            }
             VStack(alignment: .leading, spacing: 6) {
                 Text("How your target is counted").font(.plusJakarta(size: 13, weight: .semibold)).foregroundStyle(spec.accent)
-                Text("Sales you record count toward the target. Money already collected does not. Purchases and expenses count once toward the budget.")
+                Text(spec.targetNote)
                     .font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
             }
             .padding(16)
@@ -340,6 +406,8 @@ struct RetailStoreSetupView: View {
             }
             reviewLine("Company", companyName.trimmingCharacters(in: .whitespaces).isEmpty ? "Not set" : companyName)
             reviewLine("GSTIN", gstin.trimmingCharacters(in: .whitespaces).isEmpty ? "Not added" : gstin)
+            if !tradeReach.isEmpty { reviewLine("Trade reach", tradeReach.sorted().joined(separator: ", ")) }
+            if !parties.isEmpty { reviewLine("Counterparties", parties.map(\.1).joined(separator: ", ")) }
             reviewLine("People", ([ "\(owner) · Owner" ] + invites.map { "\($0.name) · \(roleLabel($0.role))" }).joined(separator: ", "))
             Text("Sales channels · \(selectedChannels.sorted().joined(separator: ", ").isEmpty ? "None yet" : selectedChannels.sorted().joined(separator: ", "))")
                 .font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
@@ -434,7 +502,7 @@ struct RetailStoreSetupView: View {
         let company = companyName.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty { localError = "Add a name."; return }
         if company.isEmpty { localError = "Add a company name."; return }
-        if selectedChannels.isEmpty { localError = "Choose at least one."; return }
+        if !spec.channelsOptional && selectedChannels.isEmpty { localError = "Choose at least one."; return }
         if (Double(budget) ?? 0) <= 0 { localError = "Enter a monthly budget above zero."; return }
         if (Double(target) ?? 0) <= 0 { localError = "Enter a monthly sales target above zero."; return }
         if needsApprover { localError = "Add someone who can approve, or choose no approval needed."; return }
@@ -450,21 +518,43 @@ struct RetailStoreSetupView: View {
             "location": location.trimmingCharacters(in: .whitespaces),
             "activationPolicy": policy,
             "participants": participants,
-            "counterparties": [[String: String]](),
+            "counterparties": parties.map { ["name": $0.1, "kind": $0.0] },
             "channels": Array(selectedChannels),
+            "tradeReach": Array(tradeReach),
             "monthlyBudget": budget.trimmingCharacters(in: .whitespaces),
             "monthlyTarget": target.trimmingCharacters(in: .whitespaces),
-            "targetMetric": "REVENUE",
+            "targetMetric": metric,
             "companyName": company,
             "gstin": gstin.trimmingCharacters(in: .whitespaces),
         ]
         onActivate(prefs, trimmed)
     }
 
+    private func metricLabel(_ code: String) -> String {
+        let metrics = spec.targetMetrics
+        switch code {
+        case "REVENUE": return metrics.contains("VALUE_DISPATCHED") ? "Sales / Revenue" : "Revenue"
+        case "LEADS": return "Leads"
+        case "ORDERS": return metrics.contains("DELIVERY_COUNT") ? "Order count" : "Orders"
+        case "CUSTOM_COUNT": return metrics.contains("DELIVERY_COUNT") ? "Compatible units" : "Custom count"
+        case "CLIENT_BILLING": return "Client billing"
+        case "PRODUCTION_OUTPUT": return "Production output"
+        case "UNITS_PRODUCED": return "Units Produced"
+        case "VALUE_DISPATCHED": return "Value Dispatched"
+        case "DELIVERY_COUNT": return "Delivery count"
+        default: return code
+        }
+    }
+
     private func modelIcon(_ code: String) -> String {
         switch code {
         case "RESTAURANT_FOOD": return "rs_setup_utensils"
         case "CONSUMER_SERVICE": return "rs_setup_handshake"
+        case "TRADING_WHOLESALE": return "rs_setup_trading"
+        case "CLIENT_CAMPAIGN", "OWN_BUSINESS_CAMPAIGN": return "rs_setup_campaign"
+        case "STANDARD_PRODUCTION": return "rs_setup_standard"
+        case "MADE_TO_ORDER": return "rs_setup_jobwork"
+        case "DISTRIBUTION_DEALERSHIP": return "rs_setup_distribution"
         default: return "rs_setup_store_chip"
         }
     }
@@ -561,6 +651,16 @@ private struct SetupSpec {
     let activate: String
     let footer: String
     let reviewKind: String
+    var tradeReach: [String] = []
+    var partySection: String = ""
+    var partyKinds: [(String, String)] = []
+    var steps: String = "3 steps · One simple setup"
+    var intro: String = "Bring your business, people, and monthly plan together before you start."
+    var partyNote: String = "Optional. These are counterparties, not people who can sign in."
+    var channelHelp: String = "These are the places you sell or serve. They are not a different kind of business."
+    var targetNote: String = "Sales you record count toward the target. Money already collected does not. Purchases and expenses count once toward the budget."
+    var targetMetrics: [String] = ["REVENUE"]
+    var channelsOptional: Bool = false
 
     var roles: [(String, String)] {
         [
@@ -574,8 +674,230 @@ private struct SetupSpec {
         ]
     }
 
+    static func campaignSpec(
+        code: String,
+        title: String,
+        badge: String,
+        intro: String,
+        basicsLine: String,
+        channels: [String],
+        partyKinds: [(String, String)],
+        partyNote: String,
+        targetMetrics: [String],
+        reviewKind: String
+    ) -> SetupSpec {
+        SetupSpec(
+            code: code,
+            bg: Color(hex: "#09121F"), card: Color(hex: "#122235"), field: Color(hex: "#09121F"),
+            border: Color(hex: "#2B4B63"), notice: Color(hex: "#16405C"), brand: Color(hex: "#6DDCFF"),
+            accent: Color(hex: "#6DDCFF"), number: Color(hex: "#406582"), secondary: Color(hex: "#A5BBCE"),
+            text: Color(hex: "#E5E0EE"), statusFill: Color(hex: "#16405C"), statusInk: Color(hex: "#6DDCFF"),
+            draftFill: Color(hex: "#16405C"), draftInk: Color(hex: "#6DDCFF"),
+            inviteFill: Color(hex: "#6DDCFF"), inviteBorder: Color(hex: "#6DDCFF"), actionInk: Color(hex: "#09121F"),
+            pillBorder: Color(hex: "#2B4B63"),
+            chipOnFill: Color(hex: "#16405C"), chipOnBorder: Color(hex: "#6DDCFF"), chipOnLabel: Color(hex: "#E5E0EE"),
+            chipOffFill: Color(hex: "#09121F"), chipOffLabel: Color(hex: "#A5BBCE"),
+            channelOnFill: Color(hex: "#16405C"), channelOnLabel: Color(hex: "#6DDCFF"), channelOffLabel: Color(hex: "#A5BBCE"),
+            hero: "rs_setup_campaign", mode: "Marketing", title: title,
+            badge: badge, basicsLine: basicsLine,
+            nameHint: "Campaign name", descriptionHint: "Everyday notes about this campaign",
+            locationHint: "Where this campaign runs",
+            ownerAccess: "Full campaign access. Only the owner changes roles.",
+            leadTitle: "Campaign lead", leadBody: "Runs day-to-day campaign work. Does not see full money records unless you allow it.",
+            peopleNote: "You can start on your own. A campaign lead and finance person are optional.",
+            channelPrompt: "Where does this campaign run? Choose at least one.",
+            channels: channels,
+            activate: "Activate campaign",
+            footer: "This stays private to your business. Only the owner can change who has access. Nothing is counted until the campaign is active.",
+            reviewKind: reviewKind,
+            partySection: "Network / Counterparties",
+            partyKinds: partyKinds,
+            steps: "4 steps · One simple setup",
+            intro: intro,
+            partyNote: partyNote,
+            channelHelp: "These are the places this campaign runs. They are not a different kind of business.",
+            targetNote: "Accepted results count toward the target. Money collected does not. Spend and vendor costs count once toward the budget.",
+            targetMetrics: targetMetrics
+        )
+    }
+
+    static func productionSpec(
+        code: String,
+        mint: Bool,
+        title: String,
+        intro: String,
+        basicsLine: String,
+        partySection: String,
+        partyKinds: [(String, String)],
+        partyNote: String,
+        targetMetrics: [String],
+        reviewKind: String,
+        steps: String,
+        tradeReach: [String] = []
+    ) -> SetupSpec {
+        let accent = mint ? "#66C7A4" : "#6DDCFF"
+        let page = mint ? "#071014" : "#09121F"
+        let card = mint ? "#15262C" : "#122235"
+        let border = mint ? "#345058" : "#2B4B63"
+        let chip = mint ? "#15262C" : "#16405C"
+        let ink = mint ? "#EFF5F2" : "#E5E0EE"
+        let secondary = mint ? "#AFC1C3" : "#A5BBCE"
+        let number = mint ? "#66C7A4" : "#406582"
+        return SetupSpec(
+            code: code,
+            bg: Color(hex: page), card: Color(hex: card), field: Color(hex: page),
+            border: Color(hex: border), notice: Color(hex: chip), brand: Color(hex: accent),
+            accent: Color(hex: accent), number: Color(hex: number), secondary: Color(hex: secondary),
+            text: Color(hex: ink), statusFill: Color(hex: chip), statusInk: Color(hex: accent),
+            draftFill: Color(hex: chip), draftInk: Color(hex: accent),
+            inviteFill: Color(hex: accent), inviteBorder: Color(hex: accent), actionInk: Color(hex: page),
+            pillBorder: Color(hex: border),
+            chipOnFill: Color(hex: chip), chipOnBorder: Color(hex: accent), chipOnLabel: Color(hex: ink),
+            chipOffFill: Color(hex: page), chipOffLabel: Color(hex: secondary),
+            channelOnFill: Color(hex: chip), channelOnLabel: Color(hex: accent), channelOffLabel: Color(hex: secondary),
+            hero: mint ? "rs_setup_jobwork" : "rs_setup_standard", mode: "Manufacturing", title: title,
+            badge: "Setup draft · Not active", basicsLine: basicsLine,
+            nameHint: "Factory name", descriptionHint: "Everyday notes about this factory",
+            locationHint: "Factory location",
+            ownerAccess: "Full manufacturing access. Only the owner changes roles.",
+            leadTitle: "Production / Order Lead",
+            leadBody: "Runs day-to-day production. Does not see full money records unless you allow it.",
+            peopleNote: "You can start on your own. A production lead and finance person are optional.",
+            channelPrompt: "Channels are optional.",
+            channels: [],
+            activate: "Activate Manufacturing Moment",
+            footer: "This stays private to your business. Only the owner can change who has access. Nothing is counted until the manufacturing business is active.",
+            reviewKind: reviewKind,
+            tradeReach: tradeReach,
+            partySection: partySection,
+            partyKinds: partyKinds,
+            steps: steps,
+            intro: intro,
+            partyNote: partyNote,
+            channelHelp: "Channels are optional. They are the places finished goods leave the factory.",
+            targetNote: "Validated sales count toward a revenue target. Money collected does not. Production, orders, and deliveries count only for the measure you choose. Purchases and expenses count once toward the budget.",
+            targetMetrics: targetMetrics,
+            channelsOptional: true
+        )
+    }
+
     static func forCode(_ code: String) -> SetupSpec {
         switch code {
+        case "STANDARD_PRODUCTION":
+            return productionSpec(
+                code: code, mint: false,
+                title: "Standard Production Setup",
+                intro: "Set up your manufacturing business, people, suppliers, buyers and monthly plan before activation.",
+                basicsLine: "A home for this factory.",
+                partySection: "Material Suppliers & Buyers",
+                partyKinds: [("SUPPLIER", "Material supplier"), ("BUYER", "Buyer or group")],
+                partyNote: "Material suppliers and buyers are optional. Counterparties stay separate from invited team roles.",
+                targetMetrics: ["REVENUE", "PRODUCTION_OUTPUT", "UNITS_PRODUCED", "VALUE_DISPATCHED"],
+                reviewKind: "Standard Production",
+                steps: "4 steps · Factory, people, suppliers, buyers and monthly plan"
+            )
+        case "MADE_TO_ORDER":
+            return productionSpec(
+                code: code, mint: true,
+                title: "Made-to-Order Production Setup",
+                intro: "Set up your job-work business, people, suppliers, customers and monthly plan.",
+                basicsLine: "A home for this workshop.",
+                partySection: "Material Suppliers & Customers",
+                partyKinds: [("SUPPLIER", "Material supplier"), ("CUSTOMER", "Customer")],
+                partyNote: "Material suppliers and customers are optional. They are counterparties, not people who can sign in.",
+                targetMetrics: ["REVENUE", "ORDERS", "DELIVERY_COUNT", "PRODUCTION_OUTPUT", "CUSTOM_COUNT"],
+                reviewKind: "Made-to-Order Production",
+                steps: "4 steps · Factory, people, suppliers, customers and monthly plan",
+                tradeReach: ["Local", "Domestic", "International"]
+            )
+        case "CLIENT_CAMPAIGN":
+            return campaignSpec(
+                code: code,
+                title: "Marketing Campaign Setup",
+                badge: "Campaign draft · Not active",
+                intro: "Run a marketing campaign with clear roles, counterparties and measurable targets before you activate.",
+                basicsLine: "A home for this client campaign.",
+                channels: ["Social", "Email", "Search", "Influencer", "Events", "Other"],
+                partyKinds: [("CLIENT", "Client contact"), ("VENDOR", "Vendor, creator, agency, or platform")],
+                partyNote: "Client identity and optional vendors, creators, agencies, and platforms are separate from invited team roles.",
+                targetMetrics: ["REVENUE", "LEADS", "ORDERS", "CUSTOM_COUNT", "CLIENT_BILLING"],
+                reviewKind: "Client Campaign"
+            )
+        case "OWN_BUSINESS_CAMPAIGN":
+            return campaignSpec(
+                code: code,
+                title: "Own Business Campaign Setup",
+                badge: "Draft · Not active",
+                intro: "You run campaigns for your own business or brand",
+                basicsLine: "A home for this brand campaign.",
+                channels: ["Instagram", "Google Search", "Email", "Influencer", "Events", "Other"],
+                partyKinds: [("VENDOR", "Vendor, creator, agency, or platform")],
+                partyNote: "Vendors, creators, agencies and platforms are separate from invited team roles. No client is required.",
+                targetMetrics: ["REVENUE", "LEADS", "ORDERS", "CUSTOM_COUNT"],
+                reviewKind: "Own Business Campaign"
+            )
+        case "TRADING_WHOLESALE":
+            return SetupSpec(
+                code: code,
+                bg: Color(hex: "#09121F"), card: Color(hex: "#122235"), field: Color(hex: "#09121F"),
+                border: Color(hex: "#2B4B63"), notice: Color(hex: "#16405C"), brand: Color(hex: "#6DDCFF"),
+                accent: Color(hex: "#6DDCFF"), number: Color(hex: "#406582"), secondary: Color(hex: "#A5BBCE"),
+                text: Color(hex: "#E5E0EE"), statusFill: Color(hex: "#16405C"), statusInk: Color(hex: "#6DDCFF"),
+                draftFill: Color(hex: "#16405C"), draftInk: Color(hex: "#6DDCFF"),
+                inviteFill: Color(hex: "#6DDCFF"), inviteBorder: Color(hex: "#6DDCFF"), actionInk: Color(hex: "#09121F"),
+                pillBorder: Color(hex: "#2B4B63"),
+                chipOnFill: Color(hex: "#16405C"), chipOnBorder: Color(hex: "#6DDCFF"), chipOnLabel: Color(hex: "#E5E0EE"),
+                chipOffFill: Color(hex: "#09121F"), chipOffLabel: Color(hex: "#A5BBCE"),
+                channelOnFill: Color(hex: "#16405C"), channelOnLabel: Color(hex: "#6DDCFF"), channelOffLabel: Color(hex: "#A5BBCE"),
+                hero: "rs_setup_trading", mode: "Trading", title: "Trading / Wholesale Setup",
+                badge: "Not started yet", basicsLine: "A home for this trading business.",
+                nameHint: "Business name", descriptionHint: "Everyday notes about this trade",
+                locationHint: "Warehouse or business location",
+                ownerAccess: "Full trading business access. Only the owner changes roles.",
+                leadTitle: "Trading manager", leadBody: "Runs day-to-day work. Does not see full money records unless you allow it.",
+                peopleNote: "You can start on your own. You can invite people after this starts.",
+                channelPrompt: "Where do you sell? Choose at least one.",
+                channels: ["Wholesale", "Direct", "Dealer", "Marketplace", "Export", "Other"],
+                activate: "Activate trading moment",
+                footer: "This stays private to your business. Only the owner can change who has access. Nothing is counted until you start.",
+                reviewKind: "Trading / Wholesale",
+                tradeReach: ["Local", "Domestic", "International"],
+                partySection: "Suppliers, Buyers & Channels",
+                partyKinds: [("SUPPLIER", "Supplier"), ("BUYER", "Buyer")],
+                steps: "4 steps · One simple setup",
+                intro: "Bring your business, people and monthly plan together. Make it yours before you activate."
+            )
+        case "DISTRIBUTION_DEALERSHIP":
+            return SetupSpec(
+                code: code,
+                bg: Color(hex: "#071014"), card: Color(hex: "#0C171B"), field: Color(hex: "#0C171B"),
+                border: Color(hex: "#345058"), notice: Color(hex: "#15262C"), brand: Color(hex: "#66C7A4"),
+                accent: Color(hex: "#66C7A4"), number: Color(hex: "#66C7A4"), secondary: Color(hex: "#66C7A4"),
+                text: Color(hex: "#EFF5F2"), statusFill: Color(hex: "#15262C"), statusInk: Color(hex: "#66C7A4"),
+                draftFill: Color(hex: "#15262C"), draftInk: Color(hex: "#66C7A4"),
+                inviteFill: Color(hex: "#66C7A4"), inviteBorder: Color(hex: "#66C7A4"), actionInk: Color(hex: "#071014"),
+                pillBorder: Color(hex: "#345058"),
+                chipOnFill: Color(hex: "#15262C"), chipOnBorder: Color(hex: "#66C7A4"), chipOnLabel: Color(hex: "#EFF5F2"),
+                chipOffFill: Color(hex: "#0C171B"), chipOffLabel: Color(hex: "#66C7A4"),
+                channelOnFill: Color(hex: "#15262C"), channelOnLabel: Color(hex: "#66C7A4"), channelOffLabel: Color(hex: "#66C7A4"),
+                hero: "rs_setup_distribution", mode: "Distribution", title: "Distribution / Dealership Setup",
+                badge: "Not started yet", basicsLine: "A home for this distribution business.",
+                nameHint: "Business name", descriptionHint: "Everyday notes about this distribution",
+                locationHint: "Depot or service territory",
+                ownerAccess: "Full distribution business access. Only the owner changes roles.",
+                leadTitle: "Distribution manager", leadBody: "Operations lead. Does not see full money records unless you allow it.",
+                peopleNote: "You can start on your own. A distribution manager and finance person are optional.",
+                channelPrompt: "Where do you sell? Choose at least one.",
+                channels: ["Retailer", "Dealer", "Sub-distributor", "Institutional", "Direct", "Other"],
+                activate: "Activate distribution moment",
+                footer: "This stays private to your business. Only the owner can change who has access. Nothing is counted until the distribution business is active.",
+                reviewKind: "Distribution / Dealership",
+                tradeReach: ["Local", "Domestic", "International"],
+                partySection: "Principals & Counterparties",
+                partyKinds: [("PRINCIPAL", "Principal or supplier"), ("DEALER", "Dealer or buyer group")],
+                steps: "4 steps · One simple setup",
+                intro: "Bring your business, people and key counterparties together. Make it yours before you activate."
+            )
         case "RESTAURANT_FOOD":
             return SetupSpec(
                 code: code,

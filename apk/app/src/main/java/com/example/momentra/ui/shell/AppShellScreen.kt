@@ -705,7 +705,7 @@ fun AppShellScreen(
                     ownerName = state.identity?.displayName.orEmpty(),
                     onCreateBack = { newMomentOpen = false },
                     onMomentCreated = { momentId, title, momentTypeCode, status ->
-                        if (momentTypeCode == "RETAIL_STORE" || momentTypeCode == "RESTAURANT_FOOD" || momentTypeCode == "CONSUMER_SERVICE") {
+                        if (momentTypeCode == "RETAIL_STORE" || momentTypeCode == "RESTAURANT_FOOD" || momentTypeCode == "CONSUMER_SERVICE" || momentTypeCode == "TRADING_WHOLESALE" || momentTypeCode == "DISTRIBUTION_DEALERSHIP" || momentTypeCode == "CLIENT_CAMPAIGN" || momentTypeCode == "OWN_BUSINESS_CAMPAIGN" || momentTypeCode == "STANDARD_PRODUCTION" || momentTypeCode == "MADE_TO_ORDER") {
                             newMomentOpen = false
                             shellViewModel.onMomentCreated(momentId, title, momentTypeCode, status)
                             tourController.onSignal(TourSignal.MOMENT_CREATED)

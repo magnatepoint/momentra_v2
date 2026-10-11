@@ -140,4 +140,29 @@ describe('personal experience projection', () => {
     assert.equal(view.life.moodCoverageLabel, '1 / 2 expenses · 50% coverage');
     assert.deepEqual(view.life.moodByArea.find((a) => a.areaLabel === 'Education & Growth')?.responses, ['Good']);
   });
+
+  it('sends an expense with no Life Area to attention and keeps it out of spend and stories', () => {
+    const rows: LifeExpenseFact[] = [
+      fact({ expenseId: 'ok', areaCode: 'P1', subcategoryCode: 'P1.1', amount: 400, effectiveAt: '2026-10-04T00:00:00.000Z' }),
+      fact({
+        expenseId: 'open',
+        areaCode: null,
+        subcategoryCode: null,
+        amount: 900,
+        merchantName: 'Unknown payee',
+        effectiveAt: '2026-10-05T00:00:00.000Z',
+      }),
+    ];
+    const view = projectPersonalExperience(rows, now);
+    assert.equal(view.pulse.attention.quiet, false);
+    assert.equal(view.pulse.attention.issueCount, 1);
+    assert.equal(view.pulse.attention.title, '1 need a Life Area.');
+    assert.equal(view.pulse.snapshot.total, '400.00');
+    assert.equal(view.pulse.recent.some((row) => row.expenseId === 'open'), false);
+    assert.equal(view.life.areas.find((area) => area.areaCode === 'P1')?.spend, '400.00');
+    assert.equal(view.life.total, '400.00');
+    assert.equal(view.moments.active.length, 0);
+    assert.equal(view.moments.emerging.length, 0);
+    assert.equal(view.expenseCount, 1);
+  });
 });

@@ -129,8 +129,8 @@ async function loadFacts(client: PoolClient, userId: string): Promise<LifeExpens
     currency_code: string;
     merchant_name: string | null;
     note: string | null;
-    life_area_code: string;
-    life_subcategory_code: string;
+    life_area_code: string | null;
+    life_subcategory_code: string | null;
     mood_code: string | null;
     classification_source: string | null;
     effective_at: Date;
@@ -144,9 +144,7 @@ async function loadFacts(client: PoolClient, userId: string): Promise<LifeExpens
             effective_at, status, origin, economic_kind, reversed_expense_id
      FROM finance.expense
      WHERE created_by_user_id = $1
-       AND domain_code = 'PERSONAL'
-       AND life_area_code IS NOT NULL
-       AND life_subcategory_code IS NOT NULL`,
+       AND domain_code = 'PERSONAL'`,
     [userId]
   );
   return rows.rows.map((r) => ({
@@ -336,7 +334,7 @@ export async function createPersonalLifeExpense(
   );
   const photoUploadId = body.photo ? await linkExpensePhoto(client, ctx, expenseId, momentId, body.photo) : null;
   const { domainEventId } = await insertDomainEventAndOutbox(client, ctx, {
-    eventName: 'personal_expense_created',
+    eventName: 'PersonalExpenseCreated',
     domainCode: 'PERSONAL',
     aggregateType: 'EXPENSE',
     aggregateId: expenseId,
@@ -437,7 +435,7 @@ export async function updatePersonalLifeExpense(
     ]
   );
   await insertDomainEventAndOutbox(client, ctx, {
-    eventName: 'personal_expense_context_changed',
+    eventName: 'PersonalExpenseContextChanged',
     domainCode: 'PERSONAL',
     aggregateType: 'EXPENSE',
     aggregateId: expenseId,
@@ -452,7 +450,7 @@ export async function updatePersonalLifeExpense(
   });
   if (body.moodCode !== undefined) {
     await insertDomainEventAndOutbox(client, ctx, {
-      eventName: 'personal_expense_mood_set',
+      eventName: 'PersonalExpenseMoodSet',
       domainCode: 'PERSONAL',
       aggregateType: 'EXPENSE',
       aggregateId: expenseId,
@@ -517,7 +515,7 @@ export async function refundPersonalLifeExpense(
     [refundId, momentId, ctx.userId]
   );
   await insertDomainEventAndOutbox(client, ctx, {
-    eventName: 'personal_expense_created',
+    eventName: 'PersonalExpenseCreated',
     domainCode: 'PERSONAL',
     aggregateType: 'EXPENSE',
     aggregateId: refundId,
@@ -540,7 +538,7 @@ export async function voidPersonalLifeExpense(
     [expenseId]
   );
   await insertDomainEventAndOutbox(client, ctx, {
-    eventName: 'personal_expense_voided',
+    eventName: 'PersonalExpenseVoided',
     domainCode: 'PERSONAL',
     aggregateType: 'EXPENSE',
     aggregateId: expenseId,

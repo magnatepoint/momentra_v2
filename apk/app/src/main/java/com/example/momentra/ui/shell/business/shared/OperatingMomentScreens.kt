@@ -35,7 +35,11 @@ import com.example.momentra.data.api.OperatingBoardSectionDto
 import com.example.momentra.data.api.OperatingProjectionDto
 import com.example.momentra.data.repository.BusinessSliceRepository
 import com.example.momentra.domain.BottomDestination
+import com.example.momentra.ui.shell.business.distribution.DistributionActive
+import com.example.momentra.ui.shell.business.marketing.MarketingActive
+import com.example.momentra.ui.shell.business.production.ProductionActive
 import com.example.momentra.ui.shell.business.restaurant.RestaurantActive
+import com.example.momentra.ui.shell.business.trading.TradingActive
 import com.example.momentra.ui.shell.business.service.ConsumerServiceActive
 import com.example.momentra.ui.shell.business.retail.RetailStoreActive
 
@@ -124,6 +128,126 @@ fun OperatingMomentPage(
     }
     if (model != null && model.subtype == "RESTAURANT_FOOD") {
         RestaurantActive(
+            model = model,
+            tab = tab,
+            onOpenQuickAdd = onOpenQuickAdd,
+            onRecord = { draft ->
+                repo.recordOperatingEvent(
+                    momentId,
+                    draft.eventType,
+                    draft.title,
+                    draft.amount,
+                    draft.note,
+                    draft.channelName,
+                    draft.counterpartyName,
+                    draft.paymentStatus,
+                ).fold(
+                    onSuccess = { tick += 1 },
+                    onFailure = { error = it.message },
+                )
+            },
+            onDecide = { eventId, decision ->
+                repo.decideOperatingEvent(momentId, eventId, decision).fold(
+                    onSuccess = { tick += 1 },
+                    onFailure = { error = it.message },
+                )
+            },
+            modifier = modifier,
+        )
+        return
+    }
+    if (model != null && (model.subtype == "CLIENT_CAMPAIGN" || model.subtype == "OWN_BUSINESS_CAMPAIGN")) {
+        MarketingActive(
+            model = model,
+            tab = tab,
+            onOpenQuickAdd = onOpenQuickAdd,
+            onRecord = { draft ->
+                repo.recordOperatingEvent(
+                    momentId,
+                    draft.eventType,
+                    draft.title,
+                    draft.amount,
+                    draft.note,
+                    draft.channelName,
+                    draft.counterpartyName,
+                    draft.paymentStatus,
+                ).fold(
+                    onSuccess = { tick += 1 },
+                    onFailure = { error = it.message },
+                )
+            },
+            onDecide = { eventId, decision ->
+                repo.decideOperatingEvent(momentId, eventId, decision).fold(
+                    onSuccess = { tick += 1 },
+                    onFailure = { error = it.message },
+                )
+            },
+            modifier = modifier,
+        )
+        return
+    }
+    if (model != null && (model.subtype == "STANDARD_PRODUCTION" || model.subtype == "MADE_TO_ORDER")) {
+        ProductionActive(
+            model = model,
+            tab = tab,
+            onOpenQuickAdd = onOpenQuickAdd,
+            onRecord = { draft ->
+                repo.recordOperatingEvent(
+                    momentId,
+                    draft.eventType,
+                    draft.title,
+                    draft.amount,
+                    draft.note,
+                    draft.channelName,
+                    draft.counterpartyName,
+                    draft.paymentStatus,
+                ).fold(
+                    onSuccess = { tick += 1 },
+                    onFailure = { error = it.message },
+                )
+            },
+            onDecide = { eventId, decision ->
+                repo.decideOperatingEvent(momentId, eventId, decision).fold(
+                    onSuccess = { tick += 1 },
+                    onFailure = { error = it.message },
+                )
+            },
+            modifier = modifier,
+        )
+        return
+    }
+    if (model != null && model.subtype == "TRADING_WHOLESALE") {
+        TradingActive(
+            model = model,
+            tab = tab,
+            onOpenQuickAdd = onOpenQuickAdd,
+            onRecord = { draft ->
+                repo.recordOperatingEvent(
+                    momentId,
+                    draft.eventType,
+                    draft.title,
+                    draft.amount,
+                    draft.note,
+                    draft.channelName,
+                    draft.counterpartyName,
+                    draft.paymentStatus,
+                ).fold(
+                    onSuccess = { tick += 1 },
+                    onFailure = { error = it.message },
+                )
+            },
+            onDecide = { eventId, decision ->
+                repo.decideOperatingEvent(momentId, eventId, decision).fold(
+                    onSuccess = { tick += 1 },
+                    onFailure = { error = it.message },
+                )
+            },
+            modifier = modifier,
+        )
+        return
+    }
+    if (model != null && model.subtype == "DISTRIBUTION_DEALERSHIP") {
+        DistributionActive(
             model = model,
             tab = tab,
             onOpenQuickAdd = onOpenQuickAdd,
@@ -300,14 +424,14 @@ private fun PulseBlocks(model: OperatingProjectionDto?) {
             InfoCard("Target", "${target.progress} of ${target.value} ${target.metric}")
         }
         model.paymentReadiness.forEach { item ->
-            InfoCard("Payment readiness", "${item.title} · ${item.amount} · ${item.status}")
+            InfoCard("Payment Readiness", "${item.title} · ${item.amount} · ${item.status}")
         }
     } else {
         InfoCard("Your view", "Finance totals stay with Finance, Approver, and Owner.")
     }
     model?.attention?.forEach { InfoCard(it.kind, it.title) }
     if (model?.attention.isNullOrEmpty()) {
-        InfoCard("Needs attention", "Nothing is waiting.")
+        InfoCard("Needs Attention", "Nothing is waiting.")
     }
     val recent = model?.activity.orEmpty().take(5)
     if (recent.isNotEmpty()) {

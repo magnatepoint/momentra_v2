@@ -31,11 +31,11 @@ enum OperatingMomentCatalog {
         case .marketingCampaigns:
             return [
                 OperatingSubtype(code: "CLIENT_CAMPAIGN", label: "Client Campaign", partyLabel: "Client", targetMetrics: ["REVENUE", "LEADS", "ORDERS", "CUSTOM_COUNT", "CLIENT_BILLING"], requiresChannel: true, quickAdds: marketingAdds + ["COLLECTION"]),
-                OperatingSubtype(code: "OWN_BUSINESS_CAMPAIGN", label: "Own Business Campaign", partyLabel: "Brand", targetMetrics: ["REVENUE", "LEADS", "ORDERS", "CUSTOM_COUNT"], requiresChannel: true, quickAdds: marketingAdds),
+                OperatingSubtype(code: "OWN_BUSINESS_CAMPAIGN", label: "Own Business Campaign", partyLabel: "Brand", targetMetrics: ["REVENUE", "LEADS", "ORDERS", "CUSTOM_COUNT"], requiresChannel: true, quickAdds: marketingAdds + ["COLLECTION"]),
             ]
         case .tradingDistribution:
             return [
-                OperatingSubtype(code: "TRADING_WHOLESALE", label: "Trading / Wholesale", partyLabel: "Business", targetMetrics: ["REVENUE", "ORDERS", "CUSTOM_COUNT"], requiresChannel: false, quickAdds: ["SALE", "PURCHASE", "SPEND", "PAYMENT", "COLLECTION", "BUDGET", "UPDATE", "ISSUE", "APPROVAL", "STOCK", "ORDER"]),
+                OperatingSubtype(code: "TRADING_WHOLESALE", label: "Trading / Wholesale", partyLabel: "Business", targetMetrics: ["REVENUE", "ORDERS", "CUSTOM_COUNT"], requiresChannel: false, quickAdds: ["SALE", "PURCHASE", "SPEND", "PAYMENT", "COLLECTION", "BUDGET", "UPDATE", "ISSUE", "APPROVAL", "STOCK", "ORDER", "SHIPMENT"]),
                 OperatingSubtype(code: "DISTRIBUTION_DEALERSHIP", label: "Distribution / Dealership", partyLabel: "Principal", targetMetrics: ["REVENUE", "ORDERS", "CUSTOM_COUNT"], requiresChannel: false, quickAdds: ["SALE", "PURCHASE", "SPEND", "PAYMENT", "COLLECTION", "BUDGET", "UPDATE", "ISSUE", "APPROVAL", "STOCK", "ORDER", "SHIPMENT"]),
             ]
         case .retailConsumer:
@@ -46,8 +46,8 @@ enum OperatingMomentCatalog {
             ]
         case .manufacturingProduction:
             return [
-                OperatingSubtype(code: "STANDARD_PRODUCTION", label: "Standard Production", partyLabel: "Plant", targetMetrics: ["REVENUE", "ORDERS", "CUSTOM_COUNT"], requiresChannel: false, quickAdds: ["PRODUCTION", "PURCHASE", "SPEND", "SALE", "DELIVERY", "PAYMENT", "COLLECTION", "BUDGET", "TARGET", "UPDATE", "ISSUE", "APPROVAL"]),
-                OperatingSubtype(code: "MADE_TO_ORDER", label: "Made-to-Order", partyLabel: "Workshop", targetMetrics: ["REVENUE", "ORDERS", "CUSTOM_COUNT"], requiresChannel: false, quickAdds: ["PRODUCTION", "PURCHASE", "SPEND", "SALE", "CUSTOMER_ORDER", "DELIVERY", "PAYMENT", "COLLECTION", "BUDGET", "TARGET", "UPDATE", "ISSUE", "APPROVAL"]),
+                OperatingSubtype(code: "STANDARD_PRODUCTION", label: "Standard Production", partyLabel: "Plant", targetMetrics: ["REVENUE", "PRODUCTION_OUTPUT", "UNITS_PRODUCED", "VALUE_DISPATCHED"], requiresChannel: false, quickAdds: ["PRODUCTION", "PURCHASE", "SPEND", "SALE", "CUSTOMER_ORDER", "DELIVERY", "PAYMENT", "COLLECTION", "BUDGET", "TARGET", "UPDATE", "ISSUE", "APPROVAL", "STOCK"]),
+                OperatingSubtype(code: "MADE_TO_ORDER", label: "Made-to-Order", partyLabel: "Workshop", targetMetrics: ["REVENUE", "ORDERS", "DELIVERY_COUNT", "PRODUCTION_OUTPUT", "CUSTOM_COUNT"], requiresChannel: false, quickAdds: ["PRODUCTION", "PURCHASE", "SPEND", "SALE", "CUSTOMER_ORDER", "DELIVERY", "PAYMENT", "COLLECTION", "BUDGET", "TARGET", "UPDATE", "ISSUE", "APPROVAL", "STOCK"]),
             ]
         }
     }
@@ -67,7 +67,7 @@ enum OperatingMomentCatalog {
 
     static let preferenceKeys: Set<String> = [
         "subtype", "identityName", "partyName", "description", "currency", "startDate", "location", "activationPolicy",
-        "participants", "counterparties", "channels", "monthlyBudget", "monthlyTarget", "targetMetric",
+        "participants", "counterparties", "channels", "tradeReach", "monthlyBudget", "monthlyTarget", "targetMetric",
     ]
 
     static func label(_ code: String) -> String {
@@ -194,6 +194,106 @@ struct OperatingMomentPage: View {
                         tick += 1
                     }
                 )
+            } else if let projection, projection.subtype == "CLIENT_CAMPAIGN" || projection.subtype == "OWN_BUSINESS_CAMPAIGN" {
+                MarketingActiveView(
+                    model: projection,
+                    tab: tab,
+                    onOpenQuickAdd: onOpenQuickAdd,
+                    onRecord: { draft in
+                        guard let momentId else { return }
+                        _ = try await APIClient.shared.recordOperatingEvent(
+                            momentId: momentId,
+                            eventType: draft.eventType,
+                            title: draft.title,
+                            amount: draft.amount,
+                            note: draft.note,
+                            channelName: draft.channelName,
+                            counterpartyName: draft.counterpartyName,
+                            paymentStatus: draft.paymentStatus
+                        )
+                        tick += 1
+                    },
+                    onDecide: { eventId, decision in
+                        guard let momentId else { return }
+                        _ = try await APIClient.shared.decideOperatingEvent(momentId: momentId, eventId: eventId, decision: decision)
+                        tick += 1
+                    }
+                )
+            } else if let projection, projection.subtype == "STANDARD_PRODUCTION" || projection.subtype == "MADE_TO_ORDER" {
+                ProductionActiveView(
+                    model: projection,
+                    tab: tab,
+                    onOpenQuickAdd: onOpenQuickAdd,
+                    onRecord: { draft in
+                        guard let momentId else { return }
+                        _ = try await APIClient.shared.recordOperatingEvent(
+                            momentId: momentId,
+                            eventType: draft.eventType,
+                            title: draft.title,
+                            amount: draft.amount,
+                            note: draft.note,
+                            channelName: draft.channelName,
+                            counterpartyName: draft.counterpartyName,
+                            paymentStatus: draft.paymentStatus
+                        )
+                        tick += 1
+                    },
+                    onDecide: { eventId, decision in
+                        guard let momentId else { return }
+                        _ = try await APIClient.shared.decideOperatingEvent(momentId: momentId, eventId: eventId, decision: decision)
+                        tick += 1
+                    }
+                )
+            } else if let projection, projection.subtype == "TRADING_WHOLESALE" {
+                TradingActiveView(
+                    model: projection,
+                    tab: tab,
+                    onOpenQuickAdd: onOpenQuickAdd,
+                    onRecord: { draft in
+                        guard let momentId else { return }
+                        _ = try await APIClient.shared.recordOperatingEvent(
+                            momentId: momentId,
+                            eventType: draft.eventType,
+                            title: draft.title,
+                            amount: draft.amount,
+                            note: draft.note,
+                            channelName: draft.channelName,
+                            counterpartyName: draft.counterpartyName,
+                            paymentStatus: draft.paymentStatus
+                        )
+                        tick += 1
+                    },
+                    onDecide: { eventId, decision in
+                        guard let momentId else { return }
+                        _ = try await APIClient.shared.decideOperatingEvent(momentId: momentId, eventId: eventId, decision: decision)
+                        tick += 1
+                    }
+                )
+            } else if let projection, projection.subtype == "DISTRIBUTION_DEALERSHIP" {
+                DistributionActiveView(
+                    model: projection,
+                    tab: tab,
+                    onOpenQuickAdd: onOpenQuickAdd,
+                    onRecord: { draft in
+                        guard let momentId else { return }
+                        _ = try await APIClient.shared.recordOperatingEvent(
+                            momentId: momentId,
+                            eventType: draft.eventType,
+                            title: draft.title,
+                            amount: draft.amount,
+                            note: draft.note,
+                            channelName: draft.channelName,
+                            counterpartyName: draft.counterpartyName,
+                            paymentStatus: draft.paymentStatus
+                        )
+                        tick += 1
+                    },
+                    onDecide: { eventId, decision in
+                        guard let momentId else { return }
+                        _ = try await APIClient.shared.decideOperatingEvent(momentId: momentId, eventId: eventId, decision: decision)
+                        tick += 1
+                    }
+                )
             } else if let projection, projection.subtype == "CONSUMER_SERVICE" {
                 ConsumerServiceActiveView(
                     model: projection,
@@ -258,13 +358,13 @@ struct OperatingMomentPage: View {
                 card("Target", "\(target.progress) of \(target.value) \(target.metric)")
             }
             ForEach(projection?.paymentReadiness ?? [], id: \.id) { item in
-                card("Payment readiness", "\(item.title) · \(item.amount) · \(item.status)")
+                card("Payment Readiness", "\(item.title) · \(item.amount) · \(item.status)")
             }
         } else {
             card("Your view", "Finance totals stay with Finance, Approver, and Owner.")
         }
         if (projection?.attention ?? []).isEmpty {
-            card("Needs attention", "Nothing is waiting.")
+            card("Needs Attention", "Nothing is waiting.")
         }
         ForEach(projection?.attention ?? [], id: \.id) { item in
             card(item.kind, item.title)
