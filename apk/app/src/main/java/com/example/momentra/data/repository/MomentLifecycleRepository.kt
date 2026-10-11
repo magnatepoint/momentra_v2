@@ -144,6 +144,14 @@ class MomentLifecycleRepository(
             ).data
         }.recoverCatching { e -> throw mapError(e) }
 
+    suspend fun duplicateBusiness(momentId: String): Result<CreateMomentResultDto> =
+        runCatching {
+            api.duplicateBusinessMoment(
+                momentId = momentId,
+                idempotencyKey = UUID.randomUUID().toString(),
+            ).data
+        }.recoverCatching { e -> throw mapError(e) }
+
     suspend fun duplicateGroup(momentId: String, includeData: Boolean = false): Result<CreateMomentResultDto> =
         runCatching {
             api.duplicateGroupMoment(

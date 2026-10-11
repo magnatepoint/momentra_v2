@@ -51,12 +51,15 @@ struct ManageMomentFlowSheet: View {
     @State private var confirmComplete = false
     @State private var confirmDuplicate = false
     @State private var viewerIsLeader = false
+    @State private var confirmBusinessDuplicate = false
     @State private var candidates: [LeaveCandidate] = []
     @State private var transferUserId: String?
     @State private var notificationCadence: String = "ALL"
 
     private var supportsLeave: Bool { domain == .group || domain == .business }
-    private var leaveNoun: String { domain == .business ? "Company" : "Group" }
+    private var showLeave: Bool { domain == .group || (domain == .business && !(companyId ?? "").isEmpty) }
+    private var leaveNoun: String { domain == .business ? "company" : "Group" }
+    private var isBusiness: Bool { domain == .business }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -101,14 +104,14 @@ struct ManageMomentFlowSheet: View {
                         isPresented = false
                         onEditSetup()
                     }
-                    if domain == .group {
+                    if domain == .group || isBusiness {
                         manageRow(
                             icon: "doc.on.doc.fill",
                             well: ManageMomentTokens.blue,
-                            title: "Duplicate group",
-                            subtitle: "Start a new chapter with the same setup"
+                            title: isBusiness ? "Duplicate this business" : "Duplicate group",
+                            subtitle: isBusiness ? "Start a new one with the same setup" : "Start a new chapter with the same setup"
                         ) {
-                            confirmDuplicate = true
+                            if isBusiness { confirmBusinessDuplicate = true } else { confirmDuplicate = true }
                         }
                     }
                     manageRow(
@@ -163,16 +166,16 @@ struct ManageMomentFlowSheet: View {
                         manageRow(
                             icon: "pause.fill",
                             well: ManageMomentTokens.blue,
-                            title: "Pause rhythm",
-                            subtitle: "Pause tracking without losing your data"
+                            title: isBusiness ? "Pause this business" : "Pause rhythm",
+                            subtitle: isBusiness ? "Pause tracking without losing your records" : "Pause tracking without losing your data"
                         ) {
                             confirmPause = true
                         }
                         manageRow(
                             icon: "checkmark",
                             well: ManageMomentTokens.green,
-                            title: "Complete Chapter",
-                            subtitle: "Mark this moment as finished"
+                            title: isBusiness ? "Finish this business" : "Complete Chapter",
+                            subtitle: isBusiness ? "Mark it as finished" : "Mark this moment as finished"
                         ) {
                             confirmComplete = true
                         }
@@ -190,7 +193,7 @@ struct ManageMomentFlowSheet: View {
                                 Text("Delete permanently")
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundStyle(ManageMomentTokens.redText)
-                                Text("Removes this moment; analytics kept")
+                                Text(isBusiness ? "Removes this business. Past reports stay." : "Removes this moment; analytics kept")
                                     .font(.system(size: 10))
                                     .foregroundStyle(ManageMomentTokens.muted)
                             }
@@ -207,7 +210,7 @@ struct ManageMomentFlowSheet: View {
                     .padding(.horizontal, 16)
                 }
 
-                if supportsLeave {
+                if showLeave {
                     Spacer().frame(height: 8)
                     let leaveEnabled = !(viewerIsLeader && candidates.isEmpty)
                     Button {
@@ -352,21 +355,29 @@ struct ManageMomentFlowSheet: View {
                 .preferredColorScheme(.dark)
             }
         }
-        .confirmationDialog("Pause rhythm?", isPresented: $confirmPause, titleVisibility: .visible) {
+        .confirmationDialog(isBusiness ? "Pause this business?" : "Pause rhythm?", isPresented: $confirmPause, titleVisibility: .visible) {
             Button("Pause", role: .destructive) {
                 Task { await runLifecycle(.archive) }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Pause tracking without losing your data.")
+            Text(isBusiness ? "Pause tracking without losing your records." : "Pause tracking without losing your data.")
         }
-        .confirmationDialog("Complete Chapter?", isPresented: $confirmComplete, titleVisibility: .visible) {
-            Button("Complete", role: .destructive) {
+        .confirmationDialog(isBusiness ? "Finish this business?" : "Complete Chapter?", isPresented: $confirmComplete, titleVisibility: .visible) {
+            Button(isBusiness ? "Finish" : "Complete", role: .destructive) {
                 Task { await runLifecycle(.complete) }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Mark this moment as finished.")
+            Text(isBusiness ? "Mark it as finished." : "Mark this moment as finished.")
+        }
+        .confirmationDialog("Duplicate this business?", isPresented: $confirmBusinessDuplicate, titleVisibility: .visible) {
+            Button("Duplicate") {
+                Task { await runBusinessDuplicate() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Start a new one with the same setup. Recorded sales and expenses stay on this one.")
         }
         .confirmationDialog("Duplicate group?", isPresented: $confirmDuplicate, titleVisibility: .visible) {
             Button("Setup & checklist only") {
@@ -417,7 +428,7 @@ struct ManageMomentFlowSheet: View {
             }
         case .business:
             guard let companyId, !companyId.isEmpty else {
-                viewerIsLeader = false
+                viewerIsLeader = true
                 candidates = []
                 return
             }
@@ -482,6 +493,19 @@ struct ManageMomentFlowSheet: View {
                 isPresented = false
                 onCompleted()
             }
+        } catch {
+            errorText = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    private func runBusinessDuplicate() async {
+        busy = true
+        errorText = nil
+        defer { busy = false }
+        do {
+            let created = try await APIClient.shared.duplicateBusinessMoment(momentId: momentId)
+            isPresented = false
+            onDuplicated(created.momentId, created.title)
         } catch {
             errorText = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }

@@ -330,20 +330,26 @@ async function loadMomentLeadership(
   momentId: string
 ): Promise<{
   domain_code: string;
+  created_by_user_id: string | null;
   organizer_user_id: string | null;
   participant_role: string | null;
   membership_type: string | null;
+  company_id: string | null;
 } | null> {
   const row = await client.query<{
     domain_code: string;
+    created_by_user_id: string | null;
     organizer_user_id: string | null;
     participant_role: string | null;
     membership_type: string | null;
+    company_id: string | null;
   }>(
     `SELECT m.domain_code,
+            m.created_by_user_id,
             gmc.organizer_user_id,
             mp.participant_role,
-            cm.membership_type
+            cm.membership_type,
+            bmc.company_id
      FROM core.moment m
      LEFT JOIN collaboration.group_moment_context gmc ON gmc.moment_id = m.moment_id
      LEFT JOIN collaboration.moment_participant mp
@@ -359,9 +365,11 @@ async function loadMomentLeadership(
 
 function isMomentLeader(r: {
   domain_code: string;
+  created_by_user_id: string | null;
   organizer_user_id: string | null;
   participant_role: string | null;
   membership_type: string | null;
+  company_id: string | null;
 }, userId: string): boolean {
   if (r.domain_code === 'PERSONAL') return true;
   if (r.domain_code === 'GROUP') {
@@ -370,7 +378,9 @@ function isMomentLeader(r: {
     return isOrganizerUser || isLeaderRole;
   }
   if (r.domain_code === 'BUSINESS') {
-    return r.membership_type != null && COMPANY_LEADER_TYPES.has(r.membership_type);
+    if (r.membership_type != null && COMPANY_LEADER_TYPES.has(r.membership_type)) return true;
+    if (r.company_id != null) return false;
+    return r.participant_role === 'ORGANIZER' || r.created_by_user_id === userId;
   }
   return false;
 }

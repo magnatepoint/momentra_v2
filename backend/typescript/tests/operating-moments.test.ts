@@ -203,6 +203,63 @@ describe('operating moment catalog', () => {
     assert.equal(staff.boards.moments.find((section) => section.code === 'sales')?.rows[0]?.amount, null);
   });
 
+  it('counts a recorded service in sales and a collected service in received', () => {
+    const prefs = normalizeOperatingPreferences(
+      'RETAIL_CONSUMER',
+      {
+        subtype: 'CONSUMER_SERVICE',
+        identityName: 'Care',
+        partyName: 'Care',
+        monthlyBudget: '8000',
+        monthlyTarget: '20000',
+        targetMetric: 'REVENUE',
+        channels: ['Walk-in'],
+        startDate: '2026-10-01',
+      },
+      { userId: 'u', displayName: 'Asha' }
+    );
+    const events: OperatingEventRow[] = [
+      {
+        operatingEventId: 'svc-1',
+        eventType: 'SERVICE',
+        title: 'Home visit',
+        note: null,
+        amount: '900.0000',
+        currencyCode: 'INR',
+        counterpartyName: null,
+        channelName: 'Walk-in',
+        paymentRelevance: 'RECEIVABLE',
+        paymentStatus: 'COLLECTED',
+        approvalStatus: 'NONE',
+        submittedByUserId: 'u',
+        decidedByUserId: null,
+        occurredAt: '2026-10-02T00:00:00.000Z',
+      },
+      {
+        operatingEventId: 'svc-2',
+        eventType: 'SERVICE',
+        title: 'Follow up',
+        note: null,
+        amount: '400.0000',
+        currencyCode: 'INR',
+        counterpartyName: null,
+        channelName: 'Walk-in',
+        paymentRelevance: 'RECEIVABLE',
+        paymentStatus: 'PENDING',
+        approvalStatus: 'NONE',
+        submittedByUserId: 'u',
+        decidedByUserId: null,
+        occurredAt: '2026-10-03T00:00:00.000Z',
+      },
+    ];
+    const finance = projectOperatingMoment({ familyCode: 'RETAIL_CONSUMER', prefs, role: 'FINANCE', events });
+    assert.equal(finance.finance?.sales, '1300.0000');
+    assert.equal(finance.finance?.received, '900.0000');
+    assert.equal(finance.target?.progress, '1300.0000');
+    assert.equal(finance.boards.moments.find((section) => section.code === 'services')?.rows.length, 2);
+    assert.equal(finance.boards.moments.some((section) => section.code === 'purchases'), false);
+  });
+
   it('rejects a retail store without a positive budget', () => {
     assert.throws(
       () =>

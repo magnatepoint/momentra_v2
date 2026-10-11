@@ -367,6 +367,60 @@ v1Router.get('/business/moments', async (req, res, next) => {
   }
 });
 
+v1Router.post('/business/moments/:momentId/company', requireIdempotencyKey, async (req, res, next) => {
+  try {
+    const ctx = req.requestContext!;
+    const body = parseBody(momentService.linkBusinessCompanySchema, req.body ?? {});
+    const result = await runCommand({
+      operationCode: 'BUSINESS_MOMENT_LINK_COMPANY',
+      idempotencyKey: req.idempotencyKey!,
+      body,
+      ctx,
+      resourceType: 'MOMENT',
+      execute: async (client, b) => {
+        const parsed = b as z.infer<typeof momentService.linkBusinessCompanySchema>;
+        const r = await momentService.linkBusinessMomentCompany(
+          client,
+          ctx,
+          param(req.params.momentId),
+          parsed.companyId
+        );
+        return { result: r, resourceId: r.momentId };
+      },
+    });
+    res.json(commandEnvelope(result, ctx.correlationId));
+  } catch (e) {
+    next(e);
+  }
+});
+
+v1Router.post('/business/moments/:momentId/duplicate', requireIdempotencyKey, async (req, res, next) => {
+  try {
+    const ctx = req.requestContext!;
+    const result = await runCommand({
+      operationCode: 'BUSINESS_MOMENT_DUPLICATE',
+      idempotencyKey: req.idempotencyKey!,
+      body: {},
+      ctx,
+      resourceType: 'MOMENT',
+      execute: async (client) => {
+        const r = await momentService.duplicateBusinessMoment(client, ctx, param(req.params.momentId));
+        return { result: r, resourceId: r.momentId };
+      },
+    });
+    const hints = projectionCodesForDomain(result.domainCode);
+    publishProjectionUpdated(ctx.userId, hints.map((h) => h.toUpperCase().replace('.', '_')), ctx.correlationId);
+    res.status(201).json(
+      commandEnvelope(result, ctx.correlationId, {
+        resourceVersion: result.version,
+        projectionHints: toProjectionHints(hints),
+      })
+    );
+  } catch (e) {
+    next(e);
+  }
+});
+
 // --- Business shell (company selector + setup flow) ---
 v1Router.get('/companies', async (req, res, next) => {
   try {

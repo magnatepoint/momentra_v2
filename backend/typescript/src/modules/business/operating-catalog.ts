@@ -660,10 +660,11 @@ function financeTotals(events: OperatingEventRow[], visible: boolean): Operating
   const sum = (match: (row: OperatingEventRow) => boolean) =>
     money(rows.filter(match).reduce((total, row) => total + num(row.amount), 0));
   return {
-    sales: sum((row) => row.eventType === 'SALE'),
+    sales: sum((row) => row.eventType === 'SALE' || row.eventType === 'SERVICE'),
     received: sum(
       (row) =>
-        (row.eventType === 'COLLECTION' || row.eventType === 'SALE') && row.paymentStatus === 'COLLECTED'
+        (row.eventType === 'COLLECTION' || row.eventType === 'SALE' || row.eventType === 'SERVICE') &&
+        row.paymentStatus === 'COLLECTED'
     ),
     outstanding: sum(
       (row) =>

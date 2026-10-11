@@ -1146,6 +1146,105 @@ async function rebuildGroupFinanceSnapshotAfterCopy(
   }
 }
 
+export const linkBusinessCompanySchema = z
+  .object({
+    companyId: z.string().uuid(),
+  })
+  .strict();
+
+/** Attach a company to a business moment that was started without one. */
+export async function linkBusinessMomentCompany(
+  client: PoolClient,
+  ctx: RequestContext,
+  momentId: string,
+  companyId: string
+): Promise<{ momentId: string; companyId: string }> {
+  await assertMomentLifecycleLeader(client, ctx, momentId);
+  const membership = await client.query(
+    `SELECT 1 FROM business.company_membership
+     WHERE company_id = $1 AND user_id = $2 AND status = 'ACTIVE'
+       AND membership_type IN ('OWNER', 'ADMIN')`,
+    [companyId, ctx.userId]
+  );
+  if (!membership.rowCount) {
+    throw new AppError(ErrorCode.GOVERNANCE_DENIED, 'Active company ownership required.', 403);
+  }
+  const current = await client.query<{ company_id: string | null }>(
+    `SELECT company_id FROM business.business_moment_context WHERE moment_id = $1`,
+    [momentId]
+  );
+  if (!current.rows[0]) {
+    throw new AppError(ErrorCode.RESOURCE_NOT_FOUND, 'Business moment not found.', 404);
+  }
+  if (current.rows[0].company_id && current.rows[0].company_id !== companyId) {
+    throw new AppError(ErrorCode.VALIDATION_FAILED, 'This business already belongs to a company.', 400);
+  }
+  if (!current.rows[0].company_id) {
+    await client.query(
+      `UPDATE business.business_moment_context
+       SET company_id = $2, updated_at = now(), version = version + 1
+       WHERE moment_id = $1 AND company_id IS NULL`,
+      [momentId, companyId]
+    );
+    await client.query(
+      `UPDATE business.business_system_setup
+       SET company_id = $2, updated_at = now()
+       WHERE moment_id = $1 AND company_id IS NULL`,
+      [momentId, companyId]
+    );
+  }
+  return { momentId, companyId };
+}
+
+/** Copy a business moment's setup into a new moment. Recorded sales and expenses stay on the original. */
+export async function duplicateBusinessMoment(
+  client: PoolClient,
+  ctx: RequestContext,
+  sourceMomentId: string
+): Promise<MomentResult> {
+  await assertMomentLifecycleLeader(client, ctx, sourceMomentId);
+  const src = await client.query<{
+    domain_code: string;
+    title: string;
+    type_code: string;
+    business_family: string;
+    company_id: string | null;
+    preferences: Record<string, unknown> | null;
+  }>(
+    `SELECT m.domain_code, m.title, mt.code AS type_code, bmc.business_family, bmc.company_id, bss.preferences
+     FROM core.moment m
+     JOIN core.moment_type mt ON mt.moment_type_id = m.moment_type_id
+     JOIN business.business_moment_context bmc ON bmc.moment_id = m.moment_id
+     LEFT JOIN business.business_system_setup bss ON bss.moment_id = m.moment_id
+     WHERE m.moment_id = $1
+     ORDER BY bss.created_at DESC NULLS LAST
+     LIMIT 1`,
+    [sourceMomentId]
+  );
+  const row = src.rows[0];
+  if (!row || row.domain_code !== 'BUSINESS') {
+    throw new AppError(ErrorCode.VALIDATION_FAILED, 'Only business moments can be duplicated this way.', 400);
+  }
+  const copySuffix = ' (Copy)';
+  const baseTitle = row.title.trim() || 'Business';
+  const title =
+    baseTitle.length + copySuffix.length <= 500
+      ? `${baseTitle}${copySuffix}`
+      : `${baseTitle.slice(0, Math.max(1, 500 - copySuffix.length))}${copySuffix}`;
+  const createBody = createMomentSchema.parse({
+    domainCode: 'BUSINESS',
+    momentTypeCode: row.type_code,
+    title,
+    status: 'ACTIVE',
+    companyId: row.company_id ?? undefined,
+    businessSetup: {
+      familyCode: row.business_family,
+      preferences: row.preferences ?? {},
+    },
+  });
+  return createMoment(client, ctx, createBody);
+}
+
 /** Prefill for Personal or Business setup resume (DRAFT or ACTIVE). */
 export async function getDomainSetupPrefill(
   client: PoolClient,

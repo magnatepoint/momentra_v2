@@ -1291,7 +1291,7 @@ struct AppShellView: View {
                 ownerName: model.identity?.displayName ?? "",
                 onBack: { newMomentOpen = false },
                 onCreated: { outcome in
-                    if outcome.momentTypeCode == "RETAIL_STORE" {
+                    if outcome.momentTypeCode == "RETAIL_STORE" || outcome.momentTypeCode == "RESTAURANT_FOOD" || outcome.momentTypeCode == "CONSUMER_SERVICE" {
                         newMomentOpen = false
                         model.onMomentCreated(
                             momentId: outcome.momentId,

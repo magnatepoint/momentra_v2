@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.momentra.data.api.ApiClient
 import com.example.momentra.data.api.ApiResultException
+import com.example.momentra.data.api.CreateCompanyBody
 import com.example.momentra.data.api.CreateMomentParticipantBody
 import com.example.momentra.data.api.DomainSetupPrefillDto
 import com.example.momentra.data.api.GroupSetupBlockDto
@@ -97,6 +98,8 @@ class MomentCreateViewModel(
         editingMomentId: String? = null,
         editingMomentStatus: String? = null,
         status: String? = null,
+        companyName: String? = null,
+        taxIdentifier: String? = null,
         onSuccess: (CreateMomentOutcome) -> Unit,
     ) {
         val catalog = BusinessSetupCatalog.forKind(kind)
@@ -109,6 +112,17 @@ class MomentCreateViewModel(
                 BusinessSetupCatalog.allowedKeys(kind),
             )
             val momentTypeCode = subtype ?: catalog.momentTypeCode
+            val resolvedCompanyId = try {
+                ensureBusinessCompany(
+                    companyId = companyId,
+                    companyName = companyName,
+                    taxIdentifier = taxIdentifier,
+                    editingMomentId = editingMomentId,
+                )
+            } catch (e: Exception) {
+                finishCreateFailure(e)
+                return@launch
+            }
             if (editingMomentId != null) {
                 submitBusinessEdit(
                     momentId = editingMomentId,
@@ -120,7 +134,7 @@ class MomentCreateViewModel(
                 return@launch
             }
             repository.createBusinessMoment(
-                companyId = companyId,
+                companyId = resolvedCompanyId,
                 familyCode = kind.familyCode,
                 momentTypeCode = momentTypeCode,
                 title = resolvedTitle,
@@ -206,6 +220,51 @@ class MomentCreateViewModel(
                 },
             )
         }
+    }
+
+    private suspend fun ensureBusinessCompany(
+        companyId: String?,
+        companyName: String?,
+        taxIdentifier: String?,
+        editingMomentId: String?,
+    ): String? {
+        val name = companyName?.trim().orEmpty()
+        if (name.isEmpty()) return companyId?.takeIf { it.isNotBlank() }
+        val gst = taxIdentifier?.trim()?.takeIf { it.isNotEmpty() }
+        val existing = companyId?.takeIf { it.isNotBlank() }
+        if (existing == null) {
+            val created = ApiClient.apiService.createCompany(
+                idempotencyKey = UUID.randomUUID().toString(),
+                body = CreateCompanyBody(
+                    displayName = name,
+                    legalName = name,
+                    taxIdentifier = gst,
+                ),
+            ).data
+            if (editingMomentId != null) {
+                ApiClient.apiService.linkBusinessMomentCompany(
+                    momentId = editingMomentId,
+                    idempotencyKey = UUID.randomUUID().toString(),
+                    body = mapOf("companyId" to created.companyId),
+                )
+            }
+            return created.companyId
+        }
+        val detail = ApiClient.apiService.getCompany(existing).data
+        val version = (detail["version"] as? Number)?.toInt()
+            ?: throw ApiResultException.Validation(message = "Company version missing.")
+        val body = mutableMapOf<String, Any>(
+            "displayName" to name,
+            "legalName" to name,
+            "expectedVersion" to version,
+        )
+        body["taxIdentifier"] = gst ?: ""
+        ApiClient.apiService.patchCompany(
+            companyId = existing,
+            idempotencyKey = UUID.randomUUID().toString(),
+            body = body,
+        )
+        return existing
     }
 
     private suspend fun submitGroupEdit(
