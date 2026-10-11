@@ -1,6 +1,113 @@
 import Foundation
 import FirebaseAuth
 
+struct OperatingMoneyPayload: Decodable {
+    let amount: String
+    let spent: String
+    let remaining: String
+}
+
+struct OperatingTargetPayload: Decodable {
+    let metric: String
+    let value: String
+    let progress: String
+}
+
+struct OperatingAttentionPayload: Decodable, Identifiable {
+    let id: String
+    let title: String
+    let kind: String
+}
+
+struct OperatingPaymentPayload: Decodable, Identifiable {
+    let id: String
+    let title: String
+    let amount: String
+    let relevance: String
+    let status: String
+}
+
+struct OperatingFinancePayload: Decodable {
+    let sales: String
+    let received: String
+    let outstanding: String
+    let eligibleCost: String
+    let cashPaid: String
+}
+
+struct OperatingActivityPayload: Decodable, Identifiable {
+    let id: String
+    let title: String
+    let eventType: String
+    let occurredAt: String
+    let amount: String?
+    let channelName: String?
+    let counterpartyName: String?
+    let paymentStatus: String?
+    let approvalStatus: String?
+    let note: String?
+}
+
+struct OperatingLifePayload: Decodable {
+    let channels: [String]
+    let openCommitments: Int
+    let resultProgress: String
+}
+
+struct OperatingMemoryPayload: Decodable {
+    let revisions: [OperatingAttentionPayload]
+}
+
+struct OperatingQuickAddPayload: Decodable, Identifiable {
+    let code: String
+    let label: String
+    let needsAmount: Bool
+    var id: String { code }
+}
+
+struct OperatingBoardSectionPayload: Decodable, Identifiable {
+    let code: String
+    let title: String
+    let detail: String
+    let rows: [OperatingActivityPayload]?
+    var id: String { code }
+}
+
+struct OperatingBoardsPayload: Decodable {
+    let moments: [OperatingBoardSectionPayload]?
+    let life: [OperatingBoardSectionPayload]?
+    let memory: [OperatingBoardSectionPayload]?
+}
+
+struct OperatingProjectionPayload: Decodable {
+    let retired: Bool?
+    let familyCode: String?
+    let subtype: String?
+    let subtypeLabel: String?
+    let title: String?
+    let partyName: String?
+    let role: String?
+    let financeVisible: Bool?
+    let currency: String?
+    let startDate: String?
+    let location: String?
+    let budget: OperatingMoneyPayload?
+    let target: OperatingTargetPayload?
+    let finance: OperatingFinancePayload?
+    let attention: [OperatingAttentionPayload]?
+    let paymentReadiness: [OperatingPaymentPayload]?
+    let activity: [OperatingActivityPayload]?
+    let life: OperatingLifePayload?
+    let memory: OperatingMemoryPayload?
+    let boards: OperatingBoardsPayload?
+    let quickAdds: [OperatingQuickAddPayload]?
+}
+
+struct RecordOperatingEventResult: Decodable {
+    let eventId: String
+    let approvalStatus: String
+}
+
 struct MeBootstrap: Decodable {
     let userId: String
     let displayName: String?
@@ -4068,8 +4175,10 @@ final class APIClient {
         let residentId: String?
         let participantId: String?
         let roleCode: String?
+        let roleLabel: String?
         let status: String?
         let name: String?
+        let displayName: String?
     }
 
     struct GroupResidentsPayload: Decodable {
@@ -5057,6 +5166,53 @@ final class APIClient {
 
     func getBusinessWorkload(momentId: String) async throws -> BusinessWorkloadPayload {
         try await authorizedGet(path: "v1/business/moments/\(momentId)/workload")
+    }
+
+    func getOperatingMoment(momentId: String) async throws -> OperatingProjectionPayload {
+        try await authorizedGet(path: "v1/business/moments/\(momentId)/operating")
+    }
+
+    func decideOperatingEvent(momentId: String, eventId: String, decision: String) async throws -> RecordOperatingEventResult {
+        struct Body: Encodable { let decision: String }
+        return try await authorizedPost(
+            path: "v1/business/moments/\(momentId)/operating-events/\(eventId)/decision",
+            body: Body(decision: decision),
+            idempotencyKey: UUID().uuidString
+        )
+    }
+
+    func recordOperatingEvent(
+        momentId: String,
+        eventType: String,
+        title: String,
+        amount: String?,
+        note: String? = nil,
+        channelName: String? = nil,
+        counterpartyName: String? = nil,
+        paymentStatus: String? = nil
+    ) async throws -> RecordOperatingEventResult {
+        struct Body: Encodable {
+            let eventType: String
+            let title: String
+            let amount: String?
+            let note: String?
+            let channelName: String?
+            let counterpartyName: String?
+            let paymentStatus: String?
+        }
+        return try await authorizedPost(
+            path: "v1/business/moments/\(momentId)/operating-events",
+            body: Body(
+                eventType: eventType,
+                title: title,
+                amount: amount,
+                note: note,
+                channelName: channelName,
+                counterpartyName: counterpartyName,
+                paymentStatus: paymentStatus
+            ),
+            idempotencyKey: UUID().uuidString
+        )
     }
 
     func getBusinessPulse(momentId: String) async throws -> BusinessPulsePayload {
@@ -6894,6 +7050,26 @@ final class APIClient {
         }
         let envelope = try decoder.decode(SuccessEnvelope<T>.self, from: data)
         return envelope.data
+    }
+
+    func getPersonalExperience() async throws -> PersonalExperiencePayload {
+        try await authorizedGet(path: "v1/personal/experience")
+    }
+
+    func createPersonalLifeExpense(_ body: PersonalLifeExpenseRequest) async throws -> PersonalExpenseConfirmationPayload {
+        try await authorizedPost(path: "v1/personal/expenses", body: body, idempotencyKey: UUID().uuidString)
+    }
+
+    func correctPersonalLifeExpense(expenseId: String, body: PersonalLifeExpenseCorrectionRequest) async throws -> PersonalExpenseConfirmationPayload {
+        try await authorizedPatch(path: "v1/personal/expenses/\(expenseId)", body: body, idempotencyKey: UUID().uuidString)
+    }
+
+    func refundPersonalLifeExpense(expenseId: String) async throws -> PersonalLifeRefundPayload {
+        try await authorizedPost(path: "v1/personal/expenses/\(expenseId)/refund", body: PersonalLifeRefundRequest(), idempotencyKey: UUID().uuidString)
+    }
+
+    func voidPersonalLifeExpense(expenseId: String) async throws -> PersonalLifeVoidPayload {
+        try await authorizedPost(path: "v1/personal/expenses/\(expenseId)/void", body: PersonalLifeRefundRequest(), idempotencyKey: UUID().uuidString)
     }
 
     /// URLSession surfaces Swift concurrency cancellation as NSURLErrorCancelled (-999).

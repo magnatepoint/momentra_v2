@@ -7,7 +7,7 @@ import { z } from 'zod';
 import type { RequestContext } from '../../platform/request-context/context';
 import { AppError, ErrorCode } from '../../platform/errors/errors';
 import { recordCommandSideEffects } from '../../platform/events/outbox';
-import { assertGroupMember, listOtherMemberUserIds } from './group-membership';
+import { assertGroupMember, listOtherMemberUserIds, roleLabelFor } from './group-membership';
 import * as collaborationService from './service';
 import { countMediaForMemories, listMediaForMemories } from '../memory/memory-attachments';
 import { travelCurrencyCodeSchema } from '../finance/travel-currencies';
@@ -1146,23 +1146,36 @@ export async function listResidents(client: PoolClient, ctx: RequestContext, mom
     resident_id: string;
     participant_id: string;
     resident_role: string | null;
+    participant_role: string | null;
     status: string;
+    display_name: string | null;
   }>(
-    `SELECT resident_id, participant_id, resident_role, status
-     FROM collaboration.resident
-     WHERE moment_id = $1 AND status = 'ACTIVE'
-     ORDER BY created_at ASC
+    `SELECT r.resident_id, r.participant_id, r.resident_role, r.status,
+            mp.participant_role,
+            COALESCE(up.display_name, ep.display_name, mp.metadata->>'displayName') AS display_name
+     FROM collaboration.resident r
+     LEFT JOIN collaboration.moment_participant mp
+       ON mp.participant_id = r.participant_id AND mp.moment_id = r.moment_id
+     LEFT JOIN core.user_profile up ON up.user_id = mp.user_id
+     LEFT JOIN core.external_party ep ON ep.external_party_id = mp.external_party_id
+     WHERE r.moment_id = $1 AND r.status = 'ACTIVE'
+     ORDER BY r.created_at ASC
      LIMIT 200`,
     [momentId]
   );
   return {
     momentId,
-    items: rows.rows.map((r) => ({
-      residentId: r.resident_id,
-      participantId: r.participant_id,
-      roleCode: r.resident_role,
-      status: r.status,
-    })),
+    items: rows.rows.map((r) => {
+      const roleCode = r.resident_role ?? r.participant_role ?? 'RESIDENT';
+      return {
+        residentId: r.resident_id,
+        participantId: r.participant_id,
+        roleCode,
+        roleLabel: roleLabelFor(roleCode, false),
+        status: r.status,
+        displayName: r.display_name,
+      };
+    }),
   };
 }
 

@@ -20,7 +20,7 @@ struct ShellInvariantTests {
         #expect(result.healed)
     }
 
-    @Test func businessScopesMomentsToCompany() {
+    @Test func businessListsMomentsWithoutACompany() {
         let result = ShellStateInvariants.heal(
             ShellInvariantInput(
                 supportedContexts: [.personal, .business],
@@ -38,9 +38,9 @@ struct ShellInvariantTests {
                 selectedTabByContext: [.business: .memory]
             )
         )
-        #expect(result.selectedCompanyId == "c1")
-        #expect(result.moments.map(\.momentId) == ["m1"])
-        #expect(result.selectedMomentId == "m1")
+        #expect(result.selectedCompanyId == nil)
+        #expect(result.moments.map(\.momentId) == ["m1", "m2"])
+        #expect(result.selectedMomentId == "m2")
         #expect(result.selectedTabByContext[.business] == .memory)
     }
 

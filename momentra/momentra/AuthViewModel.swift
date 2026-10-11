@@ -18,6 +18,26 @@ final class AuthViewModel: ObservableObject {
     @Published var phoneCodeSent = false
 
     var isLoggedIn: Bool { phase == .authenticated && identity != nil }
+
+    func applyDisplayName(_ displayName: String) {
+        guard let current = identity else { return }
+        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        identity = ShellIdentity(
+            userId: current.userId,
+            displayName: trimmed,
+            email: current.email,
+            firebaseUid: current.firebaseUid
+        )
+        if let firebaseUid = current.firebaseUid {
+            MomentraIdentityCache.save(
+                firebaseUid: firebaseUid,
+                userId: current.userId,
+                displayName: trimmed,
+                email: current.email
+            )
+        }
+    }
     var isLoading: Bool { phase == .authenticating || phase == .authenticatedBootstrapping }
     var isRestoringSession: Bool { phase == .restoringSession || phase == .authenticatedBootstrapping }
 

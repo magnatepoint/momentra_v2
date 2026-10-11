@@ -33,10 +33,7 @@ object IndustryTemplateCatalog {
             "projects" to false,
             "events" to false,
         ),
-        setupKinds = listOf(
-            BusinessSetupKind.BUSINESS_RUNWAY,
-            BusinessSetupKind.BUSINESS_OPERATIONS,
-        ),
+        setupKinds = BusinessSetupKind.entries,
         profileDefaults = mapOf(
             "industry" to "Retail / Kirana",
             "taxSystem" to "GST",
@@ -57,10 +54,7 @@ object IndustryTemplateCatalog {
             "projects" to false,
             "events" to false,
         ),
-        setupKinds = listOf(
-            BusinessSetupKind.BUSINESS_RUNWAY,
-            BusinessSetupKind.BUSINESS_OPERATIONS,
-        ),
+        setupKinds = BusinessSetupKind.entries,
         profileDefaults = mapOf(
             "industry" to "Pet store / Specialty",
             "taxSystem" to "GST",
@@ -81,11 +75,7 @@ object IndustryTemplateCatalog {
             "projects" to false,
             "events" to false,
         ),
-        setupKinds = listOf(
-            BusinessSetupKind.BUSINESS_RUNWAY,
-            BusinessSetupKind.BUSINESS_OPERATIONS,
-            BusinessSetupKind.TEAM_OPERATIONS,
-        ),
+        setupKinds = BusinessSetupKind.entries,
         profileDefaults = mapOf(
             "industry" to "Manufacturing / Workshop",
             "taxSystem" to "GST",
@@ -105,10 +95,7 @@ object IndustryTemplateCatalog {
             "projects" to false,
             "events" to false,
         ),
-        setupKinds = listOf(
-            BusinessSetupKind.BUSINESS_RUNWAY,
-            BusinessSetupKind.BUSINESS_OPERATIONS,
-        ),
+        setupKinds = BusinessSetupKind.entries,
         profileDefaults = mapOf(
             "industry" to "Services",
             "taxSystem" to "GST",
@@ -120,7 +107,7 @@ object IndustryTemplateCatalog {
     val CUSTOM = IndustryTemplate(
         id = "CUSTOM",
         label = "Custom / Blank",
-        subtitle = "Pick Money, Daily Business, and Team yourself",
+        subtitle = "Create a Marketing, Trading, Retail, or Manufacturing moment after the company is active",
         modules = mapOf(
             "money" to true,
             "dailyBusiness" to true,
@@ -194,12 +181,7 @@ object IndustryTemplateCatalog {
     }
 
     fun setupKindsFor(template: IndustryTemplate, customModules: Map<String, Boolean>): List<BusinessSetupKind> {
-        if (!template.isCustom) return template.setupKinds
-        val kinds = mutableListOf<BusinessSetupKind>()
-        if (customModules["money"] != false) kinds += BusinessSetupKind.BUSINESS_RUNWAY
-        if (customModules["dailyBusiness"] != false) kinds += BusinessSetupKind.BUSINESS_OPERATIONS
-        if (customModules["teamOps"] == true) kinds += BusinessSetupKind.TEAM_OPERATIONS
-        return kinds
+        return BusinessSetupKind.entries
     }
 
     fun modulesFor(template: IndustryTemplate, customModules: Map<String, Boolean>): Map<String, Boolean> {

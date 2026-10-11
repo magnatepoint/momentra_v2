@@ -96,6 +96,18 @@ final class AppShellModel: ObservableObject {
         startRealtime()
     }
 
+    func applyDisplayName(_ displayName: String) {
+        guard let current = identity else { return }
+        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        identity = ShellIdentity(
+            userId: current.userId,
+            displayName: trimmed,
+            email: current.email,
+            firebaseUid: current.firebaseUid
+        )
+    }
+
     func clearForLogout() {
         stopRealtime()
         loadTask?.cancel()
@@ -307,9 +319,8 @@ final class AppShellModel: ObservableObject {
             || code.hasPrefix("FUTURE_")
             || code.hasPrefix("LIFESTYLE")
             || code.hasPrefix("RELATIONSHIP")
-        let business = code == "TEAM_OPERATIONS"
-            || code == "BUSINESS_RUNWAY"
-            || code == "BUSINESS_OPERATIONS"
+        let business = OperatingMomentCatalog.kind(for: code) != nil
+            || OperatingMomentCatalog.isRetired(code)
         switch context {
         case .personal: return personal
         case .group: return !personal && !business

@@ -1,0 +1,21 @@
+{
+  "name": "momentra-design-pipeline",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Generates Personal v1.1 design tokens, taxonomy catalogs and native assets for iOS, Android and the backend from design/tokens + design/taxonomy + design/assets.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "tokens": "node generate-tokens.mjs",
+    "tokens:check": "node generate-tokens.mjs --check",
+    "assets": "node import-assets.mjs",
+    "assets:check": "node import-assets.mjs --check",
+    "all": "node generate-tokens.mjs && node import-assets.mjs",
+    "check": "node generate-tokens.mjs --check && node import-assets.mjs --check"
+  },
+  "devDependencies": {
+    "lucide-static": "0.577.0",
+    "sharp": "0.35.5",
+    "svg2vectordrawable": "2.9.1"
+  }
+}

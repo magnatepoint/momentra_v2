@@ -173,6 +173,7 @@ struct AuthOnlyView: View {
                 AppShellView(
                     identity: identity,
                     model: shellModel,
+                    onDisplayNameSaved: { viewModel.applyDisplayName($0) },
                     onSignOut: {
                         shellModel.clearForLogout()
                         AppLockSession.unlocked = false

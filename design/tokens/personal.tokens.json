@@ -1,0 +1,153 @@
+{
+  "$description": "Momentra Personal v1.1 design tokens (Personal mode ONLY; other modes keep their current themes). Source of truth for tools/design-pipeline/generate-tokens.mjs. Format follows W3C Design Tokens (DTCG): every leaf has $type and $value; {path.to.token} values are aliases. $extensions.figma records the Figma variable or raw source in file TzLvwVwlPbeVB8ug1zB3GM, section 2036:29539.",
+  "$extensions": {
+    "momentra": {
+      "name": "momentra.personal",
+      "version": "1.1.0",
+      "scope": "personal",
+      "figmaFile": "TzLvwVwlPbeVB8ug1zB3GM",
+      "figmaSection": "2036:29539"
+    }
+  },
+  "color": {
+    "bg": {
+      "primary": { "$type": "color", "$value": "#14121B", "$extensions": { "figma": "background/primary" } }
+    },
+    "surface": {
+      "container": { "$type": "color", "$value": "#201E28", "$extensions": { "figma": "surface/container" } },
+      "high": { "$type": "color", "$value": "#35333E", "$extensions": { "figma": "surface/high" } },
+      "primaryContainer": { "$type": "color", "$value": "#6C4EF2", "$extensions": { "figma": "surface/primary-container" } },
+      "highlight": { "$type": "color", "$value": "#2A2049", "$extensions": { "figma": "raw: featured cards / selected tiles" } },
+      "context": { "$type": "color", "$value": "#2D1F5E", "$extensions": { "figma": "context/surface" } }
+    },
+    "brand": {
+      "primary": { "$type": "color", "$value": "#C9BFFF", "$extensions": { "figma": "brand/primary" } },
+      "secondary": { "$type": "color", "$value": "#CABEFF", "$extensions": { "figma": "brand/secondary" } },
+      "tertiary": { "$type": "color", "$value": "#4CD6FF", "$extensions": { "figma": "brand/tertiary" } },
+      "accent": { "$type": "color", "$value": "{color.surface.primaryContainer}", "$extensions": { "figma": "Personal accent #6C4EF2 (personal-only, decision D2)" } }
+    },
+    "text": {
+      "primary": { "$type": "color", "$value": "#E5E0EE", "$extensions": { "figma": "text/primary" } },
+      "secondary": { "$type": "color", "$value": "#C9C4D8", "$extensions": { "figma": "text/secondary" } },
+      "subtle": { "$type": "color", "$value": "#938EA1", "$extensions": { "figma": "text/subtle" } },
+      "onAccent": { "$type": "color", "$value": "#FFFFFF", "$extensions": { "figma": "white" } },
+      "chip": { "$type": "color", "$value": "#F2ECFF", "$extensions": { "figma": "raw" } }
+    },
+    "border": {
+      "default": { "$type": "color", "$value": "#938EA1", "$extensions": { "figma": "border/default" } },
+      "hairline": { "$type": "color", "$value": "rgba(201,191,255,0.13)", "$extensions": { "figma": "raw: card hairline" } },
+      "divider": { "$type": "color", "$value": "rgba(201,191,255,0.15)", "$extensions": { "figma": "raw: dividers, unselected tile border" } },
+      "selected": { "$type": "color", "$value": "{color.brand.primary}", "$extensions": { "figma": "raw: selected tile 1.5pt border" } }
+    },
+    "fill": {
+      "iconWell": { "$type": "color", "$value": "rgba(201,191,255,0.07)", "$extensions": { "figma": "raw: QA-01 expense symbol well" } },
+      "iconWellQuiet": { "$type": "color", "$value": "rgba(201,191,255,0.05)", "$extensions": { "figma": "raw: area emblems, quiet states, draft banner" } },
+      "glow": { "$type": "color", "$value": "rgba(108,78,242,0.20)", "$extensions": { "figma": "Glow effect" } }
+    },
+    "signal": {
+      "positive": { "$type": "color", "$value": "#9AE0C7", "$extensions": { "figma": "raw: mint, fully classified / mood chosen by you" } },
+      "online": { "$type": "color", "$value": "#10B981", "$extensions": { "figma": "raw: avatar dot" } }
+    },
+    "area": {
+      "warm": { "$type": "color", "$value": "#EABCA6", "$extensions": { "figma": "raw stroke on area glyphs (peach): P1, P2, P5" } },
+      "mint": { "$type": "color", "$value": "#9AE0C7", "$extensions": { "figma": "raw stroke on area glyphs: P3" } },
+      "sky": { "$type": "color", "$value": "#A8CCF2", "$extensions": { "figma": "raw stroke on area glyphs: P4, P7" } },
+      "lavender": { "$type": "color", "$value": "#C9BFFF", "$extensions": { "figma": "raw stroke on area glyphs: P6, P8 (= brand/primary)" } },
+      "P1": { "$type": "color", "$value": "{color.area.warm}" },
+      "P2": { "$type": "color", "$value": "{color.area.warm}" },
+      "P3": { "$type": "color", "$value": "{color.area.mint}" },
+      "P4": { "$type": "color", "$value": "{color.area.sky}" },
+      "P5": { "$type": "color", "$value": "{color.area.warm}" },
+      "P6": { "$type": "color", "$value": "{color.area.lavender}" },
+      "P7": { "$type": "color", "$value": "{color.area.sky}" },
+      "P8": { "$type": "color", "$value": "{color.area.lavender}" }
+    },
+    "mood": {
+      "idle": { "$type": "color", "$value": "{color.text.secondary}", "$extensions": { "figma": "QA-02 unselected mood glyph" } },
+      "selectedGlyph": { "$type": "color", "$value": "{color.text.onAccent}", "$extensions": { "figma": "QA-02 selected glyph" } },
+      "selectedBg": { "$type": "color", "$value": "{color.surface.primaryContainer}", "$extensions": { "figma": "QA-02 selected chip" } },
+      "recorded": { "$type": "color", "$value": "{color.signal.positive}", "$extensions": { "figma": "QA-SAVED recorded mood line" } }
+    },
+    "toast": {
+      "bg": { "$type": "color", "$value": "{color.surface.container}", "$extensions": { "figma": "Expense saved 30801 normalised to Momentra tokens (was #1A1526)" } },
+      "border": { "$type": "color", "$value": "{color.border.hairline}", "$extensions": { "figma": "was #2D2540" } },
+      "text": { "$type": "color", "$value": "{color.text.primary}", "$extensions": { "figma": "was #EDE9FE (Inter)" } },
+      "icon": { "$type": "color", "$value": "{color.signal.positive}", "$extensions": { "figma": "was #34D399" } }
+    }
+  },
+  "radius": {
+    "pill": { "$type": "dimension", "$value": 999, "$extensions": { "figma": "radius/pill" } },
+    "sheet": { "$type": "dimension", "$value": 32 },
+    "card": { "$type": "dimension", "$value": 24 },
+    "row": { "$type": "dimension", "$value": 20 },
+    "tileSelected": { "$type": "dimension", "$value": 18 },
+    "tile": { "$type": "dimension", "$value": 16 },
+    "button": { "$type": "dimension", "$value": 14, "$extensions": { "figma": "radius/button" } },
+    "well": { "$type": "dimension", "$value": 12 },
+    "chip": { "$type": "dimension", "$value": 8 }
+  },
+  "space": {
+    "xs": { "$type": "dimension", "$value": 4 },
+    "sm": { "$type": "dimension", "$value": 8 },
+    "compact": { "$type": "dimension", "$value": 12 },
+    "inner": { "$type": "dimension", "$value": 14 },
+    "md": { "$type": "dimension", "$value": 16, "$extensions": { "figma": "spacing/md" } },
+    "inset": { "$type": "dimension", "$value": 20 },
+    "lg": { "$type": "dimension", "$value": 24 },
+    "section": { "$type": "dimension", "$value": 32 }
+  },
+  "size": {
+    "buttonHeight": { "$type": "dimension", "$value": 56, "$extensions": { "figma": "size/button-height (52pt visual inside a 56pt slot)" } },
+    "buttonVisual": { "$type": "dimension", "$value": 52 },
+    "tabBar": { "$type": "dimension", "$value": 72 },
+    "iconSm": { "$type": "dimension", "$value": 16 },
+    "icon": { "$type": "dimension", "$value": 20 },
+    "iconMd": { "$type": "dimension", "$value": 24 },
+    "iconLg": { "$type": "dimension", "$value": 28 },
+    "areaGlyphHeader": { "$type": "dimension", "$value": 30 },
+    "areaGlyph": { "$type": "dimension", "$value": 36 },
+    "emblem": { "$type": "dimension", "$value": 56 },
+    "iconStroke": { "$type": "dimension", "$value": 1.7, "$extensions": { "figma": "Lucide stroke used across Personal icons" } },
+    "tabIconStroke": { "$type": "dimension", "$value": 1.8 },
+    "hairline": { "$type": "dimension", "$value": 1 },
+    "selectedBorder": { "$type": "dimension", "$value": 1.5 }
+  },
+  "shadow": {
+    "glow": {
+      "$type": "shadow",
+      "$value": { "color": "#6C4EF2", "alpha": 0.2, "offsetX": 0, "offsetY": 0, "blur": 40, "spread": 0 },
+      "$extensions": { "figma": "Glow effect on the QA-01 expense capture card" }
+    }
+  },
+  "font": {
+    "family": {
+      "base": { "$type": "fontFamily", "$value": "Plus Jakarta Sans" }
+    },
+    "face": {
+      "400": { "$type": "fontFace", "$value": { "postScriptName": "PlusJakartaSans-Regular", "file": "PlusJakartaSans-Regular.ttf", "androidResource": "plus_jakarta_sans_regular" } },
+      "500": { "$type": "fontFace", "$value": { "postScriptName": "PlusJakartaSans-Medium", "file": "PlusJakartaSans-Medium.ttf", "androidResource": "plus_jakarta_sans_medium" } },
+      "600": { "$type": "fontFace", "$value": { "postScriptName": "PlusJakartaSans-SemiBold", "file": "PlusJakartaSans-SemiBold.ttf", "androidResource": "plus_jakarta_sans_semibold" } },
+      "700": { "$type": "fontFace", "$value": { "postScriptName": "PlusJakartaSans-Bold", "file": "PlusJakartaSans-Bold.ttf", "androidResource": "plus_jakarta_sans_bold" } },
+      "800": { "$type": "fontFace", "$value": { "postScriptName": "PlusJakartaSans-ExtraBold", "file": "PlusJakartaSans-ExtraBold.ttf", "androidResource": "plus_jakarta_sans_extrabold" } }
+    }
+  },
+  "typography": {
+    "hero": { "$type": "typography", "$value": { "fontWeight": 700, "fontSize": 28, "lineHeight": 36, "letterSpacing": 0, "textCase": "none", "iosRelativeTo": "title" }, "$extensions": { "figma": "Hero" } },
+    "amountXL": { "$type": "typography", "$value": { "fontWeight": 700, "fontSize": 48, "lineHeight": 56, "letterSpacing": 0, "textCase": "none", "iosRelativeTo": "largeTitle" } },
+    "amountCard": { "$type": "typography", "$value": { "fontWeight": 700, "fontSize": 44, "lineHeight": 52, "letterSpacing": 0, "textCase": "none", "iosRelativeTo": "largeTitle" }, "$extensions": { "figma": "QA-SAVED saved-expense card 30802" } },
+    "amountL": { "$type": "typography", "$value": { "fontWeight": 700, "fontSize": 40, "lineHeight": 48, "letterSpacing": 0, "textCase": "none", "iosRelativeTo": "largeTitle" }, "$extensions": { "figma": "also the monthly OCT/SEP issue mark" } },
+    "storyTitle": { "$type": "typography", "$value": { "fontWeight": 700, "fontSize": 25, "lineHeight": 27, "letterSpacing": -0.74, "textCase": "none", "iosRelativeTo": "title2" }, "$extensions": { "figma": "Story hero 1870:24455, normalised from the scaled instance" } },
+    "metric": { "$type": "typography", "$value": { "fontWeight": 600, "fontSize": 19, "lineHeight": 24, "letterSpacing": 0, "textCase": "none", "iosRelativeTo": "title3" } },
+    "section": { "$type": "typography", "$value": { "fontWeight": 600, "fontSize": 17, "lineHeight": 24, "letterSpacing": 0, "textCase": "none", "iosRelativeTo": "headline" }, "$extensions": { "figma": "Section Header" } },
+    "button": { "$type": "typography", "$value": { "fontWeight": 600, "fontSize": 15, "lineHeight": 20, "letterSpacing": 0, "textCase": "none", "iosRelativeTo": "body" }, "$extensions": { "figma": "Primary button label" } },
+    "body": { "$type": "typography", "$value": { "fontWeight": 400, "fontSize": 14, "lineHeight": 22, "letterSpacing": 0, "textCase": "none", "iosRelativeTo": "body" }, "$extensions": { "figma": "Body" } },
+    "label": { "$type": "typography", "$value": { "fontWeight": 600, "fontSize": 13, "lineHeight": 18, "letterSpacing": 0, "textCase": "none", "iosRelativeTo": "subheadline" } },
+    "toast": { "$type": "typography", "$value": { "fontWeight": 500, "fontSize": 13, "lineHeight": 18, "letterSpacing": 0, "textCase": "none", "iosRelativeTo": "subheadline" }, "$extensions": { "figma": "Expense saved toast 30801 (was Inter Medium 13; Plus Jakarta Sans per decision)" } },
+    "caption": { "$type": "typography", "$value": { "fontWeight": 400, "fontSize": 12, "lineHeight": 18, "letterSpacing": 0, "textCase": "none", "iosRelativeTo": "caption" }, "$extensions": { "figma": "Caption" } },
+    "metadata": { "$type": "typography", "$value": { "fontWeight": 500, "fontSize": 12, "lineHeight": 16, "letterSpacing": 0, "textCase": "none", "iosRelativeTo": "caption" }, "$extensions": { "figma": "Metadata" } },
+    "chip": { "$type": "typography", "$value": { "fontWeight": 600, "fontSize": 12, "lineHeight": 16, "letterSpacing": 0, "textCase": "none", "iosRelativeTo": "caption" } },
+    "micro": { "$type": "typography", "$value": { "fontWeight": 600, "fontSize": 11, "lineHeight": 14, "letterSpacing": 0.6, "textCase": "uppercase", "iosRelativeTo": "caption2" } },
+    "storyKicker": { "$type": "typography", "$value": { "fontWeight": 600, "fontSize": 11, "lineHeight": 14, "letterSpacing": 0.8, "textCase": "uppercase", "iosRelativeTo": "caption2" } },
+    "tabLabel": { "$type": "typography", "$value": { "fontWeight": 500, "fontSize": 10, "lineHeight": 12, "letterSpacing": 0, "textCase": "none", "iosRelativeTo": "caption2" } }
+  }
+}

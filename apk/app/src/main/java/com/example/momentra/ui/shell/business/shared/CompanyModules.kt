@@ -21,11 +21,7 @@ object CompanyModules {
     private const val PREFS = "momentra_company_modules"
     private const val KEY_PREFIX = "module_"
 
-    fun moduleKeyForSetupKind(kind: BusinessSetupKind): String? = when (kind) {
-        BusinessSetupKind.TEAM_OPERATIONS -> "teamOps"
-        BusinessSetupKind.BUSINESS_RUNWAY -> "money"
-        BusinessSetupKind.BUSINESS_OPERATIONS -> "dailyBusiness"
-    }
+    fun moduleKeyForSetupKind(kind: BusinessSetupKind): String? = null
 
     fun moduleKeyForTheme(theme: BusinessActiveTheme): String = when (theme.typeLabel) {
         BusinessActiveTheme.BusinessRunway.typeLabel -> "money"

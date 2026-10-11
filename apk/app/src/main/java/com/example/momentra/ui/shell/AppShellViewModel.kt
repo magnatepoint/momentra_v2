@@ -32,6 +32,7 @@ import com.example.momentra.ui.shell.personal.shared.PersonalTabDataCache
 import com.example.momentra.ui.shell.personal.shared.loadPersonalPulseTab
 import com.example.momentra.ui.shell.personal.shared.resolvePreferredPersonalMoment
 import com.example.momentra.ui.shell.business.shared.BusinessTabDataCache
+import com.example.momentra.ui.shell.business.shared.OperatingMomentCatalog
 import com.example.momentra.ui.shell.business.shared.businessRefreshPrefetchesPulse
 import com.example.momentra.ui.shell.business.shared.invalidateBusinessPulseLoad
 import com.example.momentra.ui.shell.business.shared.prefetchBusinessTabs
@@ -1051,6 +1052,15 @@ class AppShellViewModel(
         _state.update { it.copy(life360Open = open, profileOpen = if (open) false else it.profileOpen) }
     }
 
+    fun applyDisplayName(displayName: String) {
+        val trimmed = displayName.trim()
+        if (trimmed.isEmpty()) return
+        _state.update { state ->
+            val current = state.identity ?: return@update state
+            state.copy(identity = current.copy(displayName = trimmed))
+        }
+    }
+
     fun openProfile(open: Boolean = true) {
         _state.update { it.copy(profileOpen = open, life360Open = if (open) false else it.life360Open) }
     }
@@ -1121,7 +1131,7 @@ class AppShellViewModel(
                 contextContent = ShellContentState.Empty,
                 momentExperience = MomentExperienceKind.FIRST_MOMENT,
                 companyMenuOpen = false,
-                showCompanySwitcher = true,
+                showCompanySwitcher = false,
             )
         }
         persistCompany(company.companyId)
@@ -1153,9 +1163,8 @@ class AppShellViewModel(
             code.startsWith("FUTURE_") ||
             code.startsWith("LIFESTYLE") ||
             code.startsWith("RELATIONSHIP")
-        val business = code == "TEAM_OPERATIONS" ||
-            code == "BUSINESS_RUNWAY" ||
-            code == "BUSINESS_OPERATIONS"
+        val business = OperatingMomentCatalog.kindForTypeCode(code) != null ||
+            OperatingMomentCatalog.isRetired(code)
         return when (context) {
             AppContext.PERSONAL -> personal
             AppContext.GROUP -> !personal && !business

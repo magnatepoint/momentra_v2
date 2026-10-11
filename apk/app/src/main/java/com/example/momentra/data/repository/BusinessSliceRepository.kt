@@ -2,6 +2,9 @@ package com.example.momentra.data.repository
 
 import com.example.momentra.data.api.ApiClient
 import com.example.momentra.data.api.ApiService
+import com.example.momentra.data.api.DecideOperatingEventBody
+import com.example.momentra.data.api.OperatingProjectionDto
+import com.example.momentra.data.api.RecordOperatingEventBody
 import com.example.momentra.data.api.BusinessFacetDto
 import com.example.momentra.data.api.BusinessFinancePayloadDto
 import com.example.momentra.data.api.BusinessLifePayloadDto
@@ -99,6 +102,46 @@ import java.util.UUID
 class BusinessSliceRepository(
     private val api: ApiService = ApiClient.apiService,
 ) {
+    suspend fun getOperating(momentId: String): Result<OperatingProjectionDto> = runCatching {
+        api.getOperatingMoment(momentId).data
+    }.recoverCatching { e -> throw mapError(e) }
+
+    suspend fun recordOperatingEvent(
+        momentId: String,
+        eventType: String,
+        title: String,
+        amount: String?,
+        note: String?,
+        channelName: String? = null,
+        counterpartyName: String? = null,
+        paymentStatus: String? = null,
+    ): Result<Unit> = runCatching {
+        api.recordOperatingEvent(
+            momentId = momentId,
+            idempotencyKey = UUID.randomUUID().toString(),
+            body = RecordOperatingEventBody(
+                eventType = eventType,
+                title = title,
+                amount = amount,
+                note = note,
+                counterpartyName = counterpartyName,
+                channelName = channelName,
+                paymentStatus = paymentStatus,
+            ),
+        )
+        Unit
+    }.recoverCatching { e -> throw mapError(e) }
+
+    suspend fun decideOperatingEvent(momentId: String, eventId: String, decision: String): Result<Unit> = runCatching {
+        api.decideOperatingEvent(
+            momentId = momentId,
+            eventId = eventId,
+            idempotencyKey = UUID.randomUUID().toString(),
+            body = DecideOperatingEventBody(decision = decision),
+        )
+        Unit
+    }.recoverCatching { e -> throw mapError(e) }
+
     suspend fun getPulse(momentId: String): Result<BusinessFacetDto<BusinessPulsePayloadDto>> = runCatching {
         api.getBusinessPulse(momentId).data
     }.recoverCatching { e -> throw mapError(e) }

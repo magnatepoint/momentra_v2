@@ -1,195 +1,212 @@
 import SwiftUI
 
-/// Interactive Business setup wizard — Android `BusinessSetupWizardContent` parity.
 struct BusinessSetupWizardView: View {
     let kind: BusinessSetupKind
     @ObservedObject var createModel: MomentCreateModel
-    let companyId: String
+    let companyId: String?
     var editingMomentId: String? = nil
     var initialTitle: String? = nil
+    var ownerName: String = ""
     var onClose: () -> Void
     var onCreated: (CreateMomentOutcome) -> Void
 
-    @State private var selections: [String: Any] = [:]
-    @State private var momentTitle: String = ""
-    @State private var editingMomentStatus: String?
+    @State private var step = 0
+    @State private var subtype: OperatingSubtype
+    @State private var identity: String
+    @State private var party = ""
+    @State private var details = ""
+    @State private var people = ""
+    @State private var role = "OPERATIONS_LEAD"
+    @State private var counterparties = ""
+    @State private var channels = ""
+    @State private var budget = ""
+    @State private var target = ""
+    @State private var metric: String
+    @State private var localError: String?
 
-    private var catalog: BusinessSetupCatalogEntry {
-        BusinessSetupCatalog.forKind(kind)
+    init(
+        kind: BusinessSetupKind,
+        createModel: MomentCreateModel,
+        companyId: String?,
+        editingMomentId: String? = nil,
+        initialTitle: String? = nil,
+        ownerName: String = "",
+        onClose: @escaping () -> Void,
+        onCreated: @escaping (CreateMomentOutcome) -> Void
+    ) {
+        self.kind = kind
+        self.createModel = createModel
+        self.companyId = companyId
+        self.editingMomentId = editingMomentId
+        self.initialTitle = initialTitle
+        self.ownerName = ownerName
+        self.onClose = onClose
+        self.onCreated = onCreated
+        let first = OperatingMomentCatalog.subtypes(kind)[0]
+        _subtype = State(initialValue: first)
+        _identity = State(initialValue: initialTitle ?? "")
+        _metric = State(initialValue: first.targetMetrics[0])
     }
 
     var body: some View {
-        SetupWizardScaffold(backgroundColor: SetupTokens.bizBg) {
-            VStack(alignment: .leading, spacing: 20) {
-                SetupWizardHeader(
-                    title: kind.title,
-                    durationLabel: catalog.subtitle,
-                    onClose: {
-                        if let editingMomentId,
-                           editingMomentStatus?.caseInsensitiveCompare("DRAFT") == .orderedSame {
-                            createModel.discardMomentDraft(momentId: editingMomentId, onSuccess: onClose)
-                        } else {
-                            onClose()
-                        }
-                    },
-                    enabled: !createModel.state.submitting
-                )
-
-                SetupTitleField(
-                    label: "Moment title",
-                    value: $momentTitle,
-                    placeholder: catalog.defaultTitle
-                )
-                .padding(.horizontal, 16)
-
-                ForEach(Array(catalog.sections.enumerated()), id: \.offset) { index, section in
-                    businessSectionCard(index: index, section: section)
-                }
-
-                businessPreview
-                    .padding(.horizontal, 16)
-
-                if let error = createModel.state.error {
-                    Text(error)
-                        .font(.system(size: 13))
-                        .foregroundStyle(SetupTokens.error)
-                        .padding(.horizontal, 16)
-                }
-            }
-        } footer: {
-            SetupStickyFooter(
-                tagline: BusinessSetupCatalog.footerTagline(
-                    kind: kind,
-                    audience: (selections[BusinessAudience.prefKey] as? String)
-                        ?? BusinessAudience.forCompany(companyId: companyId)
-                ),
-                ctaLabel: catalog.activateLabel,
-                onCta: { submit(status: "ACTIVE") },
-                submitting: createModel.state.submitting,
-                onSaveDraft: { submit(status: "DRAFT") },
-                accentGradient: kind.ctaGradient,
-                backgroundColor: SetupTokens.bizBg
-            )
-            .accessibilityIdentifier("business.setup.submit")
-        }
-        .accessibilityIdentifier(kind.maestroTag)
-        .trackScreen(kind.analyticsScreen)
-        .onAppear {
-            let audience = BusinessAudience.forCompany(companyId: companyId)
-            selections = BusinessSetupCatalog.defaultPreferences(kind: kind, audience: audience)
-            momentTitle = (initialTitle?.isEmpty == false) ? initialTitle! : catalog.defaultTitle
-            guard let editingMomentId else { return }
-            Task {
-                if let prefill = await createModel.getDomainSetupPrefill(momentId: editingMomentId) {
-                    editingMomentStatus = prefill.status
-                    selections = PersonalSetupEditPrefill.mergeDefaults(
-                        BusinessSetupCatalog.defaultPreferences(kind: kind, audience: audience),
-                        saved: prefill.preferences
+        if kind == .retailConsumer && ["RETAIL_STORE", "RESTAURANT_FOOD", "CONSUMER_SERVICE"].contains(subtype.code) {
+            RetailStoreSetupView(
+                subtypes: OperatingMomentCatalog.subtypes(kind),
+                subtype: subtype,
+                ownerName: ownerName,
+                createModel: createModel,
+                onSubtype: { item in
+                    subtype = item
+                    metric = item.targetMetrics[0]
+                },
+                onClose: onClose,
+                onActivate: { prefs, title in
+                    createModel.submitBusinessSetup(
+                        kind: kind,
+                        companyId: companyId,
+                        preferences: prefs,
+                        title: title,
+                        subtype: subtype.code,
+                        editingMomentId: editingMomentId,
+                        status: "ACTIVE",
+                        onSuccess: onCreated
                     )
-                    if initialTitle == nil || initialTitle?.isEmpty == true {
-                        momentTitle = prefill.title
-                    }
+                }
+            )
+            .accessibilityIdentifier(kind.maestroTag)
+        } else {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Button("Close", action: onClose).foregroundStyle(Color(hex: "#94A3B8"))
+                    Spacer()
+                    Text("Step \(step + 1) of 4").font(.caption).foregroundStyle(Color(hex: "#94A3B8"))
+                }
+                Text(kind.title).font(.title2.weight(.semibold)).foregroundStyle(.white)
+                Text(kind.body).foregroundStyle(Color(hex: "#94A3B8"))
+                if step == 0 { identityStep }
+                if step == 1 { peopleStep }
+                if step == 2 { field("Counterparties", "Optional. One name per line.", text: $counterparties) }
+                if step == 3 { planStep }
+                if let message = localError ?? createModel.state.error {
+                    Text(message).foregroundStyle(Color(hex: "#F87171"))
+                }
+                HStack {
+                    if step > 0 { button("Back", Color(hex: "#1E293B")) { step -= 1 } }
+                    button(step < 3 ? "Continue" : "Activate", kind.activateColor) { advance() }
                 }
             }
+            .padding(20)
+        }
+        .background(Color(hex: "#0C0F15"))
+        .accessibilityIdentifier(kind.maestroTag)
         }
     }
 
-    @ViewBuilder
-    private func businessSectionCard(index: Int, section: BusinessSetupSectionSpec) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(String(format: "%02d · %@", index + 1, section.title.uppercased()))
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(SetupTokens.bizAccent)
-
-            ForEach(section.fields, id: \.key) { field in
-                SetupPrefField(field: field, selections: $selections, selectedChipColor: kind.activateColor)
-            }
-
-            ForEach(section.textFields, id: \.key) { field in
-                textField(field)
-            }
-        }
-        .padding(16)
-        .background(SetupTokens.bizCard, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color(hex: "#1E293B"), lineWidth: 1)
-        )
-        .padding(.horizontal, 16)
-    }
-
-    @ViewBuilder
-    private func textField(_ field: BusinessSetupTextFieldSpec) -> some View {
+    private var identityStep: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(field.label)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color(hex: "#E2E8F0"))
-            TextField(
-                field.label,
-                text: Binding(
-                    get: { selections[field.key] as? String ?? "" },
-                    set: { selections[field.key] = $0 }
-                )
-            )
-            .textFieldStyle(.plain)
-            .font(.system(size: 15))
-            .foregroundStyle(.white)
-            .padding(12)
-            .background(Color(hex: "#0F172A"), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color(hex: "#1E293B"), lineWidth: 1)
-            )
-            .accessibilityIdentifier("setup.text.\(field.key)")
+            Text("Operating model").font(.caption).foregroundStyle(Color(hex: "#94A3B8"))
+            ForEach(OperatingMomentCatalog.subtypes(kind)) { item in
+                Button(item.label) {
+                    subtype = item
+                    metric = item.targetMetrics[0]
+                }
+                .buttonStyle(.bordered)
+            }
+            field("Moment name", "What you are running", text: $identity)
+            field(subtype.partyLabel, "Who this moment is for", text: $party)
+            field("Description", "Optional", text: $details)
         }
     }
 
-    @ViewBuilder
-    private var businessPreview: some View {
-        switch kind {
-        case .teamOperations:
-            SetupPreviewCard(
-                title: "Team & Work Preview",
-                subtitle: "\(selections["teamName"] as? String ?? "") · \(selections["workMode"] as? String ?? "") · \(selections["size"] as? String ?? "")",
-                bullets: [
-                    "Reviews: \(selections["reviewCycle"] as? String ?? "")",
-                    "Approval threshold: \(selections["approvalThreshold"] as? String ?? "")",
-                ]
-            )
-        case .businessRunway:
-            SetupPreviewCard(
-                title: "Money & Cash Flow Preview",
-                subtitle: "Cash \(selections["availableCash"] as? String ?? "") · Spend \(selections["monthlySpending"] as? String ?? "")/mo",
-                bullets: [
-                    "Revenue: \(selections["monthlyRevenue"] as? String ?? "") (\(selections["revenueStage"] as? String ?? ""))",
-                    "Warning at \(selections["warningThreshold"] as? String ?? "") runway",
-                ]
-            )
-        case .businessOperations:
-            SetupPreviewCard(
-                title: "Daily Business Preview",
-                subtitle: "\(selections["scope"] as? String ?? "") · \(selections["model"] as? String ?? "") · \(selections["cadence"] as? String ?? "") cadence",
-                bullets: [
-                    "Budget: \(selections["monthlyBudget"] as? String ?? "")",
-                    "Alarm threshold: \(selections["approvalAlarm"] as? String ?? "")",
-                ]
-            )
+    private var peopleStep: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("You are the Owner. Extra names share the role you pick.")
+                .font(.caption).foregroundStyle(Color(hex: "#94A3B8"))
+            ForEach(OperatingMomentCatalog.roles.prefix(4), id: \.0) { item in
+                Button(item.1) { role = item.0 }.buttonStyle(.bordered)
+            }
+            field("Names", "Optional, one per line", text: $people)
         }
     }
 
-    private func submit(status: String) {
-        let title = momentTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+    private var planStep: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if subtype.requiresChannel {
+                field("Channels", "Comma separated", text: $channels)
+            }
+            field("Monthly budget", "Positive amount", text: $budget)
+            field("Monthly target", "Positive amount or count", text: $target)
+            ForEach(subtype.targetMetrics, id: \.self) { item in
+                Button(item) { metric = item }.buttonStyle(.bordered)
+            }
+        }
+    }
+
+    private func field(_ label: String, _ hint: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label).foregroundStyle(.white)
+            Text(hint).font(.caption).foregroundStyle(Color(hex: "#94A3B8"))
+            TextField(label, text: text).textFieldStyle(.roundedBorder)
+        }
+    }
+
+    private func button(_ label: String, _ color: Color, action: @escaping () -> Void) -> some View {
+        Button(label, action: action)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(color)
+            .foregroundStyle(Color(hex: "#0C0F15"))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func advance() {
+        if step == 0 {
+            if identity.trimmingCharacters(in: .whitespaces).isEmpty { localError = "Moment name is required."; return }
+            if party.trimmingCharacters(in: .whitespaces).isEmpty { localError = "\(subtype.partyLabel) name is required."; return }
+        }
+        if step == 3 {
+            if subtype.requiresChannel && channels.trimmingCharacters(in: .whitespaces).isEmpty {
+                localError = "Select at least one channel."; return
+            }
+            if Double(budget) == nil || (Double(budget) ?? 0) <= 0 { localError = "Monthly budget must be a positive amount."; return }
+            if Double(target) == nil || (Double(target) ?? 0) <= 0 { localError = "Monthly target must be a positive amount."; return }
+        }
+        localError = nil
+        if step < 3 {
+            step += 1
+            return
+        }
+        let participants: [[String: String]] = people.split(separator: "\n").map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.map {
+            ["displayName": $0, "role": role]
+        }
+        let parties: [[String: String]] = counterparties.split(separator: "\n").map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.map {
+            ["name": $0, "kind": "OTHER"]
+        }
+        let channelList = channels.split { $0 == "," || $0 == "\n" }.map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let prefs: [String: Any] = [
+            "subtype": subtype.code,
+            "identityName": identity.trimmingCharacters(in: .whitespaces),
+            "partyName": party.trimmingCharacters(in: .whitespaces),
+            "description": details,
+            "currency": "INR",
+            "startDate": "",
+            "participants": participants,
+            "counterparties": parties,
+            "channels": channelList,
+            "monthlyBudget": budget.trimmingCharacters(in: .whitespaces),
+            "monthlyTarget": target.trimmingCharacters(in: .whitespaces),
+            "targetMetric": metric,
+        ]
         createModel.submitBusinessSetup(
             kind: kind,
             companyId: companyId,
-            preferences: selections,
-            title: title.isEmpty ? catalog.defaultTitle : title,
+            preferences: prefs,
+            title: identity.trimmingCharacters(in: .whitespaces),
+            subtype: subtype.code,
             editingMomentId: editingMomentId,
-            editingMomentStatus: editingMomentStatus,
-            status: status
-        ) { outcome in
-            editingMomentStatus = outcome.status
-            onCreated(outcome)
-        }
+            status: "ACTIVE",
+            onSuccess: onCreated
+        )
     }
 }

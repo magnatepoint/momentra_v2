@@ -442,6 +442,36 @@ interface ApiService {
     @GET("v1/personal/memory")
     suspend fun getPersonalMemory(): SuccessEnvelope<PersonalMemoryDto>
 
+    @GET("v1/personal/experience")
+    suspend fun getPersonalExperience(): SuccessEnvelope<PersonalExperienceDto>
+
+    @POST("v1/personal/expenses")
+    suspend fun createPersonalLifeExpense(
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: PersonalLifeExpenseBody,
+    ): SuccessEnvelope<PersonalExpenseConfirmationDto>
+
+    @PATCH("v1/personal/expenses/{expenseId}")
+    suspend fun correctPersonalLifeExpense(
+        @Path("expenseId") expenseId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: PersonalLifeExpenseCorrectionBody,
+    ): SuccessEnvelope<PersonalExpenseConfirmationDto>
+
+    @POST("v1/personal/expenses/{expenseId}/refund")
+    suspend fun refundPersonalLifeExpense(
+        @Path("expenseId") expenseId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: PersonalLifeRefundBody,
+    ): SuccessEnvelope<PersonalLifeRefundDto>
+
+    @POST("v1/personal/expenses/{expenseId}/void")
+    suspend fun voidPersonalLifeExpense(
+        @Path("expenseId") expenseId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: PersonalLifeRefundBody,
+    ): SuccessEnvelope<PersonalLifeVoidDto>
+
     @GET("v1/personal/attention")
     suspend fun getPersonalAttention(): SuccessEnvelope<PersonalAttentionDto>
 
@@ -890,6 +920,26 @@ interface ApiService {
     ): SuccessEnvelope<RelationshipsBondSnapshotDto>
 
     // --- S4 Business slice ---
+    @GET("v1/business/moments/{momentId}/operating")
+    suspend fun getOperatingMoment(
+        @Path("momentId") momentId: String,
+    ): SuccessEnvelope<OperatingProjectionDto>
+
+    @POST("v1/business/moments/{momentId}/operating-events")
+    suspend fun recordOperatingEvent(
+        @Path("momentId") momentId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: RecordOperatingEventBody,
+    ): SuccessEnvelope<RecordOperatingEventResultDto>
+
+    @POST("v1/business/moments/{momentId}/operating-events/{eventId}/decision")
+    suspend fun decideOperatingEvent(
+        @Path("momentId") momentId: String,
+        @Path("eventId") eventId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: DecideOperatingEventBody,
+    ): SuccessEnvelope<DecideOperatingEventResultDto>
+
     @GET("v1/business/moments/{momentId}/pulse")
     suspend fun getBusinessPulse(
         @Path("momentId") momentId: String,

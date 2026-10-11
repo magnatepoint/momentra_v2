@@ -1,54 +1,59 @@
 import SwiftUI
 
 enum BusinessSetupKind: String, CaseIterable, Identifiable {
-    case teamOperations = "TEAM_OPERATIONS"
-    case businessRunway = "BUSINESS_RUNWAY"
-    case businessOperations = "BUSINESS_OPERATIONS"
+    case marketingCampaigns = "MARKETING_CAMPAIGNS"
+    case tradingDistribution = "TRADING_DISTRIBUTION"
+    case retailConsumer = "RETAIL_CONSUMER"
+    case manufacturingProduction = "MANUFACTURING_PRODUCTION"
 
     var id: String { rawValue }
+    var familyCode: String { rawValue }
 
     var title: String {
         switch self {
-        case .teamOperations: return "Set up Team & Work"
-        case .businessRunway: return "Set up Money & Cash Flow"
-        case .businessOperations: return "Set up Daily Business"
+        case .marketingCampaigns: return "Marketing & Campaigns"
+        case .tradingDistribution: return "Trading & Distribution"
+        case .retailConsumer: return "Retail & Consumer"
+        case .manufacturingProduction: return "Manufacturing & Production"
         }
     }
 
-    var familyCode: String { rawValue }
+    var body: String {
+        switch self {
+        case .marketingCampaigns: return "Budget, channels, people, and results for a campaign."
+        case .tradingDistribution: return "Source, move, and collect across wholesale or distribution."
+        case .retailConsumer: return "A store, a food outlet, or a consumer service."
+        case .manufacturingProduction: return "Standard production or made-to-order job work."
+        }
+    }
 
     var analyticsScreen: String {
         switch self {
-        case .teamOperations: return AnalyticsScreens.businessSetupTeamOps
-        case .businessRunway: return AnalyticsScreens.businessSetupRunway
-        case .businessOperations: return AnalyticsScreens.businessSetupOps
+        case .marketingCampaigns: return AnalyticsScreens.businessSetupTeamOps
+        case .tradingDistribution: return AnalyticsScreens.businessSetupRunway
+        case .retailConsumer, .manufacturingProduction: return AnalyticsScreens.businessSetupOps
         }
     }
 
     var activateColor: Color {
         switch self {
-        case .teamOperations: return Color(hex: "#10B981")
-        case .businessRunway: return Color(hex: "#FBBF24")
-        case .businessOperations: return Color(hex: "#818CF8")
+        case .marketingCampaigns: return Color(hex: "#818CF8")
+        case .tradingDistribution: return Color(hex: "#FBBF24")
+        case .retailConsumer: return Color(hex: "#34D399")
+        case .manufacturingProduction: return Color(hex: "#38BDF8")
         }
     }
 
     var maestroTag: String {
         switch self {
-        case .teamOperations: return "business.setup.team_operations"
-        case .businessRunway: return "business.setup.business_runway"
-        case .businessOperations: return "business.setup.business_operations"
+        case .marketingCampaigns: return "business.setup.marketing_campaigns"
+        case .tradingDistribution: return "business.setup.trading_distribution"
+        case .retailConsumer: return "business.setup.retail_consumer"
+        case .manufacturingProduction: return "business.setup.manufacturing_production"
         }
     }
 
     var ctaGradient: LinearGradient {
-        switch self {
-        case .teamOperations:
-            return LinearGradient(colors: [Color(hex: "#10B981"), Color(hex: "#34D399")], startPoint: .leading, endPoint: .trailing)
-        case .businessRunway:
-            return LinearGradient(colors: [Color(hex: "#FBBF24"), Color(hex: "#F59E0B")], startPoint: .leading, endPoint: .trailing)
-        case .businessOperations:
-            return LinearGradient(colors: [SetupTokens.bizAccent, SetupTokens.accentPurple], startPoint: .leading, endPoint: .trailing)
-        }
+        LinearGradient(colors: [activateColor, activateColor.opacity(0.8)], startPoint: .leading, endPoint: .trailing)
     }
 }

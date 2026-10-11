@@ -4,6 +4,7 @@ import {
   BUSINESS_SETUP_CATALOG,
   type BusinessSetupFamilyCode,
 } from '../business/setup-service';
+import { isLegacyBusinessFamily, isOperatingFamily, normalizeOperatingPreferences } from '../business/operating-catalog';
 import {
   PERSONAL_SETUP_CATALOG,
   type PersonalSetupSystemCode,
@@ -93,26 +94,28 @@ export function validateAndMergePersonalPreferences(
 }
 
 export function validateAndMergeBusinessPreferences(
-  familyCode: BusinessSetupFamilyCode,
-  input: Record<string, unknown> | undefined
+  familyCode: BusinessSetupFamilyCode | 'TEAM_OPERATIONS' | 'BUSINESS_RUNWAY' | 'BUSINESS_OPERATIONS',
+  input: Record<string, unknown> | undefined,
+  creator?: { userId: string; displayName: string }
 ): Record<string, unknown> {
-  const catalog = BUSINESS_SETUP_CATALOG.find((s) => s.familyCode === familyCode);
-  if (!catalog) {
-    throw new AppError(ErrorCode.VALIDATION_FAILED, `Unknown business setup: ${familyCode}`, 400);
+  if (isLegacyBusinessFamily(familyCode)) {
+    return { ...(input ?? {}) };
   }
-  const allowed = allowedKeysForCatalog(catalog.defaultPreferences);
-  const prefs = input ?? {};
-  const cleaned: Record<string, unknown> = {};
-  for (const key of Object.keys(prefs)) {
-    if (!allowed.has(key)) {
-      // Forward-compat: clients may stamp company-profile keys (e.g. industryTemplate).
-      console.warn(JSON.stringify({ event: 'ignore_unknown_business_pref', familyCode, key }));
-      continue;
+  if (isOperatingFamily(familyCode)) {
+    try {
+      return normalizeOperatingPreferences(familyCode, input, creator ?? {
+        userId: '00000000-0000-0000-0000-000000000000',
+        displayName: 'Owner',
+      }) as unknown as Record<string, unknown>;
+    } catch (err) {
+      throw new AppError(
+        ErrorCode.VALIDATION_FAILED,
+        err instanceof Error ? err.message : 'Invalid operating setup.',
+        400
+      );
     }
-    validatePreferenceValue(key, prefs[key]);
-    cleaned[key] = prefs[key];
   }
-  return { ...catalog.defaultPreferences, ...cleaned };
+  throw new AppError(ErrorCode.VALIDATION_FAILED, `Unknown business setup: ${familyCode}`, 400);
 }
 
 export const personalSetupBlockSchema = z
@@ -124,7 +127,15 @@ export const personalSetupBlockSchema = z
 
 export const businessSetupBlockSchema = z
   .object({
-    familyCode: z.enum(['TEAM_OPERATIONS', 'BUSINESS_RUNWAY', 'BUSINESS_OPERATIONS']),
+    familyCode: z.enum([
+      'TEAM_OPERATIONS',
+      'BUSINESS_RUNWAY',
+      'BUSINESS_OPERATIONS',
+      'MARKETING_CAMPAIGNS',
+      'TRADING_DISTRIBUTION',
+      'RETAIL_CONSUMER',
+      'MANUFACTURING_PRODUCTION',
+    ]),
     preferences: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();

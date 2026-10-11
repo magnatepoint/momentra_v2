@@ -18,6 +18,7 @@ import com.example.momentra.ui.shell.empty.business.BusinessSetupBottomSheet
 @Composable
 fun BusinessCreateFlow(
     companyId: String?,
+    ownerName: String = "",
     onCreateBack: () -> Unit,
     onMomentCreated: (String, String, String?, String) -> Unit,
     modifier: Modifier = Modifier,
@@ -59,6 +60,7 @@ fun BusinessCreateFlow(
                         openSetup = null
                         onMomentCreated(outcome.momentId, outcome.title, outcome.momentTypeCode, outcome.status)
                     },
+                    ownerName = ownerName,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

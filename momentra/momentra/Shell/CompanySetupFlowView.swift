@@ -384,12 +384,9 @@ struct CompanySetupFlowView: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    if industryTemplate.isCustom {
-                        fieldLabel("WHICH MOMENTS TO START WITH?")
-                        moduleToggle("Money & Cash Flow", isOn: $customMoney)
-                        moduleToggle("Daily Business", isOn: $customDaily)
-                        moduleToggle("Team & Work", isOn: $customTeam)
-                    }
+                    Text("After activation, create a Marketing, Trading, Retail, or Manufacturing moment.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(muted)
                 }
                 fieldLabel("COMPANY NAME")
                 textField($companyName, placeholder: "Your shop or company name")
@@ -693,7 +690,7 @@ struct CompanySetupFlowView: View {
     private var launchNextSteps: (intro: String, steps: [(title: String, body: String, color: Color)]) {
         if !BusinessAudience.isSmallShop(audience) {
             return (
-                "After activation, open Create to add Money, Daily Business, or Team moments",
+                "After activation, open Create to add a Marketing, Trading, Retail, or Manufacturing moment",
                 []
             )
         }
@@ -707,14 +704,7 @@ struct CompanySetupFlowView: View {
             return ("Turn on at least one moment before activating", [])
         }
         let steps: [(title: String, body: String, color: Color)] = kinds.map { kind in
-            switch kind {
-            case .businessRunway:
-                return ("Money & Cash Flow", "Revenue, Khata, invoices, and spend tracking", Color(hex: "#F59E0B"))
-            case .businessOperations:
-                return ("Daily Business", "Day-to-day ops, vendors, and routines", Color(hex: "#A78BFA"))
-            case .teamOperations:
-                return ("Team & Work", "Team rhythm, reviews, and collaboration", green)
-            }
+            (kind.title, kind.body, kind.activateColor)
         }
         let intro = steps.count == 1
             ? "After activation, we'll set up:"
@@ -889,7 +879,7 @@ struct CompanySetupFlowView: View {
         if smallShop && industryTemplate.isCustom {
             let kinds = IndustryTemplateCatalog.setupKinds(for: industryTemplate, customModules: customMods)
             if kinds.isEmpty {
-                activateError = "Turn on at least one moment (Money, Daily Business, or Team)"
+                activateError = "Turn on at least one Marketing, Trading, Retail, or Manufacturing moment"
                 return
             }
         }
@@ -964,36 +954,8 @@ struct CompanySetupFlowView: View {
                     logoError = error.localizedDescription
                 }
             }
-            if let template {
-                let kinds = IndustryTemplateCatalog.setupKinds(for: template, customModules: customMods)
-                let repo = MomentCreateRepository()
-                var failedTitles: [String] = []
-                for kind in kinds {
-                    let entry = BusinessSetupCatalog.forKind(kind)
-                    var prefs = BusinessSetupCatalog.defaultPreferences(kind: kind, audience: audience)
-                    prefs.removeValue(forKey: IndustryTemplateCatalog.profileKey)
-                    let allowed = Set(BusinessSetupCatalog.forKind(kind).defaultPreferences.keys)
-                    prefs = prefs.filter { allowed.contains($0.key) }
-                    do {
-                        _ = try await repo.createBusinessSetup(
-                            draftKey: "template-\(created.companyId)-\(kind.rawValue)",
-                            companyId: created.companyId,
-                            familyCode: kind.familyCode,
-                            title: entry.defaultTitle,
-                            description: nil,
-                            momentTypeCode: entry.momentTypeCode,
-                            preferences: prefs,
-                            status: "ACTIVE"
-                        )
-                    } catch {
-                        failedTitles.append(entry.defaultTitle)
-                    }
-                }
-                if !failedTitles.isEmpty {
-                    softWarnings.append(
-                        "Company created; \(failedTitles.joined(separator: ", ")) could not be set up—open Create to add"
-                    )
-                }
+            if template != nil {
+                softWarnings.append("Open Create to add a Marketing, Trading, Retail, or Manufacturing moment")
             }
             if !softWarnings.isEmpty {
                 activateWarning = softWarnings.joined(separator: " · ")

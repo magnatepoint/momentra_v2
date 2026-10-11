@@ -51,6 +51,24 @@ function mediaBucket(): string {
   return process.env.MEDIA_BUCKET?.trim() || 'momentra-media';
 }
 
+async function ensureMediaBucket(supabase: SupabaseClient, bucket: string): Promise<void> {
+  const { data: buckets } = await supabase.storage.listBuckets();
+  const bucketNames = new Set((buckets ?? []).map((b) => b.name));
+  if (bucketNames.has(bucket)) return;
+  const { error: createErr } = await supabase.storage.createBucket(bucket, {
+    public: false,
+    fileSizeLimit: MAX_BYTES,
+    allowedMimeTypes: [...ALLOWED_TYPES],
+  });
+  if (createErr && !/already exists|duplicate/i.test(createErr.message)) {
+    throw new AppError(
+      ErrorCode.INFRASTRUCTURE_UNAVAILABLE,
+      `Failed to create Supabase media bucket "${bucket}": ${createErr.message}`,
+      500
+    );
+  }
+}
+
 /** Client-supplied scope ids are not authorization. Reject before any signed URL is minted. */
 async function assertUploadScope(
   client: PoolClient,
@@ -147,23 +165,7 @@ export async function createUploadIntent(
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
   const supabase = getSupabaseAdmin();
-  // Ensure bucket exists (idempotent). Create as private for signed uploads.
-  const { data: buckets } = await supabase.storage.listBuckets();
-  const bucketNames = new Set((buckets ?? []).map((b) => b.name));
-  if (!bucketNames.has(bucket)) {
-    const { error: createErr } = await supabase.storage.createBucket(bucket, {
-      public: false,
-      fileSizeLimit: MAX_BYTES,
-      allowedMimeTypes: [...ALLOWED_TYPES],
-    });
-    if (createErr && !/already exists|duplicate/i.test(createErr.message)) {
-      throw new AppError(
-        ErrorCode.INFRASTRUCTURE_UNAVAILABLE,
-        `Failed to create Supabase media bucket "${bucket}": ${createErr.message}`,
-        500
-      );
-    }
-  }
+  await ensureMediaBucket(supabase, bucket);
 
   const { data: signed, error } = await supabase.storage.from(bucket).createSignedUploadUrl(objectKey);
   if (error || !signed?.signedUrl) {
@@ -199,6 +201,61 @@ export async function createUploadIntent(
     expiresAt,
     ownerUserId: ctx.userId,
   };
+}
+
+/** Stores image bytes and records a completed upload owned by the caller. */
+export async function storeCompletedMedia(
+  client: PoolClient,
+  ctx: RequestContext,
+  input: {
+    contentType: string;
+    bytes: Buffer;
+    scopeType: 'USER' | 'MOMENT' | 'COMPANY';
+    scopeId: string;
+  }
+): Promise<{ uploadId: string }> {
+  if (!ALLOWED_TYPES.has(input.contentType)) {
+    throw new AppError(ErrorCode.VALIDATION_FAILED, 'Content type not allowed.', 400);
+  }
+  if (input.bytes.length === 0 || input.bytes.length > MAX_BYTES) {
+    throw new AppError(ErrorCode.VALIDATION_FAILED, 'File exceeds maximum size.', 400);
+  }
+  await assertUploadScope(client, ctx, input.scopeType, input.scopeId);
+
+  const uploadId = randomUUID();
+  const bucket = mediaBucket();
+  const objectKey = `${input.scopeType.toLowerCase()}/${input.scopeId}/${uploadId}`;
+  const supabase = getSupabaseAdmin();
+  await ensureMediaBucket(supabase, bucket);
+  const { error } = await supabase.storage.from(bucket).upload(objectKey, input.bytes, {
+    contentType: input.contentType,
+    upsert: false,
+  });
+  if (error) {
+    throw new AppError(
+      ErrorCode.INFRASTRUCTURE_UNAVAILABLE,
+      `Failed to store photo: ${error.message}`,
+      500
+    );
+  }
+
+  await client.query(
+    `INSERT INTO platform.media_upload (
+       media_upload_id, user_id, scope_type, scope_id, content_type,
+       bucket, object_key, size_bytes, status, completed_at
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'COMPLETED', now())`,
+    [
+      uploadId,
+      ctx.userId,
+      input.scopeType,
+      input.scopeId,
+      input.contentType,
+      bucket,
+      objectKey,
+      input.bytes.length,
+    ]
+  );
+  return { uploadId };
 }
 
 export async function completeUpload(

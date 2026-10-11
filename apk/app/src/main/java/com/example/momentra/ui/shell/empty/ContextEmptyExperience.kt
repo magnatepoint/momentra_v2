@@ -63,6 +63,7 @@ import com.example.momentra.ui.shell.empty.personal.PersonalCreateEmptyContent
 import com.example.momentra.ui.shell.empty.personal.PersonalMemoryEmptyContent
 import com.example.momentra.ui.shell.empty.personal.PersonalMomentsEmptyContent
 import com.example.momentra.ui.shell.empty.personal.PersonalPulseEmptyContent
+import com.example.momentra.ui.shell.personal.experience.PersonalExperienceHost
 import com.example.momentra.ui.shell.circle.CircleComingSoonContent
 import com.example.momentra.ui.theme.ShellTokens
 
@@ -153,57 +154,7 @@ private fun PersonalEmpty(
 
 ) {
 
-    when (destination) {
-
-        BottomDestination.LIFE -> PersonalLifeEmptyContent(
-
-            onStartCta = onCreateMoment,
-
-            history = if (between) history else emptyList(),
-
-            modifier = modifier,
-
-        )
-
-        BottomDestination.CREATE -> PersonalCreateEmptyContent(
-
-            history = if (between) history else emptyList(),
-
-            modifier = modifier,
-
-        )
-
-        BottomDestination.PULSE -> PersonalPulseEmptyContent(
-
-            onCreateMoment = onCreateMoment,
-
-            history = if (between) history else emptyList(),
-
-            modifier = modifier,
-
-        )
-
-        BottomDestination.MOMENTS -> PersonalMomentsEmptyContent(
-
-            onCreateMoment = onCreateMoment,
-
-            history = if (between) history else emptyList(),
-
-            modifier = modifier,
-
-        )
-
-        BottomDestination.MEMORY -> PersonalMemoryEmptyContent(
-
-            onCreateMoment = onCreateMoment,
-
-            history = if (between) history else emptyList(),
-
-            modifier = modifier,
-
-        )
-
-    }
+    PersonalExperienceHost(destination = destination, modifier = modifier)
 
 }
 
@@ -385,38 +336,13 @@ private fun BusinessEmpty(
     val accent = Color(0xFF818CF8)
 
     if (destination == BottomDestination.CREATE) {
-        AnimatedContent(
-            targetState = hasCompany,
-            transitionSpec = {
-                if (targetState) {
-                    (slideInHorizontally { it / 5 } + fadeIn(tween(320))) togetherWith
-                        (slideOutHorizontally { -it / 6 } + fadeOut(tween(240)))
-                } else {
-                    (slideInHorizontally { -it / 5 } + fadeIn(tween(320))) togetherWith
-                        (slideOutHorizontally { it / 6 } + fadeOut(tween(240)))
-                }
-            },
-            label = "businessCompanyGate",
+        BusinessCreateFlow(
+            companyId = companyId,
+            onCreateBack = onCreateBack,
+            onMomentCreated = onMomentCreated,
+            createViewModel = createViewModel,
             modifier = modifier,
-        ) { companyReady ->
-            if (!companyReady) {
-                CompanyFlowSheet(
-                    companies = emptyList(),
-                    selectedCompanyId = null,
-                    startOnCreate = true,
-                    onDismiss = onCreateBack,
-                    onSelect = { _ -> },
-                    onCreated = onCompanyActivated,
-                )
-            } else {
-                BusinessCreateFlow(
-                    companyId = companyId,
-                    onCreateBack = onCreateBack,
-                    onMomentCreated = onMomentCreated,
-                    createViewModel = createViewModel,
-                )
-            }
-        }
+        )
         return
     }
 

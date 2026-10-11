@@ -2,11 +2,16 @@ package com.example.momentra.ui.account
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -56,6 +61,7 @@ import kotlinx.coroutines.tasks.await
 @Composable
 fun AccountHubSheet(
     identity: ShellIdentity,
+    onDisplayNameSaved: (String) -> Unit = {},
     onSignOut: () -> Unit,
     onClose: () -> Unit,
     onAccountDeleted: () -> Unit,
@@ -68,6 +74,7 @@ fun AccountHubSheet(
     val securityPrefs = remember { SecurityPreferences(context) }
 
     var displayName by remember { mutableStateOf(identity.displayName.orEmpty()) }
+    var saving by remember { mutableStateOf(false) }
     var statusMsg by remember { mutableStateOf<String?>(null) }
     var hideBalances by remember { mutableStateOf(securityPrefs.hideBalances()) }
     var pushEnabled by remember { mutableStateOf(securityPrefs.notificationsEnabledLocal()) }
@@ -132,13 +139,6 @@ fun AccountHubSheet(
             fontSize = 20.sp,
             modifier = Modifier.semantics { heading() },
         )
-        val accountTitle = PersonLabel.accountName(displayName.trim().ifBlank { identity.displayName })
-        if (accountTitle.isNotEmpty()) {
-            Text(text = accountTitle, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-        }
-        PersonLabel.contactEmail(identity.email)?.let { email ->
-            Text(text = email, fontSize = 14.sp, color = Color(0xFF8E8E93))
-        }
         statusMsg?.let {
             Text(
                 text = it,
@@ -149,29 +149,70 @@ fun AccountHubSheet(
 
         when (hubSection) {
             "home" -> {
+                val trimmedName = displayName.trim()
+                val visibleName = PersonLabel.accountName(trimmedName.ifBlank { identity.displayName })
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF3A3358)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = profileInitials(visibleName),
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 20.sp,
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = visibleName.ifBlank { "Your name" },
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 18.sp,
+                        )
+                        PersonLabel.contactEmail(identity.email)?.let { email ->
+                            Text(text = email, fontSize = 14.sp, color = Color(0xFF8E8E93))
+                        }
+                    }
+                }
                 OutlinedTextField(
                     value = displayName,
                     onValueChange = { displayName = it },
                     label = { Text("Display name") },
                     modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
                 )
+                PersonLabel.contactEmail(identity.email)?.let { email ->
+                    Text(text = "Email", fontSize = 12.sp, color = Color(0xFF8E8E93))
+                    Text(text = email, fontSize = 16.sp)
+                }
                 Button(
                     onClick = {
                         scope.launch {
-                            accountRepo.patchMe(displayName = displayName.trim().ifBlank { null })
-                                .onSuccess { statusMsg = "Profile saved" }
+                            saving = true
+                            accountRepo.patchMe(displayName = trimmedName)
+                                .onSuccess { saved ->
+                                    val applied = saved.displayName?.trim().orEmpty().ifBlank { trimmedName }
+                                    displayName = applied
+                                    onDisplayNameSaved(applied)
+                                    statusMsg = "Profile saved"
+                                }
                                 .onFailure { statusMsg = it.message ?: "Save failed" }
+                            saving = false
                         }
                     },
+                    enabled = trimmedName.isNotEmpty() && !saving,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Save profile") }
+                ) { Text(if (saving) "Saving…" else "Save") }
 
                 HorizontalDivider()
-                TextButton(onClick = { hubSection = "security" }) { Text("App Security") }
-                TextButton(onClick = { hubSection = "privacy" }) { Text("Privacy & Consent") }
+                TextButton(onClick = { hubSection = "security" }) { Text("Security") }
+                TextButton(onClick = { hubSection = "privacy" }) { Text("Privacy and consent") }
+                TextButton(onClick = { hubSection = "prefs" }) { Text("Notifications") }
                 TextButton(onClick = { hubSection = "devices" }) { Text("Devices") }
-                TextButton(onClick = { hubSection = "prefs" }) { Text("Preferences") }
-                TextButton(onClick = { hubSection = "legal" }) { Text("Help & Legal") }
+                TextButton(onClick = { hubSection = "legal" }) { Text("Help and legal") }
                 if (onReplayTour != null) {
                     TextButton(onClick = onReplayTour) { Text("Replay Personal tour") }
                 }
@@ -186,7 +227,9 @@ fun AccountHubSheet(
                 ) { Text("Sign out") }
 
                 if (!confirmDelete) {
-                    TextButton(onClick = { confirmDelete = true }) { Text("Delete account…") }
+                    TextButton(onClick = { confirmDelete = true }) {
+                        Text("Delete account…", color = Color(0xFFFF453A))
+                    }
                 } else {
                     Text(
                         text = "This soft-deletes your Momentra account: the profile is marked deleted and signed-in devices are revoked. Moment and domain history may be retained (no hard wipe). Shared group/business history may stay visible to other members. Questions: hello@momentra.app",
@@ -576,4 +619,10 @@ fun AccountHubSheet(
             modifier = Modifier.semantics { contentDescription = "Close account hub" },
         ) { Text("Close") }
     }
+}
+
+private fun profileInitials(name: String): String {
+    val parts = name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }.take(2)
+    val letters = parts.mapNotNull { it.firstOrNull() }.joinToString("")
+    return letters.uppercase().ifBlank { "?" }
 }

@@ -15,9 +15,8 @@ enum CompanyModules {
 
     static func moduleKey(for kind: BusinessSetupKind) -> String? {
         switch kind {
-        case .teamOperations: return "teamOps"
-        case .businessRunway: return "money"
-        case .businessOperations: return "dailyBusiness"
+        case .marketingCampaigns, .tradingDistribution, .retailConsumer, .manufacturingProduction:
+            return nil
         }
     }
 

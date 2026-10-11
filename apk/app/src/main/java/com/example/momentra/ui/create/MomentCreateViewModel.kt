@@ -90,9 +90,10 @@ class MomentCreateViewModel(
 
     fun submitBusinessSetup(
         kind: BusinessSetupKind,
-        companyId: String,
+        companyId: String?,
         preferences: Map<String, Any>,
         title: String? = null,
+        subtype: String? = null,
         editingMomentId: String? = null,
         editingMomentStatus: String? = null,
         status: String? = null,
@@ -107,11 +108,12 @@ class MomentCreateViewModel(
                 preferences,
                 BusinessSetupCatalog.allowedKeys(kind),
             )
+            val momentTypeCode = subtype ?: catalog.momentTypeCode
             if (editingMomentId != null) {
                 submitBusinessEdit(
                     momentId = editingMomentId,
                     title = resolvedTitle,
-                    momentTypeCode = catalog.momentTypeCode,
+                    momentTypeCode = momentTypeCode,
                     activateAfter = status == "ACTIVE" && editingMomentStatus.equals("DRAFT", ignoreCase = true),
                     onSuccess = onSuccess,
                 )
@@ -120,7 +122,7 @@ class MomentCreateViewModel(
             repository.createBusinessMoment(
                 companyId = companyId,
                 familyCode = kind.familyCode,
-                momentTypeCode = catalog.momentTypeCode,
+                momentTypeCode = momentTypeCode,
                 title = resolvedTitle,
                 preferences = prefs,
                 status = status,

@@ -15,8 +15,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.momentra.domain.AppContext
 import com.example.momentra.ui.create.MomentCreateViewModel
-import com.example.momentra.ui.shell.business.shared.BusinessActiveTheme
-import com.example.momentra.ui.shell.empty.business.BusinessSetupKind
+import com.example.momentra.ui.shell.business.shared.OperatingMomentCatalog
 import com.example.momentra.ui.shell.empty.business.BusinessSetupWizardContent
 import com.example.momentra.ui.shell.empty.group.GroupExperienceSetupContent
 import com.example.momentra.ui.shell.empty.group.GroupLivingSetupContent
@@ -65,17 +64,11 @@ fun EditMomentSetupHost(
                 )
             }
             AppContext.BUSINESS -> {
-                val theme = BusinessActiveTheme.forTypeCode(momentTypeCode)
-                val kind = when {
-                    theme.typeLabel == BusinessActiveTheme.BusinessRunway.typeLabel ->
-                        BusinessSetupKind.BUSINESS_RUNWAY
-                    theme.typeLabel == BusinessActiveTheme.BusinessOperations.typeLabel ->
-                        BusinessSetupKind.BUSINESS_OPERATIONS
-                    else -> BusinessSetupKind.TEAM_OPERATIONS
-                }
-                if (companyId.isNullOrBlank()) {
+                val kind = OperatingMomentCatalog.kindForTypeCode(momentTypeCode)
+                if (companyId.isNullOrBlank() || kind == null) {
                     Text(
-                        "Company required to edit business setup",
+                        if (kind == null) "This business moment is retired. Create a new one."
+                        else "Company required to edit business setup",
                         color = Color.White,
                         fontSize = 14.sp,
                         modifier = Modifier.align(Alignment.Center),

@@ -309,7 +309,7 @@ struct LivingPulseActiveView: View {
         positions: [APIClient.GroupFinancePositionPayload],
         currency: String
     ) -> some View {
-        let nameById = GroupParticipantNameMap.build(participants)
+        let nameById = livingNameMap(participants)
         if !positions.isEmpty {
             let maxContribution = positions
                 .map { GroupFinanceFormat.parseAmount($0.contributionTotal ?? $0.paidTotal) }
@@ -317,11 +317,12 @@ struct LivingPulseActiveView: View {
                 .max() ?? 0
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(Array(positions.prefix(8).enumerated()), id: \.element.id) { idx, pos in
-                    let name = GroupParticipantNameMap.resolve(
-                        participantId: pos.participantId,
+                    let name = livingPersonName(
                         positionDisplayName: pos.displayName,
+                        participantId: pos.participantId,
                         nameById: nameById
                     )
+                    let role = participants.first { $0.participantId == pos.participantId }?.roleLabel ?? "Resident"
                     let amountRaw = pos.contributionTotal ?? pos.paidTotal
                     let amount = GroupFinanceFormat.parseAmount(amountRaw)
                     let amountLabel: String = {
@@ -337,6 +338,7 @@ struct LivingPulseActiveView: View {
                         name: name,
                         amountLabel: amountLabel,
                         percent: pct,
+                        role: role,
                         featured: idx == 0 && amount > 0
                     )
                 }
@@ -346,13 +348,14 @@ struct LivingPulseActiveView: View {
                 ForEach(Array(participants.prefix(8).enumerated()), id: \.element.id) { idx, p in
                     LivingCrewRow(
                         theme: theme,
-                        name: GroupParticipantNameMap.resolve(
-                            participantId: p.participantId,
+                        name: livingPersonName(
                             positionDisplayName: p.displayName,
+                            participantId: p.participantId,
                             nameById: nameById
                         ),
                         amountLabel: "—",
                         percent: 0,
+                        role: p.roleLabel ?? "Resident",
                         featured: idx == 0
                     )
                 }
@@ -364,6 +367,27 @@ struct LivingPulseActiveView: View {
                 detail: "Invite residents or record a contribution — nothing is invented."
             )
         }
+    }
+
+    private func livingNameMap(_ people: [APIClient.GroupParticipantPayload]) -> [String: String] {
+        var map: [String: String] = [:]
+        for person in people {
+            let key = person.participantId.lowercased()
+            if map[key] != nil { continue }
+            map[key] = PersonLabel.accountName(person.displayName)
+        }
+        return map
+    }
+
+    private func livingPersonName(
+        positionDisplayName: String?,
+        participantId: String,
+        nameById: [String: String]
+    ) -> String {
+        let direct = PersonLabel.accountName(positionDisplayName)
+        if !direct.isEmpty { return direct }
+        if let mapped = nameById[participantId.lowercased()], !mapped.isEmpty { return mapped }
+        return "Resident"
     }
 
     private func load() async {

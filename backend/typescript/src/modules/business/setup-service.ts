@@ -4,11 +4,21 @@ import type { RequestContext } from '../../platform/request-context/context';
 import { AppError, ErrorCode } from '../../platform/errors/errors';
 import { insertAudit, insertDomainEventAndOutbox } from '../../platform/events/outbox';
 import * as momentService from '../moment/service';
+import {
+  OPERATING_FAMILIES,
+  type OperatingFamilyCode,
+} from './operating-catalog';
+import {
+  assertOperatingActivate,
+  momentTypeForActivate,
+  normalizeOperatingPreferences,
+} from './operating-service';
 
 export const BUSINESS_SETUP_FAMILY_CODES = [
-  'TEAM_OPERATIONS',
-  'BUSINESS_RUNWAY',
-  'BUSINESS_OPERATIONS',
+  'MARKETING_CAMPAIGNS',
+  'TRADING_DISTRIBUTION',
+  'RETAIL_CONSUMER',
+  'MANUFACTURING_PRODUCTION',
 ] as const;
 
 export type BusinessSetupFamilyCode = (typeof BUSINESS_SETUP_FAMILY_CODES)[number];
@@ -34,84 +44,37 @@ export interface BusinessSetupCatalogItem {
   defaultPreferences: Record<string, unknown>;
 }
 
-export const BUSINESS_SETUP_CATALOG: BusinessSetupCatalogItem[] = [
-  {
-    familyCode: 'TEAM_OPERATIONS',
-    title: 'Set up Team & Work',
-    subtitle: "Configure your team's operating system in one go.",
-    figmaNodeId: '692:34736',
-    defaultMomentTypeCode: 'TEAM_OPERATIONS',
-    activateLabel: 'Activate Team & Work',
-    defaultTitle: 'Team & Work',
-    defaultPreferences: {
-      audience: 'GROWING',
-      teamName: 'Growth & Product',
-      size: '11-25 people',
-      workMode: 'Hybrid',
-      country: 'India',
-      currency: 'INR',
-      timezone: 'IST (UTC+5:30)',
-      language: 'English',
-      financialYear: 'Apr - Mar',
-      taxSystem: 'GST',
-      coordination: 'Structured',
-      reviewCycle: 'Weekly',
-      monitoring: 'Balanced',
-      spendingApproval: 'Required',
-      approvalThreshold: '',
-      multiCurrency: false,
-      extraCurrencies: [],
-    },
+export const BUSINESS_SETUP_CATALOG: BusinessSetupCatalogItem[] = OPERATING_FAMILIES.map((family) => ({
+  familyCode: family.familyCode,
+  title: family.title,
+  subtitle: family.subtitle,
+  figmaNodeId: family.figmaNodeId,
+  defaultMomentTypeCode: family.subtypes[0]!.code,
+  activateLabel: family.activateLabel,
+  defaultTitle: family.title,
+  defaultPreferences: {
+    subtype: family.subtypes[0]!.code,
+    identityName: '',
+    partyName: '',
+    description: '',
+    currency: 'INR',
+    startDate: '',
+    participants: [],
+    counterparties: [],
+    channels: [],
+    monthlyBudget: '',
+    monthlyTarget: '',
+    targetMetric: family.subtypes[0]!.targetMetrics[0],
+    subtypes: family.subtypes.map((s) => ({
+      code: s.code,
+      label: s.label,
+      partyLabel: s.partyLabel,
+      targetMetrics: s.targetMetrics,
+      requiresChannel: s.requiresChannel,
+      quickAdds: s.quickAdds,
+    })),
   },
-  {
-    familyCode: 'BUSINESS_RUNWAY',
-    title: 'Set up Money & Cash Flow',
-    subtitle: 'Configure your financial operating system on-the-go.',
-    figmaNodeId: '692:36690',
-    defaultMomentTypeCode: 'BUSINESS_RUNWAY',
-    activateLabel: 'Activate Money & Cash Flow',
-    defaultTitle: 'Money & Cash Flow',
-    defaultPreferences: {
-      audience: 'GROWING',
-      businessStage: 'Scaling',
-      goalHorizon: '18-months goal',
-      multiCurrency: true,
-      availableCash: '',
-      monthlySpending: '',
-      revenueStage: 'Growing',
-      monthlyRevenue: '',
-      revenueModel: 'Recurring',
-      warningThreshold: '6 months',
-      fundingSource: 'Bootstrapped + revenue',
-      currency: 'INR',
-      extraCurrencies: [],
-    },
-  },
-  {
-    familyCode: 'BUSINESS_OPERATIONS',
-    title: 'Set up Daily Business',
-    subtitle: 'Configure operational capacity, monitoring and approvals.',
-    figmaNodeId: '692:37188',
-    defaultMomentTypeCode: 'BUSINESS_OPERATIONS',
-    activateLabel: 'Activate Daily Business',
-    defaultTitle: 'Daily Business',
-    defaultPreferences: {
-      audience: 'GROWING',
-      coreOps: 'Growth & Product',
-      scope: 'Company-wide',
-      model: 'Centralized',
-      cadence: 'Monthly',
-      monthlyBudget: '',
-      allocationMethod: 'Category-based',
-      monitoringStyle: 'Proactive',
-      approvalModel: 'Threshold-based',
-      approvalAlarm: '',
-      currency: 'INR',
-      multiCurrency: false,
-      extraCurrencies: [],
-    },
-  },
-];
+}));
 
 export const activateBusinessSetupSchema = z
   .object({
@@ -134,33 +97,14 @@ export function getSetupByCode(code: string): BusinessSetupCatalogItem | undefin
 }
 
 async function insertFamilyContext(
-  client: PoolClient,
-  momentId: string,
-  familyCode: BusinessSetupFamilyCode,
-  title: string
+  _client: PoolClient,
+  _momentId: string,
+  _familyCode: BusinessSetupFamilyCode,
+  _title: string
 ): Promise<void> {
-  if (familyCode === 'TEAM_OPERATIONS') {
-    await client.query(
-      `INSERT INTO business.team_operations_context (moment_id, business_family, objective_text, status)
-       VALUES ($1, 'TEAM_OPERATIONS', $2, 'ACTIVE')
-       ON CONFLICT (moment_id) DO NOTHING`,
-      [momentId, title]
-    );
-  } else if (familyCode === 'BUSINESS_RUNWAY') {
-    await client.query(
-      `INSERT INTO business.business_runway_context (moment_id, business_family, scenario_name, status)
-       VALUES ($1, 'BUSINESS_RUNWAY', $2, 'ACTIVE')
-       ON CONFLICT (moment_id) DO NOTHING`,
-      [momentId, title]
-    );
-  } else if (familyCode === 'BUSINESS_OPERATIONS') {
-    await client.query(
-      `INSERT INTO business.business_operations_context (moment_id, business_family, objective_text, status)
-       VALUES ($1, 'BUSINESS_OPERATIONS', $2, 'ACTIVE')
-       ON CONFLICT (moment_id) DO NOTHING`,
-      [momentId, title]
-    );
-  }
+  // Operating moments keep identity, people, counterparties, and the monthly plan
+  // on business_system_setup.preferences. The legacy per-family context tables
+  // belong to retired Team / Money / Daily setups.
 }
 
 export async function activateBusinessSetup(
@@ -177,9 +121,24 @@ export async function activateBusinessSetup(
   status: string;
   version: number;
 }> {
+  assertOperatingActivate(familyCode);
   const catalog = getSetupByCode(familyCode);
   if (!catalog) {
     throw new AppError(ErrorCode.VALIDATION_FAILED, `Unknown business setup: ${familyCode}`, 400);
+  }
+
+  let normalized;
+  try {
+    normalized = normalizeOperatingPreferences(familyCode as OperatingFamilyCode, body.preferences, {
+      userId: ctx.userId,
+      displayName: 'Owner',
+    });
+  } catch (err) {
+    throw new AppError(
+      ErrorCode.VALIDATION_FAILED,
+      err instanceof Error ? err.message : 'Invalid operating setup.',
+      400
+    );
   }
 
   const membership = await client.query(
@@ -191,9 +150,13 @@ export async function activateBusinessSetup(
     throw new AppError(ErrorCode.GOVERNANCE_DENIED, 'Active company membership required.', 403);
   }
 
-  const momentTypeCode = body.momentTypeCode ?? catalog.defaultMomentTypeCode;
-  const title = body.title ?? catalog.defaultTitle;
-  const preferences = body.preferences ?? catalog.defaultPreferences;
+  const momentTypeCode = momentTypeForActivate(
+    catalog.familyCode,
+    body.momentTypeCode ?? normalized.subtype,
+    normalized.subtype
+  );
+  const title = body.title ?? normalized.identityName;
+  const preferences = normalized as unknown as Record<string, unknown>;
 
   const moment = await momentService.createMoment(client, ctx, {
     domainCode: 'BUSINESS',

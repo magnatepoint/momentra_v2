@@ -174,32 +174,7 @@ struct ContextEmptyExperienceView: View {
 
     @ViewBuilder
     private var personalEmpty: some View {
-        switch destination {
-        case .life:
-            PersonalLifeEmptyView(
-                onStartCta: onCreateMoment,
-                history: between ? history : []
-            )
-        case .create:
-            PersonalCreateEmptyView(
-                history: between ? history : []
-            )
-        case .pulse:
-            PersonalPulseEmptyView(
-                onCreateMoment: onCreateMoment,
-                history: between ? history : []
-            )
-        case .moments:
-            PersonalMomentsEmptyView(
-                onCreateMoment: onCreateMoment,
-                history: between ? history : []
-            )
-        case .memory:
-            PersonalMemoryEmptyView(
-                onCreateMoment: onCreateMoment,
-                history: between ? history : []
-            )
-        }
+        PersonalExperienceHost(destination: destination)
     }
 
     @ViewBuilder
@@ -308,34 +283,12 @@ struct ContextEmptyExperienceView: View {
     private var businessEmpty: some View {
         switch destination {
         case .create:
-            Group {
-                if hasCompany {
-                    BusinessCreateFlowView(
-                        createModel: createModel,
-                        companyId: selectedCompanyId,
-                        onBack: onCreateBack,
-                        onCreated: onMomentCreated
-                    )
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal: .move(edge: .leading).combined(with: .opacity)
-                    ))
-                } else {
-                    CompanyFlowSheet(
-                        companies: [],
-                        selectedCompanyId: nil,
-                        startOnCreate: true,
-                        onClose: onCreateBack,
-                        onSelect: { _ in },
-                        onCreated: onCompanyActivated
-                    )
-                        .transition(.asymmetric(
-                            insertion: .move(edge: .leading).combined(with: .opacity),
-                            removal: .move(edge: .leading).combined(with: .opacity)
-                        ))
-                }
-            }
-            .animation(.easeInOut(duration: 0.32), value: hasCompany)
+            BusinessCreateFlowView(
+                createModel: createModel,
+                companyId: selectedCompanyId,
+                onBack: onCreateBack,
+                onCreated: onMomentCreated
+            )
         case .pulse:
             if first {
                 BusinessPulseEmptyView(onStartCta: onCreateMoment)
@@ -394,24 +347,12 @@ struct ContextEmptyExperienceView: View {
                 )
             )
         case .create:
-            // Defensive: create is normally handled in businessEmpty; keep real chooser here too.
-            if hasCompany {
-                BusinessCreateFlowView(
-                    createModel: createModel,
-                    companyId: selectedCompanyId,
-                    onBack: onCreateBack,
-                    onCreated: onMomentCreated
-                )
-            } else {
-                CompanyFlowSheet(
-                    companies: [],
-                    selectedCompanyId: nil,
-                    startOnCreate: true,
-                    onClose: onCreateBack,
-                    onSelect: { _ in },
-                    onCreated: onCompanyActivated
-                )
-            }
+            BusinessCreateFlowView(
+                createModel: createModel,
+                companyId: selectedCompanyId,
+                onBack: onCreateBack,
+                onCreated: onMomentCreated
+            )
         case .life:
             MomentEmptyStateView(
                 config: MomentEmptyConfig(

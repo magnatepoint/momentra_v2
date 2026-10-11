@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { RequestContext } from '../../platform/request-context/context';
 import { recordCommandSideEffects } from '../../platform/events/outbox';
 import { createMemory } from '../collaboration/service';
-import { assertCompanyMomentAccess } from './membership';
+import { assertCompanyMomentAccess, requireCompanyBoundMoment } from './membership';
 import { refreshBusinessMemoryProjection, refreshBusinessProjectionsAfterWrite } from './business-projection';
 
 const memoryTypeSchema = z.enum([
@@ -49,6 +49,7 @@ export async function createBusinessMemory(
   body: z.infer<typeof createBusinessMemorySchema>
 ): Promise<{ memoryId: string; momentId: string; companyId: string }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   const capturedAt = body.capturedAt
     ? new Date(body.capturedAt).toISOString()
     : undefined;

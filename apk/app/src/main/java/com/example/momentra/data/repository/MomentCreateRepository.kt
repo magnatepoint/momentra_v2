@@ -50,7 +50,7 @@ class MomentCreateRepository(
     }
 
     suspend fun createBusinessMoment(
-        companyId: String,
+        companyId: String?,
         familyCode: String,
         momentTypeCode: String,
         title: String,
@@ -62,7 +62,7 @@ class MomentCreateRepository(
             domainCode = "BUSINESS",
             momentTypeCode = momentTypeCode,
             title = title,
-            companyId = companyId,
+            companyId = companyId?.takeIf { it.isNotBlank() },
             status = status,
             businessSetup = BusinessSetupBlockDto(familyCode = familyCode, preferences = preferences),
         )

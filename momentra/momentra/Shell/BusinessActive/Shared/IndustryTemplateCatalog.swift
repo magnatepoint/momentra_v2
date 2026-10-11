@@ -29,7 +29,7 @@ enum IndustryTemplateCatalog {
             "projects": false,
             "events": false,
         ],
-        setupKinds: [.businessRunway, .businessOperations],
+        setupKinds: BusinessSetupKind.allCases,
         profileDefaults: [
             "industry": "Retail / Kirana",
             "taxSystem": "GST",
@@ -51,7 +51,7 @@ enum IndustryTemplateCatalog {
             "projects": false,
             "events": false,
         ],
-        setupKinds: [.businessRunway, .businessOperations],
+        setupKinds: BusinessSetupKind.allCases,
         profileDefaults: [
             "industry": "Pet store / Specialty",
             "taxSystem": "GST",
@@ -73,7 +73,7 @@ enum IndustryTemplateCatalog {
             "projects": false,
             "events": false,
         ],
-        setupKinds: [.businessRunway, .businessOperations, .teamOperations],
+        setupKinds: BusinessSetupKind.allCases,
         profileDefaults: [
             "industry": "Manufacturing / Workshop",
             "taxSystem": "GST",
@@ -94,7 +94,7 @@ enum IndustryTemplateCatalog {
             "projects": false,
             "events": false,
         ],
-        setupKinds: [.businessRunway, .businessOperations],
+        setupKinds: BusinessSetupKind.allCases,
         profileDefaults: [
             "industry": "Services",
             "taxSystem": "GST",
@@ -107,7 +107,7 @@ enum IndustryTemplateCatalog {
     static let custom = IndustryTemplate(
         id: "CUSTOM",
         label: "Custom / Blank",
-        subtitle: "Pick Money, Daily Business, and Team yourself",
+        subtitle: "Create a Marketing, Trading, Retail, or Manufacturing moment after the company is active",
         modules: [
             "money": true,
             "dailyBusiness": true,
@@ -198,11 +198,7 @@ enum IndustryTemplateCatalog {
 
     static func setupKinds(for template: IndustryTemplate, customModules: [String: Bool]) -> [BusinessSetupKind] {
         if !template.isCustom { return template.setupKinds }
-        var kinds: [BusinessSetupKind] = []
-        if customModules["money"] != false { kinds.append(.businessRunway) }
-        if customModules["dailyBusiness"] != false { kinds.append(.businessOperations) }
-        if customModules["teamOps"] == true { kinds.append(.teamOperations) }
-        return kinds
+        return BusinessSetupKind.allCases
     }
 
     static func modules(for template: IndustryTemplate, customModules: [String: Bool]) -> [String: Bool] {

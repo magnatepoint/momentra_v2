@@ -4,6 +4,7 @@ import SwiftUI
 struct BusinessCreateFlowView: View {
     @ObservedObject var createModel: MomentCreateModel
     var companyId: String?
+    var ownerName: String = ""
     var onBack: () -> Void
     var onCreated: (CreateMomentOutcome) -> Void
 
@@ -18,23 +19,22 @@ struct BusinessCreateFlowView: View {
             companyId: companyId
         )
         .sheet(item: $openSetup) { kind in
-            if let companyId {
-                BusinessSetupWizardView(
-                    kind: kind,
-                    createModel: createModel,
-                    companyId: companyId,
-                    onClose: dismissSetup,
-                    onCreated: { outcome in
-                        openSetup = nil
-                        onCreated(outcome)
-                    }
-                )
+            BusinessSetupWizardView(
+                kind: kind,
+                createModel: createModel,
+                companyId: companyId,
+                ownerName: ownerName,
+                onClose: dismissSetup,
+                onCreated: { outcome in
+                    openSetup = nil
+                    onCreated(outcome)
+                }
+            )
                 .presentationDetents([.fraction(0.94)])
                 .presentationCornerRadius(24)
                 .presentationBackground(BusinessSheetTheme.bg)
                 .presentationDragIndicator(.visible)
                 .interactiveDismissDisabled(createModel.state.submitting)
-            }
         }
     }
 

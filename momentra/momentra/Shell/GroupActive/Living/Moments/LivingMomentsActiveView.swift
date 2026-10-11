@@ -323,8 +323,8 @@ struct LivingMomentsActiveView: View {
                     } else {
                         ForEach(Array(residents.prefix(8))) { resident in
                             MomentsSimpleRowCard(
-                                title: resident.name ?? resident.participantId ?? "Resident",
-                                meta: resident.roleCode,
+                                title: PersonLabel.personName(resident.displayName ?? resident.name, fallback: "Resident"),
+                                meta: resident.roleLabel ?? "Resident",
                                 status: resident.status,
                                 chrome: chrome
                             )

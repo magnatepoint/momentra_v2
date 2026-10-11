@@ -155,7 +155,7 @@ fun LivingPulseActiveContent(
     val openTasks = pulse?.openTaskCount ?: 0
     val fundedPercent = LivingPulseMath.fundedPercent(contributionTotal, budgetTotal)
     val positions = finance?.positions.orEmpty()
-    val nameById = participants.associateBy({ it.participantId }, { PersonLabel.personName(it.displayName) })
+    val nameById = participants.associateBy({ it.participantId }, { PersonLabel.accountName(it.displayName) })
     val deadlines = planningItems.filter { !it.dueAt.isNullOrBlank() }
 
     ActiveTabScrollScaffold(
@@ -297,10 +297,8 @@ fun LivingPulseActiveContent(
                             ?: pos.paidTotal.takeIf { it.isNotBlank() && it != "0" }
                         LivingCrewRow(
                             theme = theme,
-                            name = PersonLabel.accountName(pos.displayName).ifBlank {
-                                PersonLabel.personName(nameById[pos.participantId])
-                            },
-                            role = participants.find { it.participantId == pos.participantId }?.roleCode ?: "Member",
+                            name = livingPersonName(pos.displayName, nameById[pos.participantId]),
+                            role = participants.find { it.participantId == pos.participantId }?.roleLabel ?: "Resident",
                             amountLabel = if (amount != null) {
                                 BalanceMask.mask(GroupFinanceFormat.formatMoney(amount, pos.currencyCode), hideBalances)
                             } else {
@@ -312,17 +310,20 @@ fun LivingPulseActiveContent(
                 }
                 residents.isNotEmpty() -> {
                     residents.take(8).forEach { r ->
-                        val name = PersonLabel.personName(r.name, fallback = "Resident")
-                        val role = r.roleCode ?: "Resident"
-                        LivingCrewRow(theme = theme, name = name, role = role, amountLabel = "—")
+                        LivingCrewRow(
+                            theme = theme,
+                            name = PersonLabel.personName(r.displayName ?: r.name, fallback = "Resident"),
+                            role = r.roleLabel ?: "Resident",
+                            amountLabel = "—",
+                        )
                     }
                 }
                 participants.isNotEmpty() -> {
                     participants.take(8).forEach { p ->
                         LivingCrewRow(
                             theme = theme,
-                            name = PersonLabel.personName(p.displayName),
-                            role = p.roleCode,
+                            name = PersonLabel.personName(p.displayName, fallback = "Resident"),
+                            role = p.roleLabel ?: "Resident",
                             amountLabel = "—",
                         )
                     }
@@ -521,6 +522,14 @@ private fun LivingAccentRing(percent: Int, centerLabel: String, centerSub: Strin
             Text(centerSub, color = Color(0xFFC9C4D8), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = PlusJakartaSans)
         }
     }
+}
+
+private fun livingPersonName(positionName: String?, participantName: String?): String {
+    val direct = PersonLabel.accountName(positionName)
+    if (direct.isNotBlank()) return direct
+    val mapped = PersonLabel.accountName(participantName)
+    if (mapped.isNotBlank()) return mapped
+    return "Resident"
 }
 
 private object LivingPulseMath {

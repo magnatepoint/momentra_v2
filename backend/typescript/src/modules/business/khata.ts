@@ -8,6 +8,7 @@ import {
   assertActiveCompanyMember,
   assertCompanyMomentAccess,
   assertNotCompanyObserver,
+  requireCompanyBoundMoment,
 } from './membership';
 import { travelCurrencyCodeSchema } from '../finance/travel-currencies';
 import { paymentMethodCodeSchema } from '../finance/financial-account';
@@ -94,6 +95,7 @@ export async function createKhataEntry(
   balanceDue: string;
 }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   assertNotCompanyObserver(scope.membershipType);
   await assertGovernanceAllowed(client, ctx, {
     actionCode: 'COMPANY_UPDATE',

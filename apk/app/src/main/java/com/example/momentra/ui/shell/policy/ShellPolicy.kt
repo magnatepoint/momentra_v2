@@ -27,8 +27,7 @@ object ShellVisibilityPolicy {
             (context == AppContext.PERSONAL || context == AppContext.GROUP || context == AppContext.BUSINESS)
     }
 
-    fun showCompanySwitcher(context: AppContext, companies: List<CompanySummary>): Boolean =
-        context == AppContext.BUSINESS && companies.isNotEmpty()
+    fun showCompanySwitcher(context: AppContext, companies: List<CompanySummary>): Boolean = false
 }
 
 data class ShellInvariantInput(
@@ -53,7 +52,7 @@ data class ShellInvariantResult(
 
 /**
  * Shell-state self-heal after bootstrap merge.
- * Business order: Context → Company → Moments(company) → Moment. Never Moment→Company.
+ * Business moments list like group moments. A company is not selected.
  */
 object ShellStateInvariants {
     fun heal(input: ShellInvariantInput): ShellInvariantResult {
@@ -67,24 +66,10 @@ object ShellStateInvariants {
             healed = true
         }
 
-        var companyId = input.selectedCompanyId
-        if (context != AppContext.BUSINESS) {
-            if (companyId != null) {
-                companyId = null
-                healed = true
-            }
-        } else {
-            val validIds = input.companies.map { it.companyId }.toSet()
-            if (companyId == null || companyId !in validIds) {
-                companyId = input.companies.firstOrNull()?.companyId
-                healed = true
-            }
-        }
+        val companyId: String? = null
+        if (input.selectedCompanyId != null) healed = true
 
         val scopedMoments = when (context) {
-            AppContext.BUSINESS -> input.moments.filter { m ->
-                m.companyId == null || m.companyId == companyId
-            }
             AppContext.CIRCLE -> emptyList()
             else -> input.moments
         }
@@ -98,13 +83,6 @@ object ShellStateInvariants {
         if (momentId == null) {
             momentId = scopedMoments.firstOrNull { it.isActiveStatus() }?.momentId
                 ?: scopedMoments.firstOrNull()?.momentId
-        }
-        if (context == AppContext.BUSINESS && momentId != null) {
-            val m = scopedMoments.firstOrNull { it.momentId == momentId }
-            if (m?.companyId != null && m.companyId != companyId) {
-                momentId = scopedMoments.firstOrNull { it.isActiveStatus() }?.momentId
-                healed = true
-            }
         }
 
         val tabs = input.selectedTabByContext.filterKeys { it in supported }.toMutableMap()

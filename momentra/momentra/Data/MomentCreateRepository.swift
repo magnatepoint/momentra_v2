@@ -13,7 +13,7 @@ protocol MomentCreateGateway {
     ) async throws -> CreateMomentOutcome
     func createBusinessSetup(
         draftKey: String,
-        companyId: String,
+        companyId: String?,
         familyCode: String,
         title: String,
         description: String?,
@@ -91,7 +91,7 @@ final class MomentCreateRepository: MomentCreateGateway {
 
     func createBusinessSetup(
         draftKey: String,
-        companyId: String,
+        companyId: String?,
         familyCode: String,
         title: String,
         description: String?,
@@ -109,7 +109,7 @@ final class MomentCreateRepository: MomentCreateGateway {
                 startAt: nil,
                 endAt: nil,
                 timezone: TimeZone.current.identifier,
-                companyId: companyId,
+                companyId: companyId?.isEmpty == false ? companyId : nil,
                 participants: nil,
                 status: status,
                 personalSetup: nil,

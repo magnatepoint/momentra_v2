@@ -39,54 +39,11 @@ struct BusinessCreateMomentView: View {
         let dotAsset: String
     }
 
-    private let categories: [Category] = [
-        Category(title: "Team & Work", body: "Manage hiring, attendance, performance & team growth", icon: "biz_create_users", card: "biz_create_card_team", comingSoon: false, setupKind: .teamOperations, testTag: "business.setup.team_operations"),
-        Category(title: "Money & Cash Flow", body: "Monitor cash and spending.", icon: "biz_create_trending", card: "biz_create_card_runway", comingSoon: false, setupKind: .businessRunway, testTag: "business.setup.business_runway"),
-        Category(title: "Daily Business", body: "Organize departments, processes and workflows.", icon: "biz_create_credit_card", card: "biz_create_card_ops", comingSoon: false, setupKind: .businessOperations, testTag: "business.setup.business_operations"),
-        Category(title: "Project Operations", body: "Organize tasks, milestones, sprints & deliverables", icon: "biz_create_layers", card: "biz_create_card_project", comingSoon: true, setupKind: nil, testTag: nil),
-        Category(title: "Event Operations", body: "Organize events from planning through execution.", icon: "biz_create_wallet", card: "biz_create_card_event", comingSoon: true, setupKind: nil, testTag: nil),
-        Category(title: "Vendor Operations", body: "Manage suppliers, contracts, procurement & partnerships", icon: "biz_create_briefcase", card: "biz_create_card_vendor", comingSoon: true, setupKind: nil, testTag: nil),
-    ]
+    private let categories: [Category] = BusinessSetupKind.allCases.map { kind in
+        Category(title: kind.title, body: kind.body, icon: "biz_create_layers", card: "biz_create_card_project", comingSoon: false, setupKind: kind, testTag: kind.maestroTag)
+    }
 
     private var visibleCategories: [Category] {
-        if showRetailTagline {
-            return categories.filter { !$0.comingSoon }.map { cat in
-                switch cat.setupKind {
-                case .teamOperations:
-                    return Category(
-                        title: cat.title,
-                        body: "Staff updates, attendance, and shop team notes",
-                        icon: cat.icon,
-                        card: cat.card,
-                        comingSoon: false,
-                        setupKind: cat.setupKind,
-                        testTag: cat.testTag
-                    )
-                case .businessRunway:
-                    return Category(
-                        title: cat.title,
-                        body: "Track cash, sales, and shop spends",
-                        icon: cat.icon,
-                        card: cat.card,
-                        comingSoon: false,
-                        setupKind: cat.setupKind,
-                        testTag: cat.testTag
-                    )
-                case .businessOperations:
-                    return Category(
-                        title: cat.title,
-                        body: "Suppliers, day-to-day spends, and shop issues",
-                        icon: cat.icon,
-                        card: cat.card,
-                        comingSoon: false,
-                        setupKind: cat.setupKind,
-                        testTag: cat.testTag
-                    )
-                default:
-                    return cat
-                }
-            }
-        }
         return categories.filter { cat in
             guard let kind = cat.setupKind else { return true }
             guard let key = CompanyModules.moduleKey(for: kind) else { return true }

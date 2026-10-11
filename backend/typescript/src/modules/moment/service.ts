@@ -74,9 +74,6 @@ export const createMomentSchema = z
   })
   .strict()
   .superRefine((body, ctx) => {
-    if (body.domainCode === 'BUSINESS' && !body.companyId) {
-      ctx.addIssue({ code: 'custom', message: 'companyId is required for BUSINESS moments.', path: ['companyId'] });
-    }
     if (body.personalSetup && body.domainCode !== 'PERSONAL') {
       ctx.addIssue({ code: 'custom', message: 'personalSetup is only valid for PERSONAL moments.', path: ['personalSetup'] });
     }
@@ -310,18 +307,25 @@ export async function createMoment(
       );
     }
   } else if (body.domainCode === 'BUSINESS') {
-    const membership = await client.query(
-      `SELECT 1 FROM business.company_membership
-       WHERE company_id = $1 AND user_id = $2 AND status = 'ACTIVE'`,
-      [body.companyId, ctx.userId]
-    );
-    if (!membership.rowCount) {
-      throw new AppError(ErrorCode.GOVERNANCE_DENIED, 'Active company membership required.', 403);
+    if (body.companyId) {
+      const membership = await client.query(
+        `SELECT 1 FROM business.company_membership
+         WHERE company_id = $1 AND user_id = $2 AND status = 'ACTIVE'`,
+        [body.companyId, ctx.userId]
+      );
+      if (!membership.rowCount) {
+        throw new AppError(ErrorCode.GOVERNANCE_DENIED, 'Active company membership required.', 403);
+      }
     }
     await client.query(
       `INSERT INTO business.business_moment_context (moment_id, company_id, business_family, team_id, status, version)
        VALUES ($1, $2, $3, $4, $5, 1)`,
-      [momentId, body.companyId, familyCode, body.teamId ?? null, momentStatus]
+      [momentId, body.companyId ?? null, familyCode, body.teamId ?? null, momentStatus]
+    );
+    await client.query(
+      `INSERT INTO collaboration.moment_participant (moment_id, user_id, participant_role, status, joined_at)
+       VALUES ($1, $2, 'ORGANIZER', 'ACTIVE', now())`,
+      [momentId, ctx.userId]
     );
   }
 
@@ -446,16 +450,17 @@ export async function createMoment(
       preferences,
       momentStatus
     );
-  } else if (body.businessSetup && body.companyId) {
+  } else if (body.businessSetup) {
     const preferences = validateAndMergeBusinessPreferences(
       body.businessSetup.familyCode,
-      body.businessSetup.preferences as Record<string, unknown> | undefined
+      body.businessSetup.preferences as Record<string, unknown> | undefined,
+      { userId: ctx.userId, displayName: 'Owner' }
     );
     result.setupId = await insertBusinessSetupRow(
       client,
       ctx,
       momentId,
-      body.companyId,
+      body.companyId ?? null,
       body.businessSetup.familyCode,
       body.title,
       preferences,
@@ -586,7 +591,7 @@ export async function activateMomentDraft(
       await insertBusinessFamilyContext(
         client,
         momentId,
-        setup.rows[0].family_code as 'TEAM_OPERATIONS' | 'BUSINESS_RUNWAY' | 'BUSINESS_OPERATIONS',
+        setup.rows[0].family_code,
         setup.rows[0].title
       );
       await client.query(

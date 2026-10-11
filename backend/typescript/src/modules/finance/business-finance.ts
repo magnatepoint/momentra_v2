@@ -14,6 +14,7 @@ import {
   assertCanApproveCompanyFinance,
   assertCompanyMomentAccess,
   assertNotCompanyObserver,
+  requireCompanyBoundMoment,
 } from '../business/membership';
 
 function isUniqueViolation(err: unknown, constraint?: string): boolean {
@@ -768,6 +769,7 @@ export async function createBusinessRevenue(
     throw new AppError(ErrorCode.VALIDATION_FAILED, 'Amount must be positive.', 400);
   }
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   assertNotCompanyObserver(scope.membershipType);
 
   if (body.partyId) {
@@ -871,6 +873,7 @@ export async function createBusinessInvoice(
   status: string;
 }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   assertNotCompanyObserver(scope.membershipType);
 
   let subtotal = new Decimal(0);

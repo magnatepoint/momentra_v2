@@ -63,30 +63,32 @@ final class MomentCreateModel: ObservableObject {
 
     func submitBusinessSetup(
         kind: BusinessSetupKind,
-        companyId: String,
+        companyId: String?,
         preferences: [String: Any],
         title: String? = nil,
+        subtype: String? = nil,
         editingMomentId: String? = nil,
         editingMomentStatus: String? = nil,
         status: String? = nil,
         onSuccess: @escaping (CreateMomentOutcome) -> Void
     ) {
         let catalog = BusinessSetupCatalog.forKind(kind)
-        let allowedKeys = Set(catalog.defaultPreferences.keys)
+        let allowedKeys = OperatingMomentCatalog.preferenceKeys
         let filtered = SetupPreferenceFilter.filterToCatalogKeys(preferences, allowedKeys: allowedKeys)
         let resolvedTitle = title ?? catalog.defaultTitle
+        let momentTypeCode = subtype ?? catalog.momentTypeCode
         if let editingMomentId {
             submitEdit(
                 momentId: editingMomentId,
                 title: resolvedTitle,
-                momentTypeCode: catalog.momentTypeCode,
+                momentTypeCode: momentTypeCode,
                 activateAfter: status == "ACTIVE" && editingMomentStatus?.caseInsensitiveCompare("DRAFT") == .orderedSame,
                 onSuccess: onSuccess
             )
             return
         }
         submit(
-            draftKey: "business:\(kind.rawValue):\(companyId)",
+            draftKey: "business:\(kind.rawValue):\(companyId ?? "moment")",
             block: { draftKey in
                 try await self.repository.createBusinessSetup(
                     draftKey: draftKey,
@@ -94,7 +96,7 @@ final class MomentCreateModel: ObservableObject {
                     familyCode: kind.rawValue,
                     title: resolvedTitle,
                     description: catalog.subtitle,
-                    momentTypeCode: catalog.momentTypeCode,
+                    momentTypeCode: momentTypeCode,
                     preferences: filtered,
                     status: status
                 )

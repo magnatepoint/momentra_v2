@@ -14,15 +14,28 @@ export interface CompanyMemberInfo {
 
 export interface BusinessMomentScope {
   momentId: string;
-  companyId: string;
+  companyId: string | null;
   businessFamily: string;
   membershipType: string;
-  membershipId: string;
+  membershipId: string | null;
+}
+
+/** Khata, finance, and company records stay on a company. A moment with no company cannot use them. */
+export function requireCompanyBoundMoment(
+  scope: BusinessMomentScope
+): asserts scope is BusinessMomentScope & { companyId: string } {
+  if (!scope.companyId) {
+    throw new AppError(
+      ErrorCode.VALIDATION_FAILED,
+      'This record stays with a company.',
+      409
+    );
+  }
 }
 
 /**
- * AuthZ chain: ACTIVE company membership → company → moment belongs to company.
- * Never authorize from Moment participant alone.
+ * A company moment still requires active company membership.
+ * A moment with no company is open to its participants, the same way a group moment is.
  */
 export async function assertCompanyMomentAccess(
   client: PoolClient,
@@ -30,24 +43,32 @@ export async function assertCompanyMomentAccess(
   momentId: string
 ): Promise<BusinessMomentScope> {
   const row = await client.query<{
-    company_id: string;
+    company_id: string | null;
     business_family: string;
-    membership_id: string;
-    membership_type: string;
+    membership_id: string | null;
+    membership_type: string | null;
+    participant_id: string | null;
   }>(
     `SELECT bmc.company_id, bmc.business_family,
-            cm.company_membership_id AS membership_id, cm.membership_type
+            cm.company_membership_id AS membership_id, cm.membership_type,
+            mp.participant_id
      FROM business.business_moment_context bmc
      JOIN core.moment m ON m.moment_id = bmc.moment_id AND m.domain_code = 'BUSINESS'
-     JOIN business.company_membership cm
+     LEFT JOIN business.company_membership cm
        ON cm.company_id = bmc.company_id AND cm.user_id = $2 AND cm.status = 'ACTIVE'
-     WHERE bmc.moment_id = $1 AND bmc.status = 'ACTIVE'`,
+     LEFT JOIN collaboration.moment_participant mp
+       ON mp.moment_id = bmc.moment_id AND mp.user_id = $2 AND mp.status = 'ACTIVE'
+     WHERE bmc.moment_id = $1 AND bmc.status = 'ACTIVE'
+       AND (
+         cm.company_membership_id IS NOT NULL
+         OR (bmc.company_id IS NULL AND (mp.participant_id IS NOT NULL OR m.created_by_user_id = $2))
+       )`,
     [momentId, ctx.userId]
   );
   if (!row.rows[0]) {
     throw new AppError(
       ErrorCode.GOVERNANCE_DENIED,
-      'Not an active company member for this business moment.',
+      'Not a member of this business moment.',
       403
     );
   }
@@ -56,7 +77,7 @@ export async function assertCompanyMomentAccess(
     momentId,
     companyId: r.company_id,
     businessFamily: r.business_family,
-    membershipType: r.membership_type,
+    membershipType: r.membership_type ?? 'ORGANIZER',
     membershipId: r.membership_id,
   };
 }

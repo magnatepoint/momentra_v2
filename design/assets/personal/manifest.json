@@ -1,0 +1,44 @@
+{
+  "$description": "Personal v1.1 asset manifest, consumed by tools/design-pipeline/import-assets.mjs. Icons: every Lucide key listed here PLUS every icon referenced by design/taxonomy/personal-taxonomy.v1.json (areas, subcategories, moods) is imported. Geometry comes from the pinned lucide-static package (ISC), normalised to the Figma stroke (1.7, round caps/joins, 24 viewBox) and rendered as template/tintable assets. Artwork masters live in ./artwork and are the Figma image fills (not personal photos).",
+  "lucide": { "package": "lucide-static", "strokeWidth": 1.7, "viewBox": 24 },
+  "naming": {
+    "iosIcon": "PersonalIcons/<lucide-key>",
+    "androidIcon": "ic_pers_<lucide_key>",
+    "iosArtwork": "PersonalArtwork/<key>",
+    "androidArtwork": "<key> (drawable-nodpi WebP)"
+  },
+  "icons": [
+    { "key": "receipt", "use": "expense symbol, formation recipe, emblem", "figmaNodes": ["2036:29834", "2036:29907", "2036:30555"] },
+    { "key": "link", "use": "emerging recipe", "figmaNodes": ["2036:30558"] },
+    { "key": "layers", "use": "emerging recipe", "figmaNodes": ["2036:30561"] },
+    { "key": "route", "use": "progress quiet state", "figmaNodes": ["2036:30569"] },
+    { "key": "book-open", "use": "memory widgets, emblem", "figmaNodes": ["2036:30412", "2036:30576"] },
+    { "key": "book-check", "use": "memory quiet state", "figmaNodes": ["2036:30752"] },
+    { "key": "award", "use": "milestones", "figmaNodes": ["2036:30436"] },
+    { "key": "history", "use": "look back", "figmaNodes": ["2036:30452", "2036:30774"] },
+    { "key": "clock-3", "use": "timeline", "figmaNodes": ["2036:30429"] },
+    { "key": "calendar-days", "use": "date field", "figmaNodes": ["2036:29992"] },
+    { "key": "sparkles", "use": "insights / quiet state", "figmaNodes": ["2036:30515"] },
+    { "key": "lightbulb", "use": "insights", "figmaNodes": ["2036:30583"] },
+    { "key": "circle-check", "use": "quiet state, selected", "figmaNodes": ["2036:30500", "2036:30910"] },
+    { "key": "wallet", "use": "spending snapshot, LI-COLD", "figmaNodes": ["2036:30696"] },
+    { "key": "arrow-left", "use": "sheet back", "figmaNodes": ["2036:30868"] },
+    { "key": "arrow-up-right", "use": "explore action", "figmaNodes": ["2036:29850"] },
+    { "key": "chevron-right", "use": "row affordance", "figmaNodes": ["I2036:29839;1811:22168"] },
+    { "key": "chevron-down", "use": "currency / disclosure", "figmaNodes": ["2036:29992"] },
+    { "key": "x", "use": "close", "figmaNodes": ["2036:29992"] },
+    { "key": "check", "use": "selected / saved", "figmaNodes": ["I2036:30801;1848:21618", "2036:30797"] },
+    { "key": "pencil", "use": "edit context", "figmaNodes": ["2036:30814"] },
+    { "key": "plus", "use": "CTA", "figmaNodes": ["2036:30828"] },
+    { "key": "camera", "use": "receipt / memory photo", "figmaNodes": ["2036:30822"] },
+    { "key": "paperclip", "use": "attachment", "figmaNodes": ["2036:29992"] },
+    { "key": "store", "use": "payee field", "figmaNodes": ["2036:29992"] }
+  ],
+  "artwork": [
+    { "key": "art_pers_design_course", "source": "artwork/art_pers_design_course.jpg", "figmaNode": "2036:29736", "use": "MO-01 featured Active Moment (story hero, ~1.07:1 crop)", "catalogue": "l3_P6.2 (interim area_P6)" },
+    { "key": "art_pers_goa_sunset", "source": "artwork/art_pers_goa_sunset.jpg", "figmaNode": "2036:29757", "use": "MO-01 Emerging card (16:9)", "catalogue": "l3_P4.1" },
+    { "key": "art_pers_pottery_keepsake", "source": "artwork/art_pers_pottery_keepsake.jpg", "figmaNode": "2036:30393", "use": "ME-01 Completed Moments (4:3, caption 'Illustrated keepsake · not a personal photo')", "catalogue": "l3_P6.3 (completed treatment)" },
+    { "key": "art_pers_open_beginning", "source": "artwork/art_pers_open_beginning.jpg", "figmaNode": "2036:30549", "use": "MO-COLD empty Active Moments hero; cold state only, never a real Moment", "catalogue": "cold-state" }
+  ],
+  "artworkOutput": { "androidWebpQuality": 80, "iosJpegQuality": 85, "iosScales": [2, 3] }
+}

@@ -179,6 +179,7 @@ fun AppRoot() {
                 TrackScreen(AnalyticsScreens.HOME) {
                     AppShellScreen(
                         identity = authState.identity!!,
+                        onDisplayNameSaved = authViewModel::applyDisplayName,
                         shellViewModel = shellViewModel,
                         onSignOut = {
                             shellViewModel.clearForLogout()

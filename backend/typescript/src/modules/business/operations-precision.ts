@@ -9,7 +9,7 @@ import type { RequestContext } from '../../platform/request-context/context';
 import { AppError, ErrorCode } from '../../platform/errors/errors';
 import { insertDomainEventAndOutbox } from '../../platform/events/outbox';
 import { assertGovernanceAllowed } from '../governance/resolver';
-import { assertCompanyMomentAccess } from './membership';
+import { assertCompanyMomentAccess, requireCompanyBoundMoment } from './membership';
 
 async function bumpRecentActivity(
   client: PoolClient,
@@ -284,6 +284,7 @@ export async function createIssue(
   body: z.infer<typeof createIssueSchema>
 ): Promise<{ issueId: string; momentId: string }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   await assertGovernanceAllowed(client, ctx, {
     actionCode: 'ISSUE_CREATE',
     resourceType: 'ISSUE',
@@ -344,6 +345,7 @@ export async function createRisk(
   body: z.infer<typeof createRiskSchema>
 ): Promise<{ riskId: string; momentId: string }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   await assertGovernanceAllowed(client, ctx, {
     actionCode: 'RISK_CREATE',
     resourceType: 'RISK',
@@ -409,6 +411,7 @@ export async function createImprovement(
   body: z.infer<typeof createImprovementSchema>
 ): Promise<{ improvementId: string; momentId: string }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   await assertGovernanceAllowed(client, ctx, {
     actionCode: 'ISSUE_CREATE',
     resourceType: 'OPERATIONAL_IMPROVEMENT',
@@ -471,6 +474,7 @@ export async function createBusinessUpdate(
   body: z.infer<typeof createBusinessUpdateSchema>
 ): Promise<{ updateId: string; momentId: string }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   const r = await client.query<{ business_update_id: string }>(
     `INSERT INTO business.business_update (
        company_id, moment_id, author_user_id, title, body, status
@@ -518,6 +522,7 @@ export async function createApprovalRequest(
   body: z.infer<typeof createApprovalRequestSchema>
 ): Promise<{ approvalRequestId: string; momentId: string }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   await assertGovernanceAllowed(client, ctx, {
     actionCode: 'EXPENSE_CREATE',
     resourceType: 'APPROVAL_REQUEST',

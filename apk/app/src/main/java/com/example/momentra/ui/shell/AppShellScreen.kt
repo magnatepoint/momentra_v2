@@ -116,30 +116,17 @@ import com.example.momentra.ui.shell.business.gap.BusinessMomentsSettingsScreen
 import com.example.momentra.ui.shell.business.gap.BusinessVisibilitySettingsScreen
 import com.example.momentra.ui.shell.business.gap.PendingBusinessActivation
 import com.example.momentra.ui.shell.business.gap.VendorOperationsScreen
-import com.example.momentra.ui.shell.business.shared.BusinessPulseActiveContent
 import com.example.momentra.ui.shell.business.shared.BusinessMomentFamilyConfig
-import com.example.momentra.ui.shell.business.shared.BusinessQuickAddHub
 import com.example.momentra.ui.shell.business.shared.BusinessQuickAddKind
+import com.example.momentra.ui.shell.business.shared.OperatingMomentCatalog
+import com.example.momentra.ui.shell.business.shared.OperatingMomentPage
+import com.example.momentra.ui.shell.business.shared.OperatingTab
 import com.example.momentra.ui.shell.business.shared.BusinessRevenueSheet
 import com.example.momentra.ui.shell.business.shared.BusinessKhataHomeSheet
-import com.example.momentra.ui.shell.business.ops.create.OpsGapQuickAddSheet
-import com.example.momentra.ui.shell.business.ops.memory.OpsMemoryActiveContent
-import com.example.momentra.ui.shell.business.ops.moments.OpsMomentsActiveContent
-import com.example.momentra.ui.shell.business.ops.pulse.OpsPulseActiveContent
-import com.example.momentra.ui.shell.business.ops.create.OpsQuickAddSheets
-import com.example.momentra.ui.shell.business.runway.memory.RunwayMemoryActiveContent
-import com.example.momentra.ui.shell.business.runway.moments.RunwayMomentsActiveContent
-import com.example.momentra.ui.shell.business.runway.pulse.RunwayPulseActiveContent
-import com.example.momentra.ui.shell.business.runway.create.RunwayQuickAddSheet
-import com.example.momentra.ui.shell.business.teamops.create.TeamOpsGapQuickAddSheet
-import com.example.momentra.ui.shell.business.teamops.memory.TeamOpsMemoryActiveContent
-import com.example.momentra.ui.shell.business.teamops.moments.TeamOpsMomentsActiveContent
-import com.example.momentra.ui.shell.business.teamops.pulse.TeamOpsPulseActiveContent
 import com.example.momentra.ui.shell.business.shared.BusinessRecentActivityFlow
 import com.example.momentra.ui.shell.business.ops.components.OpsColors
 import com.example.momentra.ui.shell.business.runway.components.RunwayColors
 import com.example.momentra.ui.shell.business.teamops.components.TeamOpsColors
-import com.example.momentra.ui.shell.business.teamops.create.TeamOpsQuickAddSheets
 import com.example.momentra.ui.shell.group.shared.GroupBudgetSheet
 import com.example.momentra.ui.shell.group.shared.GroupCollabKind
 import com.example.momentra.ui.shell.group.shared.GroupCollabSheet
@@ -237,6 +224,7 @@ fun AppShellScreen(
     identity: ShellIdentity,
     onSignOut: () -> Unit,
     onSessionExpired: () -> Unit = {},
+    onDisplayNameSaved: (String) -> Unit = {},
     shellViewModel: AppShellViewModel,
 ) {
     val context = LocalContext.current
@@ -712,24 +700,14 @@ fun AppShellScreen(
                 .momentraMaxWidth(shellWindow.contentMaxWidth),
         ) {
             if (newMomentOpen && state.selectedContext == AppContext.BUSINESS) {
-                if (state.selectedCompany == null) {
-                    CompanyFlowSheet(
-                        companies = state.companies,
-                        selectedCompanyId = null,
-                        startOnCreate = true,
-                        onDismiss = { newMomentOpen = false },
-                        onSelect = shellViewModel::selectCompany,
-                        onCreated = shellViewModel::onCompanyCreated,
-                    )
-                } else {
-                    BusinessCreateFlow(
-                        companyId = state.selectedCompany!!.companyId,
-                        onCreateBack = { newMomentOpen = false },
-                        onMomentCreated = { momentId, title, momentTypeCode, status ->
-                            pendingActivation = PendingBusinessActivation(momentId, title, momentTypeCode, status)
-                        },
-                    )
-                }
+                BusinessCreateFlow(
+                    companyId = state.selectedCompany?.companyId,
+                    ownerName = state.identity?.displayName.orEmpty(),
+                    onCreateBack = { newMomentOpen = false },
+                    onMomentCreated = { momentId, title, momentTypeCode, status ->
+                        pendingActivation = PendingBusinessActivation(momentId, title, momentTypeCode, status)
+                    },
+                )
             } else {
                 ShellDestinationContent(
                     context = state.selectedContext,
@@ -756,6 +734,9 @@ fun AppShellScreen(
                     onRetry = { shellViewModel.selectContext(state.selectedContext) },
                     onSessionExpired = onSessionExpired,
                     onCreateMoment = openNewMoment,
+                    onOpenPersonalLife = { shellViewModel.selectBottomDestination(BottomDestination.LIFE) },
+                    onOpenPersonalPulse = { shellViewModel.selectBottomDestination(BottomDestination.PULSE) },
+                    onOpenPersonalMoments = { shellViewModel.selectBottomDestination(BottomDestination.MOMENTS) },
                     onCreateBack = {
                         if (state.selectedContext == AppContext.GROUP &&
                             groupCreatePhase != GroupCreatePhase.CHOOSER
@@ -876,6 +857,7 @@ fun AppShellScreen(
                 )
             }
             if (
+                false &&
                 state.selectedContext == AppContext.PERSONAL &&
                 state.selectedMomentId != null &&
                 !newMomentOpen &&
@@ -1223,7 +1205,7 @@ fun AppShellScreen(
                 },
             )
         }
-        if (state.companyMenuOpen && state.selectedContext == AppContext.BUSINESS) {
+        if (state.showCompanySwitcher && state.companyMenuOpen && state.selectedContext == AppContext.BUSINESS) {
             CompanyFlowSheet(
                 companies = state.companies,
                 selectedCompanyId = state.selectedCompany?.companyId,
@@ -1263,70 +1245,6 @@ fun AppShellScreen(
                 if (kind == BusinessQuickAddKind.EXPENSE || kind == BusinessQuickAddKind.SPEND_ENTRY) {
                     businessGapQa = null
                     businessExpenseSheetOpen = true
-                }
-            }
-            businessGapQa?.let { kind ->
-                if (kind == BusinessQuickAddKind.EXPENSE || kind == BusinessQuickAddKind.SPEND_ENTRY) {
-                    return@let
-                }
-                val typeCode = state.selectedMomentTypeCode
-                    ?: state.moments.firstOrNull { it.momentId == state.selectedMomentId }?.momentTypeCode
-                val code = typeCode.orEmpty().uppercase()
-                val isRunway = code.contains("RUNWAY")
-                val isTeamOps = code.contains("TEAM_OPERATIONS") &&
-                    TeamOpsQuickAddSheets.isTeamOpsKind(kind)
-                val isOps = code.contains("OPERATIONS") &&
-                    !code.contains("TEAM") &&
-                    !code.contains("RUNWAY") &&
-                    OpsQuickAddSheets.isOpsKind(kind)
-                when {
-                    isRunway -> RunwayQuickAddSheet(
-                        kind = kind,
-                        visible = true,
-                        momentId = state.selectedMomentId,
-                        onDismiss = { businessGapQa = null },
-                        onSaved = {
-                            shellViewModel.refreshVisibleBusinessTab()
-                            tourController.showWhereToLook(TourWhereToLook.forBusinessGeneric())
-                        },
-                    )
-                    isTeamOps -> TeamOpsGapQuickAddSheet(
-                        kind = kind,
-                        visible = true,
-                        momentId = state.selectedMomentId,
-                        onDismiss = { businessGapQa = null },
-                        onSaved = {
-                            shellViewModel.refreshVisibleBusinessTab()
-                            tourController.showWhereToLook(TourWhereToLook.forBusinessGeneric())
-                        },
-                    )
-                    isOps -> OpsGapQuickAddSheet(
-                        kind = kind,
-                        visible = true,
-                        momentId = state.selectedMomentId,
-                        companyId = state.selectedCompany?.companyId,
-                        momentTitle = state.moments.firstOrNull { it.momentId == state.selectedMomentId }?.title,
-                        onDismiss = { businessGapQa = null },
-                        onSaved = {
-                            shellViewModel.refreshVisibleBusinessTab()
-                            tourController.showWhereToLook(TourWhereToLook.forBusinessGeneric())
-                        },
-                        onExpense = { businessExpenseSheetOpen = true },
-                    )
-                    else -> BusinessGapQuickAddSheet(
-                        theme = BusinessActiveTheme.forTypeCode(typeCode),
-                        kind = kind,
-                        visible = true,
-                        momentId = state.selectedMomentId,
-                        onDismiss = { businessGapQa = null },
-                        onSaved = {
-                            shellViewModel.refreshVisibleBusinessTab()
-                            tourController.showWhereToLook(TourWhereToLook.forBusinessGeneric())
-                        },
-                        onExpense = { businessExpenseSheetOpen = true },
-                        onRevenue = { businessRevenueSheetOpen = true },
-                        onInvoice = { businessInvoiceSheetOpen = true },
-                    )
                 }
             }
             BusinessExpenseSheet(
@@ -1512,7 +1430,12 @@ fun AppShellScreen(
             momentId = state.selectedMomentId,
             visible = teamRecentActivityOpen,
             onDismiss = { teamRecentActivityOpen = false },
-            accent = TeamOpsColors.IndigoLight,
+            accent = when (OperatingMomentCatalog.kindForTypeCode(state.selectedMomentTypeCode)) {
+                com.example.momentra.ui.shell.empty.business.BusinessSetupKind.TRADING_DISTRIBUTION -> RunwayColors.Amber
+                com.example.momentra.ui.shell.empty.business.BusinessSetupKind.RETAIL_CONSUMER -> Color(0xFF34D399)
+                com.example.momentra.ui.shell.empty.business.BusinessSetupKind.MANUFACTURING_PRODUCTION -> Color(0xFF38BDF8)
+                else -> TeamOpsColors.IndigoLight
+            },
             subtitle = "Team updates, polls, memories, and other events.",
         )
         BusinessRecentActivityFlow(
@@ -1730,6 +1653,10 @@ fun AppShellScreen(
         ) {
             com.example.momentra.ui.account.AccountHubSheet(
                 identity = state.identity ?: identity,
+                onDisplayNameSaved = { name ->
+                    shellViewModel.applyDisplayName(name)
+                    onDisplayNameSaved(name)
+                },
                 onSignOut = {
                     shellViewModel.openProfile(false)
                     onSignOut()
@@ -1809,6 +1736,9 @@ private fun ShellDestinationContent(
     onRetry: () -> Unit,
     onSessionExpired: () -> Unit,
     onCreateMoment: () -> Unit,
+    onOpenPersonalLife: () -> Unit = {},
+    onOpenPersonalPulse: () -> Unit = {},
+    onOpenPersonalMoments: () -> Unit = {},
     onCreateBack: () -> Unit = onCreateMoment,
     onCompanyActivated: (CompanySummary) -> Unit = {},
     onMomentCreated: (String, String, String?, String) -> Unit = { _, _, _, _ -> },
@@ -2025,28 +1955,20 @@ private fun ShellDestinationContent(
                     }
                 }
                 context == AppContext.BUSINESS && destination == BottomDestination.CREATE -> {
-                    if (selectedMomentId != null && hasCompany) {
+                    if (selectedMomentId != null) {
                         val quickAddType = BusinessMomentFamilyConfig.selectedQuickAddTypeCode(
                             selectedMomentId,
                             moments,
                             selectedMomentTypeCode,
                         )
-                        BusinessQuickAddHub(
-                            hasActiveMoment = true,
-                            hasCompany = hasCompany,
-                            onClose = onCreateBack,
-                            onExpense = onAddExpense,
-                            onRevenue = onAddRevenue,
-                            onInvoice = onAddInvoice,
-                            onMembers = onAddMembers,
-                            onCreateMoment = onCreateMoment,
-                            onOpenCompanySettings = onOpenCompanySettings,
-                            onTile = onBusinessQuickAdd,
+                        OperatingMomentPage(
                             momentId = selectedMomentId,
                             momentTypeCode = quickAddType,
-                            companyId = companyId
-                                ?: moments.firstOrNull { it.momentId == selectedMomentId }?.companyId,
-                            capabilities = capabilities,
+                            momentTitle = selectedMomentTitle,
+                            tab = OperatingTab.QUICK_ADD,
+                            refreshToken = businessTabRefreshToken.toInt(),
+                            onCreateMoment = onCreateMoment,
+                            onOpenQuickAdd = onOpenQuickAdd,
                         )
                     } else {
                         ContextEmptyExperience(
@@ -2292,207 +2214,67 @@ private fun ShellDestinationContent(
                         context == AppContext.BUSINESS && destination == BottomDestination.PULSE -> {
                             val businessTypeCode = selectedMomentTypeCode
                                 ?: moments.firstOrNull { it.momentId == selectedMomentId }?.momentTypeCode
-                            val code = businessTypeCode.orEmpty().uppercase()
-                            when {
-                                code.contains("RUNWAY") -> RunwayPulseActiveContent(
-                                    momentId = selectedMomentId,
-                                    momentTitle = selectedMomentTitle,
-                                    refreshToken = businessTabRefreshToken,
-                                    onLogExpense = onAddExpense,
-                                    onOpenQuickAdd = onOpenQuickAdd,
-                                    onOpenMoments = onOpenMoments,
-                                    onViewAllActivity = onViewAllBusinessActivity,
-                                    onToday = onBusinessQuickAdd,
-                                    capabilities = capabilities,
-                                    momentTypeCode = businessTypeCode,
-                                )
-                                code.contains("TEAM_OPERATIONS") -> TeamOpsPulseActiveContent(
-                                    momentId = selectedMomentId,
-                                    momentTitle = selectedMomentTitle,
-                                    refreshToken = businessTabRefreshToken,
-                                    onLogDelivery = { onBusinessQuickAdd(BusinessQuickAddKind.TEAM_UPDATE) },
-                                    onOpenQuickAdd = onOpenQuickAdd,
-                                    onViewAllActivity = onViewAllTeamActivity,
-                                    onAddExpense = onAddExpense,
-                                    onOpenMoments = onOpenMoments,
-                                    onToday = onBusinessQuickAdd,
-                                    capabilities = capabilities,
-                                    momentTypeCode = businessTypeCode,
-                                )
-                                code.contains("OPERATIONS") && !code.contains("TEAM") -> OpsPulseActiveContent(
-                                    momentId = selectedMomentId,
-                                    momentTitle = selectedMomentTitle,
-                                    refreshToken = businessTabRefreshToken,
-                                    onLogSpend = onAddExpense,
-                                    onOpenQuickAdd = onOpenQuickAdd,
-                                    onOpenMoments = onOpenMoments,
-                                    onViewAllActivity = onViewAllBusinessActivity,
-                                    onToday = onBusinessQuickAdd,
-                                    capabilities = capabilities,
-                                    momentTypeCode = businessTypeCode,
-                                )
-                                else -> BusinessPulseActiveContent(
-                                    momentId = selectedMomentId,
-                                    momentTitle = selectedMomentTitle,
-                                    refreshToken = businessTabRefreshToken,
-                                    momentTypeCode = businessTypeCode,
-                                    onAddExpense = onAddExpense,
-                                    onOpenQuickAdd = onOpenQuickAdd,
-                                    onToday = onBusinessQuickAdd,
-                                    capabilities = capabilities,
-                                )
-                            }
+                            OperatingMomentPage(
+                                momentId = selectedMomentId,
+                                momentTypeCode = businessTypeCode,
+                                momentTitle = selectedMomentTitle,
+                                tab = OperatingTab.PULSE,
+                                refreshToken = businessTabRefreshToken.toInt(),
+                                onCreateMoment = onCreateMoment,
+                                onOpenQuickAdd = onOpenQuickAdd,
+                            )
                         }
                         context == AppContext.BUSINESS && destination == BottomDestination.MOMENTS -> {
                             val businessTypeCode = selectedMomentTypeCode
                                 ?: moments.firstOrNull { it.momentId == selectedMomentId }?.momentTypeCode
-                            val code = businessTypeCode.orEmpty().uppercase()
-                            when {
-                                code.contains("RUNWAY") -> RunwayMomentsActiveContent(
-                                    momentId = selectedMomentId,
-                                    momentTitle = selectedMomentTitle,
-                                    refreshToken = businessTabRefreshToken,
-                                    onLogExpense = onAddExpense,
-                                    onOpenQuickAdd = onOpenQuickAdd,
-                                    onOpenMoments = onOpenMoments,
-                                    onViewAllActivity = onViewAllBusinessActivity,
-                                )
-                                code.contains("TEAM_OPERATIONS") -> TeamOpsMomentsActiveContent(
-                                    momentId = selectedMomentId,
-                                    momentTitle = selectedMomentTitle,
-                                    refreshToken = businessTabRefreshToken,
-                                    onLogWin = { onBusinessQuickAdd(BusinessQuickAddKind.TEAM_UPDATE) },
-                                    onOpenQuickAdd = onOpenQuickAdd,
-                                    onViewAllActivity = onViewAllTeamActivity,
-                                )
-                                code.contains("OPERATIONS") && !code.contains("TEAM") -> OpsMomentsActiveContent(
-                                    momentId = selectedMomentId,
-                                    momentTitle = selectedMomentTitle,
-                                    refreshToken = businessTabRefreshToken,
-                                    onLogSpend = onAddExpense,
-                                    onOpenQuickAdd = onOpenQuickAdd,
-                                    onOpenMoments = onOpenMoments,
-                                    onViewAllActivity = onViewAllBusinessActivity,
-                                )
-                                else -> BusinessMomentsActiveContent(
-                                    momentId = selectedMomentId,
-                                    momentTitle = selectedMomentTitle,
-                                    momentTypeCode = businessTypeCode,
-                                    refreshToken = businessTabRefreshToken,
-                                    onOpenQuickAdd = onOpenQuickAdd,
-                                )
-                            }
+                            OperatingMomentPage(
+                                momentId = selectedMomentId,
+                                momentTypeCode = businessTypeCode,
+                                momentTitle = selectedMomentTitle,
+                                tab = OperatingTab.MOMENTS,
+                                refreshToken = businessTabRefreshToken.toInt(),
+                                onCreateMoment = onCreateMoment,
+                                onOpenQuickAdd = onOpenQuickAdd,
+                            )
                         }
                         context == AppContext.BUSINESS && destination == BottomDestination.LIFE -> {
                             val businessTypeCode = selectedMomentTypeCode
                                 ?: moments.firstOrNull { it.momentId == selectedMomentId }?.momentTypeCode
-                            BusinessLifeActiveContent(
+                            OperatingMomentPage(
                                 momentId = selectedMomentId,
-                                momentTitle = selectedMomentTitle,
-                                refreshToken = businessTabRefreshToken,
                                 momentTypeCode = businessTypeCode,
-                                companyId = companyId,
-                                onViewReport = onViewBusinessReport,
-                                onOpenFinance = onOpenBusinessFinance,
-                                onOpenVendor = onOpenVendor,
+                                momentTitle = selectedMomentTitle,
+                                tab = OperatingTab.LIFE,
+                                refreshToken = businessTabRefreshToken.toInt(),
+                                onCreateMoment = onCreateMoment,
+                                onOpenQuickAdd = onOpenQuickAdd,
                             )
                         }
                         context == AppContext.BUSINESS && destination == BottomDestination.MEMORY -> {
                             val businessTypeCode = selectedMomentTypeCode
                                 ?: moments.firstOrNull { it.momentId == selectedMomentId }?.momentTypeCode
-                            val code = businessTypeCode.orEmpty().uppercase()
-                            when {
-                                code.contains("RUNWAY") -> RunwayMemoryActiveContent(
-                                    momentId = selectedMomentId,
-                                    momentTitle = selectedMomentTitle,
-                                    refreshToken = businessTabRefreshToken,
-                                    onRecordLearning = { onBusinessQuickAdd(BusinessQuickAddKind.MEMORY) },
-                                    companyId = companyId,
-                                )
-                                code.contains("TEAM_OPERATIONS") -> TeamOpsMemoryActiveContent(
-                                    momentId = selectedMomentId,
-                                    momentTitle = selectedMomentTitle,
-                                    refreshToken = businessTabRefreshToken,
-                                    onRecordLearning = { onBusinessQuickAdd(BusinessQuickAddKind.MEMORY) },
-                                    onOpenQuickAdd = { onBusinessQuickAdd(BusinessQuickAddKind.TEAM_UPDATE) },
-                                    companyId = companyId,
-                                )
-                                code.contains("OPERATIONS") && !code.contains("TEAM") -> OpsMemoryActiveContent(
-                                    momentId = selectedMomentId,
-                                    momentTitle = selectedMomentTitle,
-                                    refreshToken = businessTabRefreshToken,
-                                    onRecordMemory = { onBusinessQuickAdd(BusinessQuickAddKind.MEMORY) },
-                                    companyId = companyId,
-                                )
-                                else -> BusinessMemoryActiveContent(
-                                    momentId = selectedMomentId,
-                                    momentTitle = selectedMomentTitle,
-                                    refreshToken = businessTabRefreshToken,
-                                    momentTypeCode = businessTypeCode,
-                                    onOpenQuickAdd = onOpenQuickAdd,
-                                    companyId = companyId,
-                                )
-                            }
-                        }
-                        context == AppContext.PERSONAL && destination == BottomDestination.LIFE -> {
-                            PersonalLifeActiveContent(
-                                refreshToken = personalTabRefreshToken,
-                                onLogRecovery = { onLifeOpsQuickAdd(LifeOpsQuickAddKind.RECOVERY) },
-                                onLogSpend = { onMoneyQuickAdd(MoneyQuickAddKind.MASTER_EXPENSE) },
-                                onOpenAdd = { onOpenQuickAdd() },
-                            )
-                        }
-                        context == AppContext.PERSONAL && destination == BottomDestination.PULSE -> {
-                            PersonalLifeOpsPulseActiveContent(
-                                refreshToken = personalTabRefreshToken,
-                                momentTitle = selectedMomentTitle,
+                            OperatingMomentPage(
                                 momentId = selectedMomentId,
-                                momentTypeCode = personalTypeCode,
-                                forceCollapsed = forcePersonalSimple,
-                                onAddExpense = onAddExpense,
-                                onLifeOpsQuickAdd = onLifeOpsQuickAdd,
-                                onFutureQuickAdd = onFutureQuickAdd,
-                                onLifestyleQuickAdd = onLifestyleQuickAdd,
-                                onRelationshipsQuickAdd = onRelationshipsQuickAdd,
-                                onViewAllActivity = onOpenMoments,
-                            )
-                        }
-                        context == AppContext.PERSONAL && destination == BottomDestination.MOMENTS -> {
-                            com.example.momentra.ui.shell.personal.shared.PersonalMomentsActiveContent(
-                                refreshToken = personalTabRefreshToken,
-                                momentId = selectedMomentId,
+                                momentTypeCode = businessTypeCode,
                                 momentTitle = selectedMomentTitle,
-                                momentTypeCode = personalTypeCode,
+                                tab = OperatingTab.MEMORY,
+                                refreshToken = businessTabRefreshToken.toInt(),
+                                onCreateMoment = onCreateMoment,
                                 onOpenQuickAdd = onOpenQuickAdd,
-                                onActivityChanged = onPersonalActivityChanged,
                             )
                         }
-                        context == AppContext.PERSONAL && destination == BottomDestination.MEMORY -> {
-                            com.example.momentra.ui.shell.personal.memory.PersonalMemoryActiveContent(
-                                refreshToken = personalTabRefreshToken,
-                            )
-                        }
-                        context == AppContext.PERSONAL && destination == BottomDestination.CREATE -> {
-                            PersonalQuickAddHub(
-                                hasActiveMoment = selectedMomentId != null,
-                                onClose = onCreateBack,
-                                onSpend = { onMoneyQuickAdd(MoneyQuickAddKind.MASTER_EXPENSE) },
-                                onIncome = { onMoneyQuickAdd(MoneyQuickAddKind.INCOME) },
-                                onRecovery = { onLifeOpsQuickAdd(LifeOpsQuickAddKind.RECOVERY) },
-                                onMood = { onLifeOpsQuickAdd(LifeOpsQuickAddKind.MOOD) },
-                                onAttention = { onLifeOpsQuickAdd(LifeOpsQuickAddKind.ATTENTION) },
-                                onAdjust = { onLifeOpsQuickAdd(LifeOpsQuickAddKind.ADJUST) },
-                                onTransfer = { onMoneyQuickAdd(MoneyQuickAddKind.TRANSFER) },
-                                onSavings = { onMoneyQuickAdd(MoneyQuickAddKind.SAVINGS) },
-                                onFutureQuickAdd = onFutureQuickAdd,
-                                onLifestyleQuickAdd = onLifestyleQuickAdd,
-                                onRelationshipsQuickAdd = onRelationshipsQuickAdd,
-                                momentTypeCode = personalTypeCode,
-                                capabilities = capabilities,
-                                simpleMode = false,
-                                unifiedCatalog = true,
-                                presentFamilies = personalPresentFamilies,
-                                onSetupMissing = onPersonalSetupMissing,
+                        context == AppContext.PERSONAL && (
+                            destination == BottomDestination.LIFE ||
+                                destination == BottomDestination.PULSE ||
+                                destination == BottomDestination.MOMENTS ||
+                                destination == BottomDestination.MEMORY ||
+                                destination == BottomDestination.CREATE
+                            ) -> {
+                            com.example.momentra.ui.shell.personal.experience.PersonalExperienceHost(
+                                destination = destination,
+                                onOpenLife = onOpenPersonalLife,
+                                onOpenPulse = onOpenPersonalPulse,
+                                onOpenMoments = onOpenPersonalMoments,
                             )
                         }
                         else -> {

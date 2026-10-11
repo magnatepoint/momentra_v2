@@ -90,3 +90,4 @@ V089__finance_rls_caller_scope.sql
 V090__personal_master_expense_subcategories.sql
 V091__business_khata.sql
 V092__revenue_party_payment.sql
+V093__personal_life_taxonomy.sql

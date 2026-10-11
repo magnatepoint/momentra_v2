@@ -31,14 +31,10 @@ enum EditMomentSetupTarget: Identifiable, Equatable {
             case .relationships: return .personal(.relationships)
             }
         case .business:
-            let theme = BusinessActiveTheme.forTypeCode(momentTypeCode)
-            if theme.typeLabel == BusinessActiveTheme.businessRunway.typeLabel {
-                return .business(.businessRunway)
+            if let kind = OperatingMomentCatalog.kind(for: momentTypeCode) {
+                return .business(kind)
             }
-            if theme.typeLabel == BusinessActiveTheme.businessOperations.typeLabel {
-                return .business(.businessOperations)
-            }
-            return .business(.teamOperations)
+            return nil
         case .group:
             let family = GroupExperienceFamily.forTypeCode(momentTypeCode)
             if family.isThemedPurchase { return .groupPurchase }

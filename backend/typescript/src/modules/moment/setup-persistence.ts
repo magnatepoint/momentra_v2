@@ -48,7 +48,7 @@ export async function insertPersonalSetupRow(
 export async function insertBusinessFamilyContext(
   client: PoolClient,
   momentId: string,
-  familyCode: BusinessSetupFamilyCode,
+  familyCode: string,
   title: string
 ): Promise<void> {
   if (familyCode === 'TEAM_OPERATIONS') {
@@ -79,8 +79,8 @@ export async function insertBusinessSetupRow(
   client: PoolClient,
   ctx: RequestContext,
   momentId: string,
-  companyId: string,
-  familyCode: BusinessSetupFamilyCode,
+  companyId: string | null,
+  familyCode: BusinessSetupFamilyCode | 'TEAM_OPERATIONS' | 'BUSINESS_RUNWAY' | 'BUSINESS_OPERATIONS',
   title: string,
   preferences: Record<string, unknown>,
   status: 'DRAFT' | 'ACTIVE' = 'ACTIVE'
@@ -104,8 +104,8 @@ export async function insertBusinessSetupRow(
     domainCode: 'BUSINESS',
     aggregateType: 'BUSINESS_SYSTEM_SETUP',
     aggregateId: setupId,
-    scopeType: 'COMPANY',
-    scopeId: companyId,
+    scopeType: companyId ? 'COMPANY' : 'MOMENT',
+    scopeId: companyId ?? momentId,
     payload: { setupId, familyCode, momentId, title, companyId },
   });
   await insertAudit(client, ctx, 'BUSINESS_SETUP_ACTIVATE', 'BUSINESS_SYSTEM_SETUP', setupId, domainEventId, {

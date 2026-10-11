@@ -98,47 +98,18 @@ fun BusinessCreateMomentContent(
     }
 
     val categories = remember(showRetailTagline, companyId) {
-        val live = listOf(
+        val live = BusinessSetupKind.entries.map { kind ->
             BizCategory(
-                "Team & Work",
-                if (showRetailTagline) "Staff updates, attendance, and shop team notes"
-                else "Manage hiring, attendance, performance & team growth",
-                R.drawable.ic_biz_create_users,
-                R.drawable.ic_biz_create_card_team,
+                kind.title,
+                kind.body,
+                R.drawable.ic_biz_create_layers,
+                R.drawable.ic_biz_create_card_project,
                 false,
-                BusinessSetupKind.TEAM_OPERATIONS,
-                MaestroIds.BUSINESS_SETUP_TEAM,
-            ),
-            BizCategory(
-                "Money & Cash Flow",
-                if (showRetailTagline) "Track cash, sales, and shop spends"
-                else "Monitor cash and spending.",
-                R.drawable.ic_biz_create_trending,
-                R.drawable.ic_biz_create_card_runway,
-                false,
-                BusinessSetupKind.BUSINESS_RUNWAY,
-                MaestroIds.BUSINESS_SETUP_RUNWAY,
-            ),
-            BizCategory(
-                "Daily Business",
-                if (showRetailTagline) "Suppliers, day-to-day spends, and shop issues"
-                else "Organize departments, processes and workflows.",
-                R.drawable.ic_biz_create_credit_card,
-                R.drawable.ic_biz_create_card_ops,
-                false,
-                BusinessSetupKind.BUSINESS_OPERATIONS,
-                MaestroIds.BUSINESS_SETUP_OPS,
-            ),
-        )
-        val all = if (showRetailTagline) {
-            live
-        } else {
-            live + listOf(
-                BizCategory("Project Operations", "Organize tasks, milestones, sprints & deliverables", R.drawable.ic_biz_create_layers, R.drawable.ic_biz_create_card_project, true),
-                BizCategory("Event Operations", "Organize events from planning through execution.", R.drawable.ic_biz_create_wallet, R.drawable.ic_biz_create_card_event, true),
-                BizCategory("Vendor Operations", "Manage suppliers, contracts, procurement & partnerships", R.drawable.ic_biz_create_briefcase, R.drawable.ic_biz_create_card_vendor, true),
+                kind,
+                kind.maestroTag,
             )
         }
+        val all = live
         all.filter { cat ->
             val kind = cat.setupKind ?: return@filter true
             val key = CompanyModules.moduleKeyForSetupKind(kind) ?: return@filter true

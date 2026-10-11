@@ -17,6 +17,7 @@ import { publishProjectionUpdated } from '../../realtime/sse';
 import * as businessService from '../../modules/business/service';
 import * as businessMembership from '../../modules/business/membership';
 import * as businessSetupService from '../../modules/business/setup-service';
+import * as operatingService from '../../modules/business/operating-service';
 import * as businessFinanceService from '../../modules/finance/business-finance';
 import * as businessOpsPrecision from '../../modules/business/operations-precision';
 import * as businessClosureWriters from '../../modules/business/business-closure-writers';
@@ -43,6 +44,7 @@ import * as movementService from '../../modules/finance/movement';
 import * as recurringScheduleService from '../../modules/finance/recurring-schedule';
 import * as mediaService from '../../modules/media/service';
 import * as personalService from '../../modules/personal/service';
+import * as personalLifeExpense from '../../modules/personal/life-expense';
 import * as personalSetupService from '../../modules/personal/setup-service';
 import * as lifeOpsPrecision from '../../modules/personal/life-ops-precision';
 import * as futurePrecision from '../../modules/personal/future-precision';
@@ -1276,6 +1278,78 @@ v1Router.post('/business/setups/:familyCode/activate', requireIdempotencyKey, as
     next(e);
   }
 });
+
+v1Router.get('/business/moments/:momentId/operating', async (req, res, next) => {
+  try {
+    const ctx = req.requestContext!;
+    const data = await withDb((client) =>
+      operatingService.getOperatingProjection(client, ctx, param(req.params.momentId))
+    );
+    res.json(projectionEnvelope(data, ctx.correlationId, { status: 'OK' }));
+  } catch (e) {
+    next(e);
+  }
+});
+
+v1Router.post('/business/moments/:momentId/operating-events', requireIdempotencyKey, async (req, res, next) => {
+  try {
+    const ctx = req.requestContext!;
+    const momentId = param(req.params.momentId);
+    const body = parseBody(operatingService.recordOperatingEventSchema, req.body);
+    const result = await runCommand({
+      operationCode: 'OPERATING_EVENT_RECORD',
+      idempotencyKey: req.idempotencyKey!,
+      body,
+      ctx,
+      resourceType: 'OPERATING_EVENT',
+      execute: async (client, b) => {
+        const r = await operatingService.recordOperatingEvent(
+          client,
+          ctx,
+          momentId,
+          b as operatingService.RecordOperatingEventInput
+        );
+        return { result: r, resourceId: r.eventId };
+      },
+    });
+    res.status(201).json(commandEnvelope(result, ctx.correlationId));
+  } catch (e) {
+    next(e);
+  }
+});
+
+v1Router.post(
+  '/business/moments/:momentId/operating-events/:eventId/decision',
+  requireIdempotencyKey,
+  async (req, res, next) => {
+    try {
+      const ctx = req.requestContext!;
+      const momentId = param(req.params.momentId);
+      const eventId = param(req.params.eventId);
+      const body = parseBody(operatingService.decideOperatingEventSchema, req.body);
+      const result = await runCommand({
+        operationCode: 'OPERATING_EVENT_DECIDE',
+        idempotencyKey: req.idempotencyKey!,
+        body,
+        ctx,
+        resourceType: 'OPERATING_EVENT',
+        execute: async (client, b) => {
+          const r = await operatingService.decideOperatingEvent(
+            client,
+            ctx,
+            momentId,
+            eventId,
+            b as operatingService.DecideOperatingEventInput
+          );
+          return { result: r, resourceId: r.eventId };
+        },
+      });
+      res.status(201).json(commandEnvelope(result, ctx.correlationId));
+    } catch (e) {
+      next(e);
+    }
+  }
+);
 
 for (const facet of ['pulse', 'life', 'memory', 'finance', 'actions'] as const) {
   v1Router.get(`/business/moments/:momentId/${facet}`, async (req, res, next) => {
@@ -2728,6 +2802,99 @@ v1Router.get('/personal/memory', async (req, res, next) => {
         ? 'EMPTY'
         : 'OK';
     res.json(projectionEnvelope(data, ctx.correlationId, { status }));
+  } catch (e) {
+    next(e);
+  }
+});
+
+v1Router.get('/personal/experience', async (req, res, next) => {
+  try {
+    const ctx = req.requestContext!;
+    const data = await withDb((client) => personalLifeExpense.getPersonalExperience(client, ctx.userId));
+    res.json(projectionEnvelope(data, ctx.correlationId, { status: data.cold ? 'EMPTY' : 'OK' }));
+  } catch (e) {
+    next(e);
+  }
+});
+
+v1Router.post('/personal/expenses', requireIdempotencyKey, async (req, res, next) => {
+  try {
+    const ctx = req.requestContext!;
+    const body = parseBody(personalLifeExpense.createPersonalLifeExpenseSchema, req.body);
+    const result = await runCommand({
+      operationCode: 'PERSONAL_LIFE_EXPENSE_CREATE',
+      idempotencyKey: req.idempotencyKey!,
+      body,
+      ctx,
+      resourceType: 'EXPENSE',
+      execute: async (client, b) => {
+        const r = await personalLifeExpense.createPersonalLifeExpense(client, ctx, b);
+        return { result: r, resourceId: r.expenseId };
+      },
+    });
+    res.status(201).json(commandEnvelope(result, ctx.correlationId, { resourceVersion: result.version }));
+  } catch (e) {
+    next(e);
+  }
+});
+
+v1Router.patch('/personal/expenses/:expenseId', requireIdempotencyKey, async (req, res, next) => {
+  try {
+    const ctx = req.requestContext!;
+    const body = parseBody(personalLifeExpense.updatePersonalLifeExpenseSchema, req.body);
+    const result = await runCommand({
+      operationCode: 'PERSONAL_LIFE_EXPENSE_CORRECT',
+      idempotencyKey: req.idempotencyKey!,
+      body,
+      ctx,
+      resourceType: 'EXPENSE',
+      execute: async (client, b) => {
+        const r = await personalLifeExpense.updatePersonalLifeExpense(client, ctx, param(req.params.expenseId), b);
+        return { result: r, resourceId: r.expenseId };
+      },
+    });
+    res.json(commandEnvelope(result, ctx.correlationId, { resourceVersion: result.version }));
+  } catch (e) {
+    next(e);
+  }
+});
+
+v1Router.post('/personal/expenses/:expenseId/refund', requireIdempotencyKey, async (req, res, next) => {
+  try {
+    const ctx = req.requestContext!;
+    const body = parseBody(personalLifeExpense.refundPersonalLifeExpenseSchema, req.body ?? {});
+    const result = await runCommand({
+      operationCode: 'PERSONAL_LIFE_EXPENSE_REFUND',
+      idempotencyKey: req.idempotencyKey!,
+      body,
+      ctx,
+      resourceType: 'EXPENSE',
+      execute: async (client, b) => {
+        const r = await personalLifeExpense.refundPersonalLifeExpense(client, ctx, param(req.params.expenseId), b.amount);
+        return { result: r, resourceId: r.expenseId };
+      },
+    });
+    res.status(201).json(commandEnvelope(result, ctx.correlationId));
+  } catch (e) {
+    next(e);
+  }
+});
+
+v1Router.post('/personal/expenses/:expenseId/void', requireIdempotencyKey, async (req, res, next) => {
+  try {
+    const ctx = req.requestContext!;
+    const result = await runCommand({
+      operationCode: 'PERSONAL_LIFE_EXPENSE_VOID',
+      idempotencyKey: req.idempotencyKey!,
+      body: {},
+      ctx,
+      resourceType: 'EXPENSE',
+      execute: async (client) => {
+        const r = await personalLifeExpense.voidPersonalLifeExpense(client, ctx, param(req.params.expenseId));
+        return { result: r, resourceId: r.expenseId };
+      },
+    });
+    res.json(commandEnvelope(result, ctx.correlationId));
   } catch (e) {
     next(e);
   }

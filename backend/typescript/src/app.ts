@@ -55,7 +55,8 @@ export function createApp(): express.Express {
       credentials: true,
     })
   );
-  app.use(express.json({ limit: '1mb' }));
+  // Personal expense photos travel as base64 JSON on the same save request.
+  app.use(express.json({ limit: '8mb' }));
   app.use(correlationMiddleware);
   app.use(requestLogMiddleware);
 

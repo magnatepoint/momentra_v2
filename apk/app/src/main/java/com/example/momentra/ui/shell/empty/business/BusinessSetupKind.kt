@@ -10,26 +10,38 @@ enum class BusinessSetupKind(
     val analyticsScreen: String,
     val activateColor: Color,
     val maestroTag: String,
+    val body: String,
 ) {
-    TEAM_OPERATIONS(
-        "Set up Team & Work",
-        "TEAM_OPERATIONS",
+    MARKETING_CAMPAIGNS(
+        "Marketing & Campaigns",
+        "MARKETING_CAMPAIGNS",
         AnalyticsScreens.BUSINESS_SETUP_TEAM_OPS,
-        Color(0xFF10B981),
-        MaestroIds.BUSINESS_SETUP_TEAM,
+        Color(0xFF818CF8),
+        MaestroIds.BUSINESS_SETUP_MARKETING,
+        "Budget, channels, people, and results for a campaign.",
     ),
-    BUSINESS_RUNWAY(
-        "Set up Money & Cash Flow",
-        "BUSINESS_RUNWAY",
+    TRADING_DISTRIBUTION(
+        "Trading & Distribution",
+        "TRADING_DISTRIBUTION",
         AnalyticsScreens.BUSINESS_SETUP_RUNWAY,
         Color(0xFFFBBF24),
-        MaestroIds.BUSINESS_SETUP_RUNWAY,
+        MaestroIds.BUSINESS_SETUP_TRADING,
+        "Source, move, and collect across wholesale or distribution.",
     ),
-    BUSINESS_OPERATIONS(
-        "Set up Daily Business",
-        "BUSINESS_OPERATIONS",
+    RETAIL_CONSUMER(
+        "Retail & Consumer",
+        "RETAIL_CONSUMER",
         AnalyticsScreens.BUSINESS_SETUP_OPS,
-        Color(0xFF818CF8),
-        MaestroIds.BUSINESS_SETUP_OPS,
+        Color(0xFF34D399),
+        MaestroIds.BUSINESS_SETUP_RETAIL,
+        "A store, a food outlet, or a consumer service.",
+    ),
+    MANUFACTURING_PRODUCTION(
+        "Manufacturing & Production",
+        "MANUFACTURING_PRODUCTION",
+        AnalyticsScreens.BUSINESS_SETUP_OPS,
+        Color(0xFF38BDF8),
+        MaestroIds.BUSINESS_SETUP_MANUFACTURING,
+        "Standard production or made-to-order job work.",
     ),
 }

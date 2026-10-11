@@ -1,0 +1,858 @@
+{
+  "$description": "Momentra Personal v1.1 context taxonomy (frozen, spec D-04). Source of truth for tools/design-pipeline/generate-tokens.mjs, which emits the iOS/Android catalogs and the backend constants + seed. L1 layer (NOW/BUILD) is derived from the area and never asked of the user. Every expense has exactly one area and one subcategory of that area. Icons are Lucide keys (see design/assets/personal/manifest.json); tints are token paths in design/tokens/personal.tokens.json.",
+  "version": 1,
+  "source": {
+    "spec": "Momentra Personal v1.1 spec section 3.1-3.2",
+    "figmaFile": "TzLvwVwlPbeVB8ug1zB3GM",
+    "figmaSection": "2036:29539"
+  },
+  "layers": [
+    {
+      "code": "NOW",
+      "label": "Now",
+      "sortOrder": 10
+    },
+    {
+      "code": "BUILD",
+      "label": "Build",
+      "sortOrder": 20
+    }
+  ],
+  "areas": [
+    {
+      "code": "P1",
+      "layer": "NOW",
+      "label": "Home & Daily Life",
+      "tagline": "Running my everyday life",
+      "icon": "house",
+      "tint": "color.area.P1",
+      "sortOrder": 10,
+      "figmaNodeId": "2036:30891"
+    },
+    {
+      "code": "P2",
+      "layer": "NOW",
+      "label": "Family & Care",
+      "tagline": "Looking after the people who matter to me",
+      "icon": "users",
+      "tint": "color.area.P2",
+      "sortOrder": 20,
+      "figmaNodeId": "2036:30898"
+    },
+    {
+      "code": "P3",
+      "layer": "NOW",
+      "label": "Health & Wellbeing",
+      "tagline": "Looking after myself",
+      "icon": "heart-pulse",
+      "tint": "color.area.P3",
+      "sortOrder": 30,
+      "figmaNodeId": "2036:30905"
+    },
+    {
+      "code": "P4",
+      "layer": "NOW",
+      "label": "Lifestyle & Experiences",
+      "tagline": "Things I enjoy and experience",
+      "icon": "compass",
+      "tint": "color.area.P4",
+      "sortOrder": 40,
+      "figmaNodeId": "2036:30915"
+    },
+    {
+      "code": "P5",
+      "layer": "NOW",
+      "label": "Shopping & Purchases",
+      "tagline": "Things I want or need to buy",
+      "icon": "shopping-bag",
+      "tint": "color.area.P5",
+      "sortOrder": 50,
+      "figmaNodeId": "2036:30922"
+    },
+    {
+      "code": "P6",
+      "layer": "BUILD",
+      "label": "Education & Growth",
+      "tagline": "Learning and improving myself",
+      "icon": "graduation-cap",
+      "tint": "color.area.P6",
+      "sortOrder": 60,
+      "figmaNodeId": "2036:30932"
+    },
+    {
+      "code": "P7",
+      "layer": "BUILD",
+      "label": "Money & Commitments",
+      "tagline": "Managing my money and obligations",
+      "icon": "shield-check",
+      "tint": "color.area.P7",
+      "sortOrder": 70,
+      "figmaNodeId": "2036:30939"
+    },
+    {
+      "code": "P8",
+      "layer": "BUILD",
+      "label": "Future & Milestones",
+      "tagline": "Things I am building toward",
+      "icon": "flag",
+      "tint": "color.area.P8",
+      "sortOrder": 80,
+      "figmaNodeId": "2036:30946"
+    }
+  ],
+  "subcategories": [
+    {
+      "code": "P1.1",
+      "area": "P1",
+      "label": "Home & Housing",
+      "description": "Residence, rent and living arrangements",
+      "examples": [
+        "Apartment rent",
+        "security deposit",
+        "move home"
+      ],
+      "icon": "house-plus",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 10,
+      "figmaNodeId": "2036:30998"
+    },
+    {
+      "code": "P1.2",
+      "area": "P1",
+      "label": "Groceries & Essentials",
+      "description": "Routine food and household essentials",
+      "examples": [
+        "Groceries",
+        "toiletries",
+        "cleaning supplies"
+      ],
+      "icon": "shopping-basket",
+      "iconSource": "figma",
+      "sortOrder": 20,
+      "figmaNodeId": "2036:30999"
+    },
+    {
+      "code": "P1.3",
+      "area": "P1",
+      "label": "Bills & Utilities",
+      "description": "Recurring household connectivity and utility costs",
+      "examples": [
+        "Electricity",
+        "water",
+        "gas",
+        "internet",
+        "mobile"
+      ],
+      "icon": "zap",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 30,
+      "figmaNodeId": "2036:31001"
+    },
+    {
+      "code": "P1.4",
+      "area": "P1",
+      "label": "Daily Mobility",
+      "description": "Routine movement and local transport",
+      "examples": [
+        "Fuel",
+        "cab",
+        "metro",
+        "parking",
+        "tolls"
+      ],
+      "icon": "bus",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 40,
+      "figmaNodeId": "2036:31002"
+    },
+    {
+      "code": "P1.5",
+      "area": "P1",
+      "label": "Home Maintenance",
+      "description": "Keeping the home and appliances functional",
+      "examples": [
+        "Plumber",
+        "repairs",
+        "AC/appliance service"
+      ],
+      "icon": "wrench",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 50,
+      "figmaNodeId": "2036:31004"
+    },
+    {
+      "code": "P1.6",
+      "area": "P1",
+      "label": "Daily Services",
+      "description": "Routine services supporting daily living",
+      "examples": [
+        "Domestic help",
+        "laundry",
+        "cleaning service"
+      ],
+      "icon": "concierge-bell",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 60,
+      "figmaNodeId": "2036:31005"
+    },
+    {
+      "code": "P2.1",
+      "area": "P2",
+      "label": "Children",
+      "description": "Needs and responsibilities relating to children",
+      "examples": [
+        "School fees",
+        "child activity",
+        "child needs"
+      ],
+      "icon": "baby",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 10,
+      "figmaNodeId": "2036:31051"
+    },
+    {
+      "code": "P2.2",
+      "area": "P2",
+      "label": "Parents & Elders",
+      "description": "Care and support for parents or elders",
+      "examples": [
+        "Parent medicines",
+        "caregiver",
+        "elder support"
+      ],
+      "icon": "hand-heart",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 20,
+      "figmaNodeId": "2036:31052"
+    },
+    {
+      "code": "P2.3",
+      "area": "P2",
+      "label": "Partner & Family",
+      "description": "Partner and immediate-family responsibilities",
+      "examples": [
+        "Family support",
+        "spouse-related household need"
+      ],
+      "icon": "heart",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 30,
+      "figmaNodeId": "2036:31054"
+    },
+    {
+      "code": "P2.4",
+      "area": "P2",
+      "label": "Dependents & Support",
+      "description": "Financial support for other dependents",
+      "examples": [
+        "Sibling support",
+        "dependent relative rent"
+      ],
+      "icon": "hand-helping",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 40,
+      "figmaNodeId": "2036:31055"
+    },
+    {
+      "code": "P2.5",
+      "area": "P2",
+      "label": "Pets",
+      "description": "Care and upkeep of pets",
+      "examples": [
+        "Pet food",
+        "vet",
+        "grooming"
+      ],
+      "icon": "paw-print",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 50,
+      "figmaNodeId": "2036:31057"
+    },
+    {
+      "code": "P2.6",
+      "area": "P2",
+      "label": "Family Occasions",
+      "description": "Family-centred celebrations and occasions",
+      "examples": [
+        "Birthday",
+        "anniversary",
+        "family celebration"
+      ],
+      "icon": "cake",
+      "iconSource": "figma",
+      "sortOrder": 60,
+      "figmaNodeId": "2036:31058"
+    },
+    {
+      "code": "P3.1",
+      "area": "P3",
+      "label": "Medical & Treatment",
+      "description": "Diagnosis, treatment and recovery",
+      "examples": [
+        "Doctor",
+        "hospital",
+        "medicine",
+        "dental treatment"
+      ],
+      "icon": "stethoscope",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 10,
+      "figmaNodeId": "2036:31104"
+    },
+    {
+      "code": "P3.2",
+      "area": "P3",
+      "label": "Fitness",
+      "description": "Exercise, physical training and fitness activity",
+      "examples": [
+        "Gym",
+        "trainer",
+        "running",
+        "sports fitness"
+      ],
+      "icon": "dumbbell",
+      "iconSource": "figma",
+      "sortOrder": 20,
+      "figmaNodeId": "2036:31105"
+    },
+    {
+      "code": "P3.3",
+      "area": "P3",
+      "label": "Mental Wellbeing",
+      "description": "Emotional and mental wellbeing support",
+      "examples": [
+        "Therapy",
+        "counselling",
+        "meditation"
+      ],
+      "icon": "brain",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 30,
+      "figmaNodeId": "2036:31107"
+    },
+    {
+      "code": "P3.4",
+      "area": "P3",
+      "label": "Personal Care",
+      "description": "Personal grooming and self-care",
+      "examples": [
+        "Haircut",
+        "grooming",
+        "skincare treatment"
+      ],
+      "icon": "scissors",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 40,
+      "figmaNodeId": "2036:31108"
+    },
+    {
+      "code": "P3.5",
+      "area": "P3",
+      "label": "Nutrition & Wellness",
+      "description": "Nutrition and broader wellness support",
+      "examples": [
+        "Dietician",
+        "nutrition program",
+        "wellness"
+      ],
+      "icon": "apple",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 50,
+      "figmaNodeId": "2036:31110"
+    },
+    {
+      "code": "P3.6",
+      "area": "P3",
+      "label": "Preventive Care",
+      "description": "Preventive health checks and protection",
+      "examples": [
+        "Annual check-up",
+        "diagnostics",
+        "vaccination"
+      ],
+      "icon": "shield-plus",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 60,
+      "figmaNodeId": "2036:31111"
+    },
+    {
+      "code": "P4.1",
+      "area": "P4",
+      "label": "Travel & Holidays",
+      "description": "Personal/family travel and holidays",
+      "examples": [
+        "Flights",
+        "hotel",
+        "holiday expenses"
+      ],
+      "icon": "plane",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 10,
+      "figmaNodeId": "2036:31157"
+    },
+    {
+      "code": "P4.2",
+      "area": "P4",
+      "label": "Dining & Going Out",
+      "description": "Eating out and casual outings",
+      "examples": [
+        "Restaurant",
+        "cafe",
+        "dining outing"
+      ],
+      "icon": "utensils",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 20,
+      "figmaNodeId": "2036:31158"
+    },
+    {
+      "code": "P4.3",
+      "area": "P4",
+      "label": "Entertainment",
+      "description": "Entertainment consumption and activities",
+      "examples": [
+        "Movies",
+        "streaming",
+        "games"
+      ],
+      "icon": "clapperboard",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 30,
+      "figmaNodeId": "2036:31160"
+    },
+    {
+      "code": "P4.4",
+      "area": "P4",
+      "label": "Hobbies & Interests",
+      "description": "Ongoing personal interests and hobbies",
+      "examples": [
+        "Photography",
+        "music",
+        "hobby materials"
+      ],
+      "icon": "palette",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 40,
+      "figmaNodeId": "2036:31161"
+    },
+    {
+      "code": "P4.5",
+      "area": "P4",
+      "label": "Events & Experiences",
+      "description": "Ticketed or distinct experiences",
+      "examples": [
+        "Concert",
+        "show",
+        "sports event"
+      ],
+      "icon": "ticket",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 50,
+      "figmaNodeId": "2036:31163"
+    },
+    {
+      "code": "P4.6",
+      "area": "P4",
+      "label": "Recreation & Social Life",
+      "description": "Recreational and social activities",
+      "examples": [
+        "Badminton",
+        "club activity",
+        "leisure"
+      ],
+      "icon": "party-popper",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 60,
+      "figmaNodeId": "2036:31164"
+    },
+    {
+      "code": "P5.1",
+      "area": "P5",
+      "label": "Fashion & Personal Items",
+      "description": "Clothing, footwear and personal accessories",
+      "examples": [
+        "Clothes",
+        "shoes",
+        "accessories"
+      ],
+      "icon": "shirt",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 10,
+      "figmaNodeId": "2036:31210"
+    },
+    {
+      "code": "P5.2",
+      "area": "P5",
+      "label": "Electronics & Gadgets",
+      "description": "Personal electronics and technology purchases",
+      "examples": [
+        "Phone",
+        "laptop",
+        "smartwatch"
+      ],
+      "icon": "smartphone",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 20,
+      "figmaNodeId": "2036:31211"
+    },
+    {
+      "code": "P5.3",
+      "area": "P5",
+      "label": "Home Purchases",
+      "description": "Durable items bought for the home",
+      "examples": [
+        "Furniture",
+        "refrigerator",
+        "appliances"
+      ],
+      "icon": "sofa",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 30,
+      "figmaNodeId": "2036:31213"
+    },
+    {
+      "code": "P5.4",
+      "area": "P5",
+      "label": "Vehicle & Mobility Purchase",
+      "description": "Acquisition of personal mobility assets",
+      "examples": [
+        "Car",
+        "bike",
+        "bicycle"
+      ],
+      "icon": "car",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 40,
+      "figmaNodeId": "2036:31214"
+    },
+    {
+      "code": "P5.5",
+      "area": "P5",
+      "label": "Gifts",
+      "description": "Items purchased specifically as gifts",
+      "examples": [
+        "Birthday gift",
+        "anniversary gift"
+      ],
+      "icon": "gift",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 50,
+      "figmaNodeId": "2036:31216"
+    },
+    {
+      "code": "P5.6",
+      "area": "P5",
+      "label": "Other Planned Purchases",
+      "description": "Planned purchases not naturally covered above",
+      "examples": [
+        "Instrument",
+        "collectible",
+        "unusual purchase"
+      ],
+      "icon": "package",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 60,
+      "figmaNodeId": "2036:31217"
+    },
+    {
+      "code": "P6.1",
+      "area": "P6",
+      "label": "Education",
+      "description": "Formal education undertaken by the user",
+      "examples": [
+        "University tuition",
+        "MBA"
+      ],
+      "icon": "school",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 10,
+      "figmaNodeId": "2036:31263"
+    },
+    {
+      "code": "P6.2",
+      "area": "P6",
+      "label": "Courses & Certifications",
+      "description": "Structured courses, credentials and exams",
+      "examples": [
+        "AWS",
+        "CFA",
+        "certification course"
+      ],
+      "icon": "graduation-cap",
+      "iconSource": "figma",
+      "sortOrder": 20,
+      "figmaNodeId": "2036:31264"
+    },
+    {
+      "code": "P6.3",
+      "area": "P6",
+      "label": "Skills & Learning",
+      "description": "Learning a specific capability",
+      "examples": [
+        "Python",
+        "language learning"
+      ],
+      "icon": "puzzle",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 30,
+      "figmaNodeId": "2036:31266"
+    },
+    {
+      "code": "P6.4",
+      "area": "P6",
+      "label": "Career Development",
+      "description": "Professional advancement and career capability",
+      "examples": [
+        "Career coaching",
+        "leadership program"
+      ],
+      "icon": "briefcase",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 40,
+      "figmaNodeId": "2036:31267"
+    },
+    {
+      "code": "P6.5",
+      "area": "P6",
+      "label": "Books & Knowledge",
+      "description": "Knowledge resources used for learning",
+      "examples": [
+        "Books",
+        "research subscription"
+      ],
+      "icon": "library",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 50,
+      "figmaNodeId": "2036:31269"
+    },
+    {
+      "code": "P6.6",
+      "area": "P6",
+      "label": "Personal Development",
+      "description": "Broader self-development and capability building",
+      "examples": [
+        "Public speaking",
+        "productivity program"
+      ],
+      "icon": "sprout",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 60,
+      "figmaNodeId": "2036:31270"
+    },
+    {
+      "code": "P7.1",
+      "area": "P7",
+      "label": "Loans & EMIs",
+      "description": "Repayment of borrowing obligations",
+      "examples": [
+        "Home-loan EMI",
+        "personal-loan EMI"
+      ],
+      "icon": "landmark",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 10,
+      "figmaNodeId": "2036:31316"
+    },
+    {
+      "code": "P7.2",
+      "area": "P7",
+      "label": "Insurance & Protection",
+      "description": "Financial protection commitments",
+      "examples": [
+        "Health insurance",
+        "term-life premium"
+      ],
+      "icon": "umbrella",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 20,
+      "figmaNodeId": "2036:31317"
+    },
+    {
+      "code": "P7.3",
+      "area": "P7",
+      "label": "Savings",
+      "description": "Money deliberately set aside",
+      "examples": [
+        "Emergency fund",
+        "reserve savings"
+      ],
+      "icon": "piggy-bank",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 30,
+      "figmaNodeId": "2036:31319"
+    },
+    {
+      "code": "P7.4",
+      "area": "P7",
+      "label": "Investments",
+      "description": "Money allocated to investment assets",
+      "examples": [
+        "Mutual-fund SIP",
+        "stocks"
+      ],
+      "icon": "trending-up",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 40,
+      "figmaNodeId": "2036:31320"
+    },
+    {
+      "code": "P7.5",
+      "area": "P7",
+      "label": "Taxes & Financial Obligations",
+      "description": "Tax and statutory/financial obligations",
+      "examples": [
+        "Income tax",
+        "property tax"
+      ],
+      "icon": "file-text",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 50,
+      "figmaNodeId": "2036:31322"
+    },
+    {
+      "code": "P7.6",
+      "area": "P7",
+      "label": "Recurring Commitments",
+      "description": "Recurring commitments not better represented elsewhere",
+      "examples": [
+        "Membership",
+        "storage/service commitment"
+      ],
+      "icon": "repeat",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 60,
+      "figmaNodeId": "2036:31323"
+    },
+    {
+      "code": "P8.1",
+      "area": "P8",
+      "label": "Home Ownership",
+      "description": "Long-term objective to buy/build a home",
+      "examples": [
+        "Home down payment",
+        "first-home plan"
+      ],
+      "icon": "key-round",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 10,
+      "figmaNodeId": "2036:31369"
+    },
+    {
+      "code": "P8.2",
+      "area": "P8",
+      "label": "Marriage & Partnership",
+      "description": "Major relationship/partnership milestones",
+      "examples": [
+        "Wedding",
+        "engagement"
+      ],
+      "icon": "gem",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 20,
+      "figmaNodeId": "2036:31370"
+    },
+    {
+      "code": "P8.3",
+      "area": "P8",
+      "label": "Career Change",
+      "description": "Significant transition in professional direction",
+      "examples": [
+        "Switch career",
+        "leave job for venture"
+      ],
+      "icon": "signpost",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 30,
+      "figmaNodeId": "2036:31372"
+    },
+    {
+      "code": "P8.4",
+      "area": "P8",
+      "label": "Major Life Goal",
+      "description": "Significant personally defined long-term objective",
+      "examples": [
+        "Run marathon",
+        "publish a book"
+      ],
+      "icon": "mountain",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 40,
+      "figmaNodeId": "2036:31373"
+    },
+    {
+      "code": "P8.5",
+      "area": "P8",
+      "label": "Retirement & Long-term Future",
+      "description": "Preparation for later-life future",
+      "examples": [
+        "Retirement corpus",
+        "retirement relocation"
+      ],
+      "icon": "sunset",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 50,
+      "figmaNodeId": "2036:31375"
+    },
+    {
+      "code": "P8.6",
+      "area": "P8",
+      "label": "Life Transition",
+      "description": "Major change in living circumstances or life stage",
+      "examples": [
+        "Move abroad",
+        "independent living"
+      ],
+      "icon": "luggage",
+      "iconSource": "lucide-proposal",
+      "sortOrder": 60,
+      "figmaNodeId": "2036:31376"
+    }
+  ],
+  "moods": [
+    {
+      "code": "GREAT",
+      "label": "Great",
+      "icon": "laugh",
+      "sortOrder": 10,
+      "figmaNodeId": "2036:29992"
+    },
+    {
+      "code": "GOOD",
+      "label": "Good",
+      "icon": "smile",
+      "sortOrder": 20,
+      "figmaNodeId": "2036:29992"
+    },
+    {
+      "code": "OKAY",
+      "label": "Okay",
+      "icon": "meh",
+      "sortOrder": 30,
+      "figmaNodeId": "2036:29992"
+    },
+    {
+      "code": "UNEASY",
+      "label": "Uneasy",
+      "icon": "frown",
+      "sortOrder": 40,
+      "figmaNodeId": "2036:29992"
+    },
+    {
+      "code": "BAD",
+      "label": "Bad",
+      "icon": "angry",
+      "sortOrder": 50,
+      "figmaNodeId": "2036:29992"
+    }
+  ],
+  "rules": {
+    "moodOptional": true,
+    "moodNeverInferred": true,
+    "noMoodIsNotOkay": true,
+    "oneAreaOneSubcategory": true,
+    "crossParentRejected": true,
+    "openItems": [
+      "D-05 Giving/Contributions has no home yet; must not be forced into a wrong subcategory"
+    ]
+  }
+}

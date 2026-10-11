@@ -23,219 +23,38 @@ struct BusinessSetupCatalogEntry {
 }
 
 enum BusinessSetupCatalog {
-    private static let currencyCodes = TravelCurrencyCatalog.codes
-
-    private static let teamOps = BusinessSetupCatalogEntry(
-        defaultTitle: "Team & Work",
-        subtitle: "Configure your team's operating system in one go.",
-        momentTypeCode: "TEAM_OPERATIONS",
-        activateLabel: "Activate Team & Work",
-        footerTagline: "Run your team with clarity",
-        sections: [
-            BusinessSetupSectionSpec(
-                title: "Team basics",
-                fields: [
-                    PersonalSetupFieldSpec(key: "teamName", label: "Team name", multiSelect: false, options: ["Growth & Product", "Operations", "Customer Success"]),
-                    PersonalSetupFieldSpec(key: "size", label: "Team size", multiSelect: false, options: ["1-10 people", "11-25 people", "26-50 people", "50+ people"]),
-                    PersonalSetupFieldSpec(key: "workMode", label: "Work mode", multiSelect: false, options: ["Remote", "Hybrid", "In-office"]),
-                ]
-            ),
-            BusinessSetupSectionSpec(
-                title: "Locale & finance",
-                fields: [
-                    PersonalSetupFieldSpec(key: "country", label: "Country", multiSelect: false, options: ["India", "United States", "United Kingdom", "Singapore"]),
-                    PersonalSetupFieldSpec(key: "currency", label: "Currency", multiSelect: false, options: currencyCodes, kind: .dropdown),
-                    PersonalSetupFieldSpec(key: "multiCurrency", label: "Multi-currency", multiSelect: false, options: [], kind: .toggle),
-                    PersonalSetupFieldSpec(key: "extraCurrencies", label: "Extra currencies", multiSelect: true, options: currencyCodes),
-                    PersonalSetupFieldSpec(key: "timezone", label: "Timezone", multiSelect: false, options: ["IST (UTC+5:30)", "UTC", "EST (UTC-5)", "PST (UTC-8)"]),
-                    PersonalSetupFieldSpec(key: "language", label: "Language", multiSelect: false, options: ["English", "Hindi", "Spanish", "French"]),
-                    PersonalSetupFieldSpec(key: "financialYear", label: "Financial year", multiSelect: false, options: ["Apr - Mar", "Jan - Dec", "Jul - Jun"]),
-                    PersonalSetupFieldSpec(key: "taxSystem", label: "Tax system", multiSelect: false, options: ["GST", "VAT", "Sales tax"]),
-                ]
-            ),
-            BusinessSetupSectionSpec(
-                title: "Governance",
-                fields: [
-                    PersonalSetupFieldSpec(key: "coordination", label: "Coordination style", multiSelect: false, options: ["Structured", "Flexible", "Async-first"]),
-                    PersonalSetupFieldSpec(key: "reviewCycle", label: "Review cycle", multiSelect: false, options: ["Weekly", "Bi-weekly", "Monthly"]),
-                    PersonalSetupFieldSpec(key: "monitoring", label: "Monitoring", multiSelect: false, options: ["Balanced", "Light", "Intensive"]),
-                    PersonalSetupFieldSpec(key: "spendingApproval", label: "Spending approval", multiSelect: false, options: ["Required", "Optional", "Not required"]),
-                ],
-                textFields: [
-                    BusinessSetupTextFieldSpec(key: "approvalThreshold", label: "Approval threshold"),
-                ]
-            ),
-        ],
-        fields: [],
-        defaultPreferences: [
-            "audience": BusinessAudience.growing,
-            "teamName": "Growth & Product",
-            "size": "11-25 people",
-            "workMode": "Hybrid",
-            "country": "India",
-            "currency": "INR",
-            "multiCurrency": false,
-            "extraCurrencies": [] as [String],
-            "timezone": "IST (UTC+5:30)",
-            "language": "English",
-            "financialYear": "Apr - Mar",
-            "taxSystem": "GST",
-            "coordination": "Structured",
-            "reviewCycle": "Weekly",
-            "monitoring": "Balanced",
-            "spendingApproval": "Required",
-            "approvalThreshold": "",
-        ]
-    )
-
-    private static let runway = BusinessSetupCatalogEntry(
-        defaultTitle: "Money & Cash Flow",
-        subtitle: "Configure your financial operating system on-the-go.",
-        momentTypeCode: "BUSINESS_RUNWAY",
-        activateLabel: "Activate Money & Cash Flow",
-        footerTagline: "Know your runway",
-        sections: [
-            BusinessSetupSectionSpec(
-                title: "Stage & horizon",
-                fields: [
-                    PersonalSetupFieldSpec(key: "businessStage", label: "Business stage", multiSelect: false, options: ["Early", "Scaling", "Mature", "Turnaround"]),
-                    PersonalSetupFieldSpec(key: "goalHorizon", label: "Goal horizon", multiSelect: false, options: ["6-months goal", "12-months goal", "18-months goal", "24-months goal"]),
-                    PersonalSetupFieldSpec(key: "currency", label: "Primary currency", multiSelect: false, options: currencyCodes, kind: .dropdown),
-                    PersonalSetupFieldSpec(key: "multiCurrency", label: "Multi-currency", multiSelect: false, options: [], kind: .toggle),
-                    PersonalSetupFieldSpec(key: "extraCurrencies", label: "Extra currencies", multiSelect: true, options: currencyCodes),
-                    PersonalSetupFieldSpec(key: "revenueStage", label: "Revenue stage", multiSelect: false, options: ["Pre-revenue", "Growing", "Stable", "Declining"]),
-                    PersonalSetupFieldSpec(key: "revenueModel", label: "Revenue model", multiSelect: false, options: ["Recurring", "Project-based", "Mixed", "Marketplace"]),
-                    PersonalSetupFieldSpec(key: "warningThreshold", label: "Cash warning threshold", multiSelect: false, options: ["3 months", "6 months", "9 months", "12 months"]),
-                ]
-            ),
-            BusinessSetupSectionSpec(
-                title: "Cash & revenue",
-                fields: [
-                    PersonalSetupFieldSpec(key: "fundingSource", label: "Funding source", multiSelect: false, options: ["Bootstrapped + revenue", "Venture-backed", "Revenue-only", "Grants"]),
-                ],
-                textFields: [
-                    BusinessSetupTextFieldSpec(key: "availableCash", label: "Available cash"),
-                    BusinessSetupTextFieldSpec(key: "monthlySpending", label: "Monthly spending"),
-                    BusinessSetupTextFieldSpec(key: "monthlyRevenue", label: "Monthly revenue"),
-                ]
-            ),
-        ],
-        fields: [],
-        defaultPreferences: [
-            "audience": BusinessAudience.growing,
-            "businessStage": "Scaling",
-            "goalHorizon": "18-months goal",
-            "currency": "INR",
-            "multiCurrency": true,
-            "extraCurrencies": [] as [String],
-            "availableCash": "",
-            "monthlySpending": "",
-            "revenueStage": "Growing",
-            "monthlyRevenue": "",
-            "revenueModel": "Recurring",
-            "warningThreshold": "6 months",
-            "fundingSource": "Bootstrapped + revenue",
-        ]
-    )
-
-    private static let ops = BusinessSetupCatalogEntry(
-        defaultTitle: "Daily Business",
-        subtitle: "Configure operational capacity, monitoring and approvals.",
-        momentTypeCode: "BUSINESS_OPERATIONS",
-        activateLabel: "Activate Daily Business",
-        footerTagline: "Operate with precision",
-        sections: [
-            BusinessSetupSectionSpec(
-                title: "Operations focus",
-                fields: [
-                    PersonalSetupFieldSpec(key: "coreOps", label: "Core operations focus", multiSelect: false, options: ["Growth & Product", "Delivery", "Support", "Finance"]),
-                    PersonalSetupFieldSpec(key: "scope", label: "Scope", multiSelect: false, options: ["Company-wide", "Department", "Team", "Project"]),
-                    PersonalSetupFieldSpec(key: "model", label: "Operating model", multiSelect: false, options: ["Centralized", "Distributed", "Hybrid"]),
-                    PersonalSetupFieldSpec(key: "cadence", label: "Planning cadence", multiSelect: false, options: ["Weekly", "Monthly", "Quarterly"]),
-                    PersonalSetupFieldSpec(key: "monitoringStyle", label: "Monitoring style", multiSelect: false, options: ["Proactive", "Reactive", "Balanced"]),
-                ]
-            ),
-            BusinessSetupSectionSpec(
-                title: "Currency",
-                fields: [
-                    PersonalSetupFieldSpec(key: "currency", label: "Primary currency", multiSelect: false, options: currencyCodes, kind: .dropdown),
-                    PersonalSetupFieldSpec(key: "multiCurrency", label: "Multi-currency", multiSelect: false, options: [], kind: .toggle),
-                    PersonalSetupFieldSpec(key: "extraCurrencies", label: "Extra currencies", multiSelect: true, options: currencyCodes),
-                ]
-            ),
-            BusinessSetupSectionSpec(
-                title: "Budget & approvals",
-                fields: [
-                    PersonalSetupFieldSpec(key: "allocationMethod", label: "Allocation method", multiSelect: false, options: ["Category-based", "Project-based", "Team-based"]),
-                    PersonalSetupFieldSpec(key: "approvalModel", label: "Approval model", multiSelect: false, options: ["Threshold-based", "Manager sign-off", "Committee"]),
-                ],
-                textFields: [
-                    BusinessSetupTextFieldSpec(key: "monthlyBudget", label: "Monthly budget"),
-                    BusinessSetupTextFieldSpec(key: "approvalAlarm", label: "Approval alarm threshold"),
-                ]
-            ),
-        ],
-        fields: [],
-        defaultPreferences: [
-            "audience": BusinessAudience.growing,
-            "coreOps": "Growth & Product",
-            "scope": "Company-wide",
-            "model": "Centralized",
-            "cadence": "Monthly",
-            "currency": "INR",
-            "multiCurrency": false,
-            "extraCurrencies": [] as [String],
-            "monthlyBudget": "",
-            "allocationMethod": "Category-based",
-            "monitoringStyle": "Proactive",
-            "approvalModel": "Threshold-based",
-            "approvalAlarm": "",
-        ]
-    )
-
     static func forKind(_ kind: BusinessSetupKind) -> BusinessSetupCatalogEntry {
-        switch kind {
-        case .teamOperations: return teamOps
-        case .businessRunway: return runway
-        case .businessOperations: return ops
-        }
+        let subtype = OperatingMomentCatalog.subtypes(kind)[0]
+        return BusinessSetupCatalogEntry(
+            defaultTitle: kind.title,
+            subtitle: kind.body,
+            momentTypeCode: subtype.code,
+            activateLabel: "Activate",
+            footerTagline: kind.body,
+            sections: [],
+            fields: [],
+            defaultPreferences: [
+                "subtype": subtype.code,
+                "identityName": "",
+                "partyName": "",
+                "description": "",
+                "currency": "INR",
+                "startDate": "",
+                "participants": [String: String](),
+                "counterparties": [String: String](),
+                "channels": [String](),
+                "monthlyBudget": "",
+                "monthlyTarget": "",
+                "targetMetric": subtype.targetMetrics[0],
+            ]
+        )
     }
 
     static func footerTagline(kind: BusinessSetupKind, audience: String) -> String {
-        guard BusinessAudience.isSmallShop(audience) else {
-            return forKind(kind).footerTagline
-        }
-        switch kind {
-        case .teamOperations: return "Your staff, clear and simple"
-        case .businessRunway: return "Know your cash"
-        case .businessOperations: return "Run your shop day to day"
-        }
+        kind.body
     }
 
     static func defaultPreferences(kind: BusinessSetupKind, audience: String) -> [String: Any] {
-        var base = forKind(kind).defaultPreferences
-        let normalized = BusinessAudience.normalize(audience)
-        base[BusinessAudience.prefKey] = normalized
-        guard BusinessAudience.isSmallShop(normalized) else { return base }
-        switch kind {
-        case .teamOperations:
-            base["teamName"] = "My shop"
-            base["size"] = "1-10 people"
-            base["workMode"] = "In-office"
-            base["approvalThreshold"] = ""
-        case .businessRunway:
-            base["businessStage"] = "Early"
-            base["goalHorizon"] = "6-months goal"
-            base["multiCurrency"] = false
-            base["availableCash"] = ""
-            base["monthlySpending"] = ""
-            base["monthlyRevenue"] = ""
-            base["fundingSource"] = ""
-        case .businessOperations:
-            base["coreOps"] = "Delivery"
-            base["monthlyBudget"] = ""
-            base["approvalAlarm"] = ""
-        }
-        return base
+        forKind(kind).defaultPreferences
     }
 }

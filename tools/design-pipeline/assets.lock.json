@@ -1,0 +1,81 @@
+{
+  "$description": "Raster outputs of import-assets.mjs keyed by source hash + settings. Lets re-runs skip re-encoding on any OS. Generated; do not edit.",
+  "artwork": {
+    "art_pers_design_course": {
+      "source": "f3ecb317d0ce7adf9b47adffa32d2a862221b29d9cb4ae79cea48567c3bf17cb",
+      "sourceFile": "design/assets/personal/artwork/art_pers_design_course.jpg",
+      "size": [
+        1024,
+        1024
+      ],
+      "figmaNode": "2036:29736",
+      "settings": {
+        "ios2xScale": 0.6666666666666666,
+        "iosJpegQuality": 85,
+        "androidWebpQuality": 80
+      },
+      "outputs": {
+        "ios3x": "f3ecb317d0ce7adf9b47adffa32d2a862221b29d9cb4ae79cea48567c3bf17cb",
+        "ios2x": "93865354fe9465b765493126bda184cce65d5f80b1f13c09572fa9e9b1504a5b",
+        "android": "75b4b8577843b93a9c30bdd64db7be1e5c391b4e971b1bd33bdb3b7f2f7e965c"
+      }
+    },
+    "art_pers_goa_sunset": {
+      "source": "617ec4505d2dcde8d96b07258cb25c26e578136cede8cbf7dee043a6f2e6538a",
+      "sourceFile": "design/assets/personal/artwork/art_pers_goa_sunset.jpg",
+      "size": [
+        1376,
+        768
+      ],
+      "figmaNode": "2036:29757",
+      "settings": {
+        "ios2xScale": 0.6666666666666666,
+        "iosJpegQuality": 85,
+        "androidWebpQuality": 80
+      },
+      "outputs": {
+        "ios3x": "617ec4505d2dcde8d96b07258cb25c26e578136cede8cbf7dee043a6f2e6538a",
+        "ios2x": "357e60e774b5f86a6a6b465c3d4180222b54c99bfa6d2e0ac68644c531cbbc6f",
+        "android": "eb055df0291b07ba35a3da9676acc497bc3a7d540a29b028babc128e8bf19937"
+      }
+    },
+    "art_pers_pottery_keepsake": {
+      "source": "896e7773b8f5fd29580036c5200c3c7a188f1056e1013bd142f3786f2d8a3018",
+      "sourceFile": "design/assets/personal/artwork/art_pers_pottery_keepsake.jpg",
+      "size": [
+        1200,
+        896
+      ],
+      "figmaNode": "2036:30393",
+      "settings": {
+        "ios2xScale": 0.6666666666666666,
+        "iosJpegQuality": 85,
+        "androidWebpQuality": 80
+      },
+      "outputs": {
+        "ios3x": "896e7773b8f5fd29580036c5200c3c7a188f1056e1013bd142f3786f2d8a3018",
+        "ios2x": "c202c8665bd88b3b70f11c9a91191aeedb837017c5c08ecaccdcc2bb366f9639",
+        "android": "0a49be07e5922ef9ea87d0e07aff84ab46f057b56fa2a305b580f4e19d522f09"
+      }
+    },
+    "art_pers_open_beginning": {
+      "source": "a07ab56c36b281ca0e664fcb60ac749ffd28995e6f1d00934bf52e687e0f3b60",
+      "sourceFile": "design/assets/personal/artwork/art_pers_open_beginning.jpg",
+      "size": [
+        1024,
+        1024
+      ],
+      "figmaNode": "2036:30549",
+      "settings": {
+        "ios2xScale": 0.6666666666666666,
+        "iosJpegQuality": 85,
+        "androidWebpQuality": 80
+      },
+      "outputs": {
+        "ios3x": "a07ab56c36b281ca0e664fcb60ac749ffd28995e6f1d00934bf52e687e0f3b60",
+        "ios2x": "3d3596874b424bb3ae1652959121ba5a15fd4199f7f7038e0f47f4d42b13dbc9",
+        "android": "2edc25fca9bff96f80364ea8b03437be062634159dea5fed0c93a93cac5f83c2"
+      }
+    }
+  }
+}

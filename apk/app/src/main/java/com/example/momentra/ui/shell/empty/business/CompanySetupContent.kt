@@ -519,35 +519,8 @@ fun CompanySetupContent(
                                 )
                             }
                             if (template != null) {
-                                val kinds = IndustryTemplateCatalog.setupKindsFor(template, customMods)
-                                val momentRepo = MomentCreateRepository()
-                                val failedKinds = mutableListOf<String>()
-                                for (kind in kinds) {
-                                    val entry = BusinessSetupCatalog.forKind(kind)
-                                    val prefs = BusinessSetupCatalog.defaultPreferences(
-                                        kind,
-                                        audience,
-                                    ).toMutableMap()
-                                    // Company-profile only — not a moment preference key.
-                                    prefs.remove(IndustryTemplateCatalog.PROFILE_KEY)
-                                    val allowed = BusinessSetupCatalog.allowedKeys(kind)
-                                    val safePrefs = prefs.filterKeys { it in allowed }
-                                    val result = momentRepo.createBusinessMoment(
-                                        companyId = created.companyId,
-                                        familyCode = kind.familyCode,
-                                        momentTypeCode = entry.momentTypeCode,
-                                        title = entry.defaultTitle,
-                                        preferences = safePrefs,
-                                        status = "ACTIVE",
-                                    )
-                                    if (result.isFailure) {
-                                        failedKinds += entry.defaultTitle
-                                    }
-                                }
-                                if (failedKinds.isNotEmpty()) {
-                                    softWarnings +=
-                                        "Company created; ${failedKinds.joinToString()} could not be set up—open Create to add"
-                                }
+                                softWarnings +=
+                                    "Open Create to add a Marketing, Trading, Retail, or Manufacturing moment"
                             }
                             if (softWarnings.isNotEmpty()) {
                                 activateWarning = softWarnings.joinToString(" · ")
@@ -1168,12 +1141,11 @@ private fun CoCompanyForm(
                     Text(tpl.subtitle, color = CoMuted, fontSize = 12.sp)
                 }
             }
-            if (industryTemplate.isCustom) {
-                CoFieldLabel("WHICH MOMENTS TO START WITH?")
-                CoModuleToggle("Money & Cash Flow", customMoney, onCustomMoney)
-                CoModuleToggle("Daily Business", customDaily, onCustomDaily)
-                CoModuleToggle("Team & Work", customTeam, onCustomTeam)
-            }
+            Text(
+                "After activation, create a Marketing, Trading, Retail, or Manufacturing moment.",
+                color = CoMuted,
+                fontSize = 12.sp,
+            )
         }
         CoFieldLabel("COMPANY NAME")
         CoTextField(companyName, onCompanyName, placeholder = "Your shop or company name")
@@ -1436,7 +1408,7 @@ private fun coLaunchNextSteps(
     customTeam: Boolean,
 ): Pair<String, List<CoLaunchNextStep>> {
     if (!BusinessAudience.isSmallShop(audience)) {
-        return "After activation, open Create to add Money, Daily Business, or Team moments" to emptyList()
+        return "After activation, open Create to add a Marketing, Trading, Retail, or Manufacturing moment" to emptyList()
     }
     val customMods = mapOf(
         "money" to customMoney,
@@ -1449,21 +1421,10 @@ private fun coLaunchNextSteps(
     }
     val steps = kinds.map { kind ->
         when (kind) {
-            BusinessSetupKind.BUSINESS_RUNWAY -> CoLaunchNextStep(
-                "Money & Cash Flow",
-                "Revenue, Khata, invoices, and spend tracking",
-                CoAmber,
-            )
-            BusinessSetupKind.BUSINESS_OPERATIONS -> CoLaunchNextStep(
-                "Daily Business",
-                "Day-to-day ops, vendors, and routines",
-                Color(0xFFA78BFA),
-            )
-            BusinessSetupKind.TEAM_OPERATIONS -> CoLaunchNextStep(
-                "Team & Work",
-                "Team rhythm, reviews, and collaboration",
-                CoGreen,
-            )
+            BusinessSetupKind.MARKETING_CAMPAIGNS -> CoLaunchNextStep(kind.title, kind.body, Color(0xFF818CF8))
+            BusinessSetupKind.TRADING_DISTRIBUTION -> CoLaunchNextStep(kind.title, kind.body, CoAmber)
+            BusinessSetupKind.RETAIL_CONSUMER -> CoLaunchNextStep(kind.title, kind.body, CoGreen)
+            BusinessSetupKind.MANUFACTURING_PRODUCTION -> CoLaunchNextStep(kind.title, kind.body, Color(0xFF38BDF8))
         }
     }
     val intro = if (steps.size == 1) {

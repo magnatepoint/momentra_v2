@@ -425,13 +425,13 @@ fun LivingCrewRow(
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                "$name ($role)${if (featured) " ★" else ""}",
+                if (featured) "$name ★" else name,
                 color = theme.text,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 fontFamily = PlusJakartaSans,
             )
-            Text(if (featured) "Top contributor" else "Resident", color = theme.muted, fontSize = 11.sp, fontFamily = PlusJakartaSans)
+            Text(if (featured) "Top contributor" else role, color = theme.muted, fontSize = 11.sp, fontFamily = PlusJakartaSans)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

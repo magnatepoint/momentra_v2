@@ -1149,6 +1149,131 @@ data class ActivateBusinessSetupBody(
     val timezone: String = "UTC",
 )
 
+data class OperatingMoneyDto(
+    val amount: String = "0",
+    val spent: String = "0",
+    val remaining: String = "0",
+)
+
+data class OperatingTargetDto(
+    val metric: String = "",
+    val value: String = "0",
+    val progress: String = "0",
+)
+
+data class OperatingAttentionDto(
+    val id: String = "",
+    val title: String = "",
+    val kind: String = "",
+)
+
+data class OperatingPaymentDto(
+    val id: String = "",
+    val title: String = "",
+    val amount: String = "",
+    val relevance: String = "",
+    val status: String = "",
+)
+
+data class OperatingFinanceDto(
+    val sales: String = "0.0000",
+    val received: String = "0.0000",
+    val outstanding: String = "0.0000",
+    val eligibleCost: String = "0.0000",
+    val cashPaid: String = "0.0000",
+)
+
+data class OperatingActivityDto(
+    val id: String = "",
+    val title: String = "",
+    val eventType: String = "",
+    val occurredAt: String = "",
+    val amount: String? = null,
+    val channelName: String? = null,
+    val counterpartyName: String? = null,
+    val paymentStatus: String? = null,
+    val approvalStatus: String? = null,
+    val note: String? = null,
+)
+
+data class OperatingLifeDto(
+    val channels: List<String> = emptyList(),
+    val openCommitments: Int = 0,
+    val resultProgress: String = "",
+)
+
+data class OperatingMemoryDto(
+    val revisions: List<OperatingAttentionDto> = emptyList(),
+)
+
+data class OperatingBoardSectionDto(
+    val code: String = "",
+    val title: String = "",
+    val detail: String = "",
+    val rows: List<OperatingActivityDto> = emptyList(),
+)
+
+data class OperatingBoardsDto(
+    val moments: List<OperatingBoardSectionDto> = emptyList(),
+    val life: List<OperatingBoardSectionDto> = emptyList(),
+    val memory: List<OperatingBoardSectionDto> = emptyList(),
+)
+
+data class OperatingQuickAddDto(
+    val code: String = "",
+    val label: String = "",
+    val needsAmount: Boolean = false,
+)
+
+data class OperatingProjectionDto(
+    val retired: Boolean = false,
+    val familyCode: String? = null,
+    val subtype: String? = null,
+    val subtypeLabel: String? = null,
+    val title: String? = null,
+    val partyName: String? = null,
+    val role: String? = null,
+    val financeVisible: Boolean = false,
+    val currency: String? = null,
+    val startDate: String? = null,
+    val location: String? = null,
+    val budget: OperatingMoneyDto? = null,
+    val finance: OperatingFinanceDto? = null,
+    val target: OperatingTargetDto? = null,
+    val attention: List<OperatingAttentionDto> = emptyList(),
+    val paymentReadiness: List<OperatingPaymentDto> = emptyList(),
+    val activity: List<OperatingActivityDto> = emptyList(),
+    val life: OperatingLifeDto? = null,
+    val memory: OperatingMemoryDto? = null,
+    val boards: OperatingBoardsDto? = null,
+    val quickAdds: List<OperatingQuickAddDto> = emptyList(),
+)
+
+data class RecordOperatingEventBody(
+    val eventType: String,
+    val title: String,
+    val note: String? = null,
+    val amount: String? = null,
+    val counterpartyName: String? = null,
+    val channelName: String? = null,
+    val paymentStatus: String? = null,
+)
+
+data class RecordOperatingEventResultDto(
+    val eventId: String,
+    val approvalStatus: String,
+)
+
+data class DecideOperatingEventBody(
+    val decision: String,
+    val reason: String? = null,
+)
+
+data class DecideOperatingEventResultDto(
+    val eventId: String,
+    val approvalStatus: String,
+)
+
 data class ActivateBusinessSetupResultDto(
     @SerializedName("setupId") val setupId: String,
     @SerializedName("familyCode") val familyCode: String,
@@ -1691,8 +1816,10 @@ data class GroupResidentItemDto(
     @SerializedName("residentId") val residentId: String? = null,
     @SerializedName("participantId") val participantId: String? = null,
     @SerializedName("roleCode") val roleCode: String? = null,
+    @SerializedName("roleLabel") val roleLabel: String? = null,
     val status: String? = null,
     val name: String? = null,
+    @SerializedName("displayName") val displayName: String? = null,
 )
 
 data class GroupResidentsDto(

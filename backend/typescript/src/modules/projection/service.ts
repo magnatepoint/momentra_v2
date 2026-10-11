@@ -2128,6 +2128,9 @@ export async function getBusinessMomentProjection(
 
   const { assertCompanyMomentAccess } = await import('../business/membership');
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  if (scope.companyId == null) {
+    throw new AppError(ErrorCode.VALIDATION_FAILED, 'This record stays with a company.', 409);
+  }
 
   if (facet === 'actions') {
     const actions = await getAvailableActions(client, ctx, { momentId, domain: 'BUSINESS' });

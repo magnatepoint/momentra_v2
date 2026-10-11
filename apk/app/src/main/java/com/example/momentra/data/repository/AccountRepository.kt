@@ -12,6 +12,7 @@ import com.example.momentra.data.api.NotificationCategoriesDto
 import com.example.momentra.data.api.NotificationInboxDto
 import com.example.momentra.data.api.PatchGlobalNotificationPrefsBody
 import com.example.momentra.data.api.PatchMeBody
+import com.example.momentra.data.api.PatchMeResultDto
 import com.example.momentra.data.api.PatchMomentNotificationPrefsBody
 import com.example.momentra.data.api.mapHttpFailure
 import retrofit2.HttpException
@@ -24,9 +25,8 @@ class AccountRepository(
         displayName: String? = null,
         timezone: String? = null,
         locale: String? = null,
-    ): Result<Unit> = runCatching {
-        api.patchMe(PatchMeBody(displayName = displayName, timezone = timezone, locale = locale))
-        Unit
+    ): Result<PatchMeResultDto> = runCatching {
+        api.patchMe(PatchMeBody(displayName = displayName, timezone = timezone, locale = locale)).data
     }.recoverCatching { e -> throw mapThrowable(e) }
 
     suspend fun softDeleteMe(): Result<Unit> = runCatching {

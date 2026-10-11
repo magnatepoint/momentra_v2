@@ -29,7 +29,7 @@ class ShellStateInvariantsTest {
     }
 
     @Test
-    fun businessScopesMomentsToCompany() {
+    fun businessListsMomentsWithoutACompany() {
         val result = ShellStateInvariants.heal(
             ShellInvariantInput(
                 supportedContexts = listOf(AppContext.PERSONAL, AppContext.BUSINESS),
@@ -44,9 +44,9 @@ class ShellStateInvariantsTest {
                 selectedTabByContext = mapOf(AppContext.BUSINESS to BottomDestination.MEMORY),
             ),
         )
-        assertEquals("c1", result.selectedCompanyId)
-        assertEquals(listOf("m1"), result.moments.map { it.momentId })
-        assertEquals("m1", result.selectedMomentId)
+        assertNull(result.selectedCompanyId)
+        assertEquals(listOf("m1", "m2"), result.moments.map { it.momentId })
+        assertEquals("m2", result.selectedMomentId)
         assertEquals(BottomDestination.MEMORY, result.selectedTabByContext[AppContext.BUSINESS])
     }
 

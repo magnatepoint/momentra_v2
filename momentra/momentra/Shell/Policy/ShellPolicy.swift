@@ -19,7 +19,7 @@ enum ShellVisibilityPolicy {
     }
 
     static func showCompanySwitcher(context: AppContextKind, companies: [CompanySummary]) -> Bool {
-        context == .business && !companies.isEmpty
+        false
     }
 }
 
@@ -56,24 +56,11 @@ enum ShellStateInvariants {
             healed = true
         }
 
-        var companyId = input.selectedCompanyId
-        if context != .business {
-            if companyId != nil {
-                companyId = nil
-                healed = true
-            }
-        } else {
-            let valid = Set(input.companies.map(\.companyId))
-            if companyId == nil || !(valid.contains(companyId!)) {
-                companyId = input.companies.first?.companyId
-                healed = true
-            }
-        }
+        let companyId: String? = nil
+        if input.selectedCompanyId != nil { healed = true }
 
         let scoped: [MomentSummary]
         switch context {
-        case .business:
-            scoped = input.moments.filter { $0.companyId == nil || $0.companyId == companyId }
         case .circle:
             scoped = []
         default:
@@ -88,12 +75,6 @@ enum ShellStateInvariants {
         }
         if momentId == nil {
             momentId = scoped.first(where: \.isActiveStatus)?.momentId ?? scoped.first?.momentId
-        }
-        if context == .business, let mid = momentId,
-           let m = scoped.first(where: { $0.momentId == mid }),
-           let mc = m.companyId, mc != companyId {
-            momentId = scoped.first(where: \.isActiveStatus)?.momentId
-            healed = true
         }
 
         var tabs = input.selectedTabByContext.filter { supported.contains($0.key) }

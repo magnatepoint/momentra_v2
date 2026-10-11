@@ -340,6 +340,7 @@ struct LivingCrewRow: View {
     let name: String
     let amountLabel: String
     let percent: Int
+    var role: String = "Resident"
     var featured: Bool = false
 
     var body: some View {
@@ -361,7 +362,7 @@ struct LivingCrewRow: View {
                                 Text("★").foregroundStyle(Color(hex: "#FBBF24")).font(.system(size: 12))
                             }
                         }
-                        Text(featured ? "Top contributor" : "Contributor")
+                        Text(featured ? "Top contributor" : role)
                             .font(.plusJakarta(size: 11))
                             .foregroundStyle(theme.muted)
                     }

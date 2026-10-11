@@ -33,6 +33,7 @@ import com.example.momentra.data.api.GroupSharedAssetItemDto
 import com.example.momentra.data.repository.GroupSliceRepository
 import kotlinx.coroutines.launch
 import com.example.momentra.ui.shell.group.living.create.LivingActiveTheme
+import com.example.momentra.ui.shell.shared.PersonLabel
 import com.example.momentra.ui.shell.group.shared.ActiveTabScrollScaffold
 import com.example.momentra.ui.shell.group.shared.GroupActiveLoading
 import com.example.momentra.ui.shell.group.shared.GroupEmptySection
@@ -337,9 +338,9 @@ fun LivingMomentsActiveContent(
         } else {
             residents.take(8).forEach { resident ->
                 MomentsSimpleRowCard(
-                    title = resident.name ?: resident.residentId ?: "Resident",
+                    title = PersonLabel.personName(resident.displayName ?: resident.name, fallback = "Resident"),
                     chrome = chrome,
-                    meta = resident.roleCode,
+                    meta = resident.roleLabel ?: "Resident",
                     status = resident.status,
                 )
             }

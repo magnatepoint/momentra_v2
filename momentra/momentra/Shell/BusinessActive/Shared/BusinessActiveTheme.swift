@@ -121,18 +121,15 @@ struct BusinessActiveTheme {
 
     static func forKind(_ kind: BusinessSetupKind) -> BusinessActiveTheme {
         switch kind {
-        case .teamOperations: return .teamOperations
-        case .businessRunway: return .businessRunway
-        case .businessOperations: return .businessOperations
+        case .marketingCampaigns: return .teamOperations
+        case .tradingDistribution: return .businessRunway
+        case .retailConsumer, .manufacturingProduction: return .businessOperations
         }
     }
 
     static func forTypeCode(_ momentTypeCode: String?) -> BusinessActiveTheme {
-        let code = (momentTypeCode ?? "").uppercased()
-        if code.contains("RUNWAY") { return .businessRunway }
-        if code.contains("OPERATIONS") && !code.contains("TEAM") { return .businessOperations }
-        if code.contains("TEAM") { return .teamOperations }
-        return .teamOperations
+        guard let kind = OperatingMomentCatalog.kind(for: momentTypeCode) else { return .teamOperations }
+        return forKind(kind)
     }
 }
 

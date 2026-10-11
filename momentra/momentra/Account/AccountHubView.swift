@@ -5,11 +5,13 @@ import FirebaseAuth
 /// S7 Account hub — FIGMA_GAP shell UI.
 struct AccountHubView: View {
     let identity: ShellIdentity
+    var onDisplayNameSaved: (String) -> Void = { _ in }
     let onSignOut: () -> Void
     let onClose: () -> Void
     let onAccountDeleted: () -> Void
 
     @State private var displayName: String = ""
+    @State private var saving = false
     @State private var status: String?
     @State private var pinInput = ""
     @State private var hideBalances = UserDefaults.standard.bool(forKey: "momentra_hide_balances")
@@ -43,36 +45,45 @@ struct AccountHubView: View {
                 switch section {
                 case "home":
                     Section("Profile") {
-                        TextField("Display name", text: $displayName)
-                        Button("Save profile") {
-                            Task {
-                                do {
-                                    _ = try await APIClient.shared.patchMe(displayName: displayName)
-                                    status = "Profile saved"
-                                } catch {
-                                    status = error.localizedDescription
+                        HStack(spacing: 16) {
+                            Text(profileInitials)
+                                .font(.title3.weight(.semibold))
+                                .frame(width: 56, height: 56)
+                                .background(Color.accentColor.opacity(0.18))
+                                .clipShape(Circle())
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(PersonLabel.accountName(displayName).isEmpty ? "Your name" : PersonLabel.accountName(displayName))
+                                    .font(.headline)
+                                if let email = PersonLabel.contactEmail(identity.email) {
+                                    Text(email)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
                                 }
                             }
                         }
-                        let accountTitle = PersonLabel.accountName(
-                            displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                ? identity.displayName
-                                : displayName
-                        )
-                        if !accountTitle.isEmpty {
-                            Text(accountTitle).font(.headline)
-                        }
+                        TextField("Display name", text: $displayName)
+                            .textContentType(.name)
+                            .accessibilityLabel("Display name")
                         if let email = PersonLabel.contactEmail(identity.email) {
-                            Text(email).foregroundStyle(.secondary)
+                            LabeledContent("Email") {
+                                Text(email)
+                                    .foregroundStyle(.secondary)
+                                    .accessibilityLabel("Email \(email)")
+                            }
                         }
+                        Button(saving ? "Saving…" : "Save") {
+                            Task { await saveProfile() }
+                        }
+                        .disabled(saving || displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .accessibilityHint("Saves your display name")
                     }
                     Section {
-                        Button("App Security") { section = "security" }
-                        Button("Privacy & Consent") { section = "privacy" }
+                        Button("Security") { section = "security" }
+                        Button("Privacy and consent") { section = "privacy" }
+                        Button("Notifications") { section = "prefs" }
                         Button("Devices") { section = "devices" }
-                        Button("Preferences") { section = "prefs" }
-                        Button("Developer / API server") { section = "developer" }
-                        Button("Help & Legal") { section = "legal" }
+                        Button("Help and legal") { section = "legal" }
                     }
                     Section {
                         Button("Sign out", role: .destructive, action: onSignOut)
@@ -324,6 +335,31 @@ struct AccountHubView: View {
                 Task { await saveGlobalPrefs(categories: categories) }
             }
         ))
+    }
+
+    private var profileInitials: String {
+        let source = PersonLabel.accountName(displayName)
+        let parts = source.split(separator: " ").prefix(2)
+        let letters = parts.compactMap { $0.first }.map { String($0) }.joined()
+        if !letters.isEmpty { return letters.uppercased() }
+        return "?"
+    }
+
+    private func saveProfile() async {
+        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        saving = true
+        defer { saving = false }
+        do {
+            let saved = try await APIClient.shared.patchMe(displayName: trimmed)
+            let name = saved.displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let applied = (name?.isEmpty == false) ? name! : trimmed
+            displayName = applied
+            onDisplayNameSaved(applied)
+            status = "Profile saved"
+        } catch {
+            status = error.localizedDescription
+        }
     }
 
     private func saveGlobalPrefs(

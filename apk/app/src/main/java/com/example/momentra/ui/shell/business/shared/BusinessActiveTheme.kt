@@ -101,18 +101,52 @@ data class BusinessActiveTheme(
             heroGradient = Brush.horizontalGradient(listOf(Color(0xFF6366F1), Color(0xFFA855F7))),
         )
 
+        val Marketing = TeamOperations.copy(
+            accent = Color(0xFF818CF8),
+            typeLabel = "Marketing & Campaigns",
+            pulseTitle = "Campaign",
+            momentsTitle = "Campaign",
+            lifeTitle = "Campaign",
+            memoryTitle = "Campaign",
+        )
+        val Trading = BusinessRunway.copy(
+            typeLabel = "Trading & Distribution",
+            pulseTitle = "Trading",
+            momentsTitle = "Trading",
+            lifeTitle = "Trading",
+            memoryTitle = "Trading",
+        )
+        val Retail = BusinessOperations.copy(
+            accent = Color(0xFF34D399),
+            typeLabel = "Retail & Consumer",
+            pulseTitle = "Retail",
+            momentsTitle = "Retail",
+            lifeTitle = "Retail",
+            memoryTitle = "Retail",
+        )
+        val Manufacturing = BusinessOperations.copy(
+            accent = Color(0xFF38BDF8),
+            typeLabel = "Manufacturing & Production",
+            pulseTitle = "Production",
+            momentsTitle = "Production",
+            lifeTitle = "Production",
+            memoryTitle = "Production",
+        )
+
         fun forKind(kind: BusinessSetupKind): BusinessActiveTheme = when (kind) {
-            BusinessSetupKind.TEAM_OPERATIONS -> TeamOperations
-            BusinessSetupKind.BUSINESS_RUNWAY -> BusinessRunway
-            BusinessSetupKind.BUSINESS_OPERATIONS -> BusinessOperations
+            BusinessSetupKind.MARKETING_CAMPAIGNS -> Marketing
+            BusinessSetupKind.TRADING_DISTRIBUTION -> Trading
+            BusinessSetupKind.RETAIL_CONSUMER -> Retail
+            BusinessSetupKind.MANUFACTURING_PRODUCTION -> Manufacturing
         }
 
         fun forTypeCode(momentTypeCode: String?): BusinessActiveTheme {
-            val code = momentTypeCode?.uppercase().orEmpty()
-            return when {
-                code.contains("RUNWAY") -> BusinessRunway
-                code.contains("OPERATIONS") && !code.contains("TEAM") -> BusinessOperations
-                else -> TeamOperations
+            return when (OperatingMomentCatalog.kindForTypeCode(momentTypeCode)) {
+                BusinessSetupKind.MARKETING_CAMPAIGNS -> Marketing
+                BusinessSetupKind.TRADING_DISTRIBUTION -> Trading
+                BusinessSetupKind.RETAIL_CONSUMER -> Retail
+                BusinessSetupKind.MANUFACTURING_PRODUCTION -> Manufacturing
+                null -> TeamOperations
             }
         }
     }

@@ -20,7 +20,7 @@ export interface GroupParticipantRow {
   isGuest: boolean;
 }
 
-function roleLabelFor(roleCode: string, isGuest: boolean): string {
+export function roleLabelFor(roleCode: string, isGuest: boolean): string {
   if (isGuest) return 'Guest';
   switch (roleCode) {
     case 'ORGANIZER':

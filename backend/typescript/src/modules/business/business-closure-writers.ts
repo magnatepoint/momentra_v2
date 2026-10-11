@@ -9,7 +9,7 @@ import { travelCurrencyCodeSchema, optionalTravelCurrencyCodeSchema } from '../f
 import type { RequestContext } from '../../platform/request-context/context';
 import { insertDomainEventAndOutbox } from '../../platform/events/outbox';
 import { assertGovernanceAllowed } from '../governance/resolver';
-import { assertCompanyMomentAccess } from './membership';
+import { assertCompanyMomentAccess, requireCompanyBoundMoment } from './membership';
 
 /* ------------------------------------------------------------------ */
 /*  Inline recent_activity bump (same pattern as ops-precision)       */
@@ -169,6 +169,7 @@ export async function createTaxObligation(
   body: z.infer<typeof createTaxObligationSchema>
 ): Promise<{ taxObligationId: string; momentId: string }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   await assertGovernanceAllowed(client, ctx, {
     actionCode: 'TAX_OBLIGATION_CREATE',
     resourceType: 'TAX_OBLIGATION',
@@ -219,6 +220,7 @@ export async function createForecastScenario(
   body: z.infer<typeof createForecastScenarioSchema>
 ): Promise<{ forecastScenarioId: string; momentId: string; lineCount: number }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   await assertGovernanceAllowed(client, ctx, {
     actionCode: 'FORECAST_CREATE',
     resourceType: 'FORECAST',
@@ -281,6 +283,7 @@ export async function createInvestorUpdate(
   body: z.infer<typeof createInvestorUpdateSchema>
 ): Promise<{ investorUpdateId: string; momentId: string }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   await assertGovernanceAllowed(client, ctx, {
     actionCode: 'INVESTOR_UPDATE_CREATE',
     resourceType: 'INVESTOR_UPDATE',
@@ -331,6 +334,7 @@ export async function createBudgetAlert(
   body: z.infer<typeof createBudgetAlertSchema>
 ): Promise<{ budgetAlertId: string; momentId: string }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   await assertGovernanceAllowed(client, ctx, {
     actionCode: 'BUDGET_ALERT_CREATE',
     resourceType: 'BUDGET_ALERT',
@@ -381,6 +385,7 @@ export async function createBudgetReview(
   body: z.infer<typeof createBudgetReviewSchema>
 ): Promise<{ businessReviewId: string; momentId: string }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   await assertGovernanceAllowed(client, ctx, {
     actionCode: 'REVIEW_CREATE',
     resourceType: 'REVIEW',
@@ -431,6 +436,7 @@ export async function createDecision(
   body: z.infer<typeof createDecisionSchema>
 ): Promise<{ decisionId: string; momentId: string }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   await assertGovernanceAllowed(client, ctx, {
     actionCode: 'DECISION_RECORD',
     resourceType: 'DECISION',
@@ -491,6 +497,7 @@ export async function createMeetingRecord(
   body: z.infer<typeof createMeetingRecordSchema>
 ): Promise<{ meetingRecordId: string; momentId: string }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   await assertGovernanceAllowed(client, ctx, {
     actionCode: 'MEETING_CREATE',
     resourceType: 'MEETING',
@@ -541,6 +548,7 @@ export async function createRecognition(
   body: z.infer<typeof createRecognitionSchema>
 ): Promise<{ recognitionId: string; momentId: string }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   await assertGovernanceAllowed(client, ctx, {
     actionCode: 'RECOGNITION_CREATE',
     resourceType: 'RECOGNITION',
@@ -590,6 +598,7 @@ export async function createRetrospective(
   body: z.infer<typeof createRetrospectiveSchema>
 ): Promise<{ retrospectiveId: string; momentId: string }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   await assertGovernanceAllowed(client, ctx, {
     actionCode: 'RETRO_CREATE',
     resourceType: 'RETROSPECTIVE',
@@ -639,6 +648,7 @@ export async function createActivityLogEntry(
   body: z.infer<typeof createActivityLogEntrySchema>
 ): Promise<{ activityLogEntryId: string; momentId: string }> {
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  requireCompanyBoundMoment(scope);
   await assertGovernanceAllowed(client, ctx, {
     actionCode: 'ACTIVITY_LOG_CREATE',
     resourceType: 'ACTIVITY_LOG',

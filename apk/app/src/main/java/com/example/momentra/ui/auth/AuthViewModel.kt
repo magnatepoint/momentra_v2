@@ -45,6 +45,21 @@ class AuthViewModel @JvmOverloads constructor(
     private val _state = MutableStateFlow(AuthUiState())
     val state: StateFlow<AuthUiState> = _state.asStateFlow()
 
+    fun applyDisplayName(displayName: String) {
+        val trimmed = displayName.trim()
+        if (trimmed.isEmpty()) return
+        val current = _state.value.identity ?: return
+        current.firebaseUid?.let { uid ->
+            prefs.saveCachedIdentity(
+                firebaseUid = uid,
+                userId = current.userId,
+                displayName = trimmed,
+                email = current.email,
+            )
+        }
+        _state.update { it.copy(identity = current.copy(displayName = trimmed)) }
+    }
+
     init {
         try {
             restoreSessionIfPossible()
