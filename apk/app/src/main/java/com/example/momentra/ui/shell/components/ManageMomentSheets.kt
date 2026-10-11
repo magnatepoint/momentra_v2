@@ -105,13 +105,17 @@ fun ManageMomentSheet(
     var pane by remember { mutableStateOf(ManageMomentPane.MENU) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var viewerIsLeader by remember { mutableStateOf(domain == AppContext.PERSONAL) }
+    var viewerIsLeader by remember {
+        mutableStateOf(domain == AppContext.PERSONAL || (domain == AppContext.BUSINESS && companyId.isNullOrBlank()))
+    }
     var candidates by remember { mutableStateOf<List<LeaveCandidate>>(emptyList()) }
     var transferUserId by remember { mutableStateOf<String?>(null) }
     var notificationCadence by remember { mutableStateOf("ALL") }
     val scope = rememberCoroutineScope()
     val supportsLeave = domain == AppContext.GROUP || domain == AppContext.BUSINESS
-    val leaveNoun = if (domain == AppContext.BUSINESS) "Company" else "Group"
+    val showLeave = domain == AppContext.GROUP || (domain == AppContext.BUSINESS && !companyId.isNullOrBlank())
+    val leaveNoun = if (domain == AppContext.BUSINESS) "company" else "Group"
+    val isBusiness = domain == AppContext.BUSINESS
 
     LaunchedEffect(momentId, domain, companyId, currentUserId) {
         if (domain == AppContext.GROUP || domain == AppContext.BUSINESS) {
@@ -148,7 +152,7 @@ fun ManageMomentSheet(
             AppContext.BUSINESS -> {
                 val cid = companyId
                 if (cid.isNullOrBlank()) {
-                    viewerIsLeader = false
+                    viewerIsLeader = true
                     candidates = emptyList()
                 } else {
                     runCatching { ApiClient.apiService.listCompanyMembers(cid).data.members }
@@ -277,13 +281,13 @@ fun ManageMomentSheet(
                     onDismiss()
                     onEditSetup()
                 }
-                if (domain == AppContext.GROUP) {
+                if (domain == AppContext.GROUP || isBusiness) {
                     Spacer(Modifier.height(4.dp))
                     ManageRow(
                         Icons.Filled.ContentCopy,
                         Blue,
-                        "Duplicate group",
-                        "Start a new chapter with the same setup",
+                        if (isBusiness) "Duplicate this business" else "Duplicate group",
+                        if (isBusiness) "Start a new one with the same setup" else "Start a new chapter with the same setup",
                     ) {
                         pane = ManageMomentPane.CONFIRM_DUPLICATE
                     }
@@ -332,17 +336,30 @@ fun ManageMomentSheet(
                 }
                 if (!supportsLeave || viewerIsLeader) {
                     Spacer(Modifier.height(4.dp))
-                    ManageRow(Icons.Outlined.Pause, Blue, "Pause rhythm", "Pause tracking without losing your data") {
+                    ManageRow(
+                        Icons.Outlined.Pause,
+                        Blue,
+                        if (isBusiness) "Pause this business" else "Pause rhythm",
+                        if (isBusiness) "Pause tracking without losing your records" else "Pause tracking without losing your data",
+                    ) {
                         pane = ManageMomentPane.CONFIRM_PAUSE
                     }
                     Spacer(Modifier.height(4.dp))
-                    ManageRow(Icons.Filled.Check, Green, "Complete Chapter", "Mark this moment as finished") {
+                    ManageRow(
+                        Icons.Filled.Check,
+                        Green,
+                        if (isBusiness) "Finish this business" else "Complete Chapter",
+                        if (isBusiness) "Mark it as finished" else "Mark this moment as finished",
+                    ) {
                         pane = ManageMomentPane.CONFIRM_COMPLETE
                     }
                     Spacer(Modifier.height(8.dp))
-                    DestructiveRow { pane = ManageMomentPane.DELETE }
+                    DestructiveRow(
+                        title = "Delete permanently",
+                        subtitle = if (isBusiness) "Removes this business. Past reports stay." else "Removes this moment; analytics kept",
+                    ) { pane = ManageMomentPane.DELETE }
                 }
-                if (supportsLeave) {
+                if (showLeave) {
                     Spacer(Modifier.height(8.dp))
                     LeaveRow(
                         title = "Leave $leaveNoun",
@@ -400,8 +417,8 @@ fun ManageMomentSheet(
             }
             ManageMomentPane.CONFIRM_PAUSE -> {
                 ConfirmPane(
-                    title = "Pause rhythm?",
-                    body = "Pause tracking without losing your data.",
+                    title = if (isBusiness) "Pause this business?" else "Pause rhythm?",
+                    body = if (isBusiness) "Pause tracking without losing your records." else "Pause tracking without losing your data.",
                     confirmLabel = "Pause",
                     busy = busy,
                     error = error,
@@ -411,8 +428,8 @@ fun ManageMomentSheet(
             }
             ManageMomentPane.CONFIRM_COMPLETE -> {
                 ConfirmPane(
-                    title = "Complete Chapter?",
-                    body = "Mark this moment as finished.",
+                    title = if (isBusiness) "Finish this business?" else "Complete Chapter?",
+                    body = if (isBusiness) "Mark it as finished." else "Mark this moment as finished.",
                     confirmLabel = "Complete",
                     busy = busy,
                     error = error,
@@ -421,13 +438,41 @@ fun ManageMomentSheet(
                 )
             }
             ManageMomentPane.CONFIRM_DUPLICATE -> {
-                DuplicateChoicePane(
-                    busy = busy,
-                    error = error,
-                    onClose = { pane = ManageMomentPane.MENU },
-                    onSetupOnly = { runDuplicate(includeData = false) },
-                    onIncludeData = { runDuplicate(includeData = true) },
-                )
+                if (isBusiness) {
+                    ConfirmPane(
+                        title = "Duplicate this business?",
+                        body = "Start a new one with the same setup. Recorded sales and expenses stay on this one.",
+                        confirmLabel = "Duplicate",
+                        busy = busy,
+                        error = error,
+                        onClose = { pane = ManageMomentPane.MENU },
+                        onConfirm = {
+                            scope.launch {
+                                busy = true
+                                error = null
+                                repo.duplicateBusiness(momentId).fold(
+                                    onSuccess = { created ->
+                                        busy = false
+                                        onDismiss()
+                                        onDuplicated(created.momentId, created.title)
+                                    },
+                                    onFailure = {
+                                        busy = false
+                                        error = it.message ?: "Could not duplicate"
+                                    },
+                                )
+                            }
+                        },
+                    )
+                } else {
+                    DuplicateChoicePane(
+                        busy = busy,
+                        error = error,
+                        onClose = { pane = ManageMomentPane.MENU },
+                        onSetupOnly = { runDuplicate(includeData = false) },
+                        onIncludeData = { runDuplicate(includeData = true) },
+                    )
+                }
             }
             ManageMomentPane.LEAVE_TRANSFER -> {
                 LeaveTransferPane(
@@ -523,7 +568,11 @@ private fun ManageRow(icon: ImageVector, well: Color, title: String, subtitle: S
 }
 
 @Composable
-private fun DestructiveRow(onClick: () -> Unit) {
+private fun DestructiveRow(
+    title: String = "Delete permanently",
+    subtitle: String = "Removes this moment; analytics kept",
+    onClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -545,8 +594,8 @@ private fun DestructiveRow(onClick: () -> Unit) {
             Icon(Icons.Filled.Delete, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text("Delete permanently", color = RedText, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-            Text("Removes this moment; analytics kept", color = TextMuted, fontSize = 10.sp)
+            Text(title, color = RedText, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text(subtitle, color = TextMuted, fontSize = 10.sp)
         }
         Icon(Icons.Filled.KeyboardArrowRight, contentDescription = null, tint = TextMuted, modifier = Modifier.size(14.dp))
     }

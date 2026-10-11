@@ -65,10 +65,9 @@ fun EditMomentSetupHost(
             }
             AppContext.BUSINESS -> {
                 val kind = OperatingMomentCatalog.kindForTypeCode(momentTypeCode)
-                if (companyId.isNullOrBlank() || kind == null) {
+                if (kind == null) {
                     Text(
-                        if (kind == null) "This business moment is retired. Create a new one."
-                        else "Company required to edit business setup",
+                        "This business moment is retired. Create a new one.",
                         color = Color.White,
                         fontSize = 14.sp,
                         modifier = Modifier.align(Alignment.Center),
@@ -76,7 +75,7 @@ fun EditMomentSetupHost(
                 } else {
                     BusinessSetupWizardContent(
                         kind = kind,
-                        companyId = companyId,
+                        companyId = companyId.orEmpty(),
                         createViewModel = createViewModel,
                         submitting = createState.submitting,
                         error = createState.error,

@@ -167,6 +167,20 @@ interface ApiService {
     @GET("v1/group/moments/{momentId}/setup")
     suspend fun getGroupSetupPrefill(@Path("momentId") momentId: String): SuccessEnvelope<GroupSetupPrefillDto>
 
+    @POST("v1/business/moments/{momentId}/company")
+    suspend fun linkBusinessMomentCompany(
+        @Path("momentId") momentId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: Map<String, String>,
+    ): SuccessEnvelope<Map<String, String>>
+
+    @POST("v1/business/moments/{momentId}/duplicate")
+    suspend fun duplicateBusinessMoment(
+        @Path("momentId") momentId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: Map<String, String> = emptyMap(),
+    ): SuccessEnvelope<CreateMomentResultDto>
+
     @POST("v1/group/moments/{momentId}/duplicate")
     suspend fun duplicateGroupMoment(
         @Path("momentId") momentId: String,

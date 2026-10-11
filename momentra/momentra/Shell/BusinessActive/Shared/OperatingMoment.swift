@@ -169,6 +169,56 @@ struct OperatingMomentPage: View {
                         tick += 1
                     }
                 )
+            } else if let projection, projection.subtype == "RESTAURANT_FOOD" {
+                RestaurantActiveView(
+                    model: projection,
+                    tab: tab,
+                    onOpenQuickAdd: onOpenQuickAdd,
+                    onRecord: { draft in
+                        guard let momentId else { return }
+                        _ = try await APIClient.shared.recordOperatingEvent(
+                            momentId: momentId,
+                            eventType: draft.eventType,
+                            title: draft.title,
+                            amount: draft.amount,
+                            note: draft.note,
+                            channelName: draft.channelName,
+                            counterpartyName: draft.counterpartyName,
+                            paymentStatus: draft.paymentStatus
+                        )
+                        tick += 1
+                    },
+                    onDecide: { eventId, decision in
+                        guard let momentId else { return }
+                        _ = try await APIClient.shared.decideOperatingEvent(momentId: momentId, eventId: eventId, decision: decision)
+                        tick += 1
+                    }
+                )
+            } else if let projection, projection.subtype == "CONSUMER_SERVICE" {
+                ConsumerServiceActiveView(
+                    model: projection,
+                    tab: tab,
+                    onOpenQuickAdd: onOpenQuickAdd,
+                    onRecord: { draft in
+                        guard let momentId else { return }
+                        _ = try await APIClient.shared.recordOperatingEvent(
+                            momentId: momentId,
+                            eventType: draft.eventType,
+                            title: draft.title,
+                            amount: draft.amount,
+                            note: draft.note,
+                            channelName: draft.channelName,
+                            counterpartyName: draft.counterpartyName,
+                            paymentStatus: draft.paymentStatus
+                        )
+                        tick += 1
+                    },
+                    onDecide: { eventId, decision in
+                        guard let momentId else { return }
+                        _ = try await APIClient.shared.decideOperatingEvent(momentId: momentId, eventId: eventId, decision: decision)
+                        tick += 1
+                    }
+                )
             } else {
                 generic
             }

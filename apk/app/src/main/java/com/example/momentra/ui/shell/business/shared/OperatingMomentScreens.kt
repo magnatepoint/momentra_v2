@@ -35,6 +35,8 @@ import com.example.momentra.data.api.OperatingBoardSectionDto
 import com.example.momentra.data.api.OperatingProjectionDto
 import com.example.momentra.data.repository.BusinessSliceRepository
 import com.example.momentra.domain.BottomDestination
+import com.example.momentra.ui.shell.business.restaurant.RestaurantActive
+import com.example.momentra.ui.shell.business.service.ConsumerServiceActive
 import com.example.momentra.ui.shell.business.retail.RetailStoreActive
 
 private val Bg = Color(0xFF0C0F15)
@@ -92,6 +94,66 @@ fun OperatingMomentPage(
     }
     if (model != null && model.subtype == "RETAIL_STORE") {
         RetailStoreActive(
+            model = model,
+            tab = tab,
+            onOpenQuickAdd = onOpenQuickAdd,
+            onRecord = { draft ->
+                repo.recordOperatingEvent(
+                    momentId,
+                    draft.eventType,
+                    draft.title,
+                    draft.amount,
+                    draft.note,
+                    draft.channelName,
+                    draft.counterpartyName,
+                    draft.paymentStatus,
+                ).fold(
+                    onSuccess = { tick += 1 },
+                    onFailure = { error = it.message },
+                )
+            },
+            onDecide = { eventId, decision ->
+                repo.decideOperatingEvent(momentId, eventId, decision).fold(
+                    onSuccess = { tick += 1 },
+                    onFailure = { error = it.message },
+                )
+            },
+            modifier = modifier,
+        )
+        return
+    }
+    if (model != null && model.subtype == "RESTAURANT_FOOD") {
+        RestaurantActive(
+            model = model,
+            tab = tab,
+            onOpenQuickAdd = onOpenQuickAdd,
+            onRecord = { draft ->
+                repo.recordOperatingEvent(
+                    momentId,
+                    draft.eventType,
+                    draft.title,
+                    draft.amount,
+                    draft.note,
+                    draft.channelName,
+                    draft.counterpartyName,
+                    draft.paymentStatus,
+                ).fold(
+                    onSuccess = { tick += 1 },
+                    onFailure = { error = it.message },
+                )
+            },
+            onDecide = { eventId, decision ->
+                repo.decideOperatingEvent(momentId, eventId, decision).fold(
+                    onSuccess = { tick += 1 },
+                    onFailure = { error = it.message },
+                )
+            },
+            modifier = modifier,
+        )
+        return
+    }
+    if (model != null && model.subtype == "CONSUMER_SERVICE") {
+        ConsumerServiceActive(
             model = model,
             tab = tab,
             onOpenQuickAdd = onOpenQuickAdd,

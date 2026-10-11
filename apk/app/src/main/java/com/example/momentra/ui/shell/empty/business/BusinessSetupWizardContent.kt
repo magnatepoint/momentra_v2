@@ -72,6 +72,21 @@ fun BusinessSetupWizardContent(
     var role by remember(kind) { mutableStateOf("OPERATIONS_LEAD") }
     var counterparties by remember(kind) { mutableStateOf("") }
     var localError by remember(kind) { mutableStateOf<String?>(null) }
+    var companySeed by remember(kind) { mutableStateOf("") }
+    var gstSeed by remember(kind) { mutableStateOf("") }
+
+    LaunchedEffect(editingMomentId, companyId) {
+        val momentId = editingMomentId ?: return@LaunchedEffect
+        val prefill = createViewModel.getDomainSetupPrefill(momentId)
+        val existingCompany = companyId.takeIf { it.isNotBlank() } ?: prefill?.companyId
+        if (!existingCompany.isNullOrBlank()) {
+            val detail = runCatching { com.example.momentra.data.api.ApiClient.apiService.getCompany(existingCompany).data }.getOrNull()
+            companySeed = detail?.get("displayName")?.toString().orEmpty().ifBlank { prefill?.title ?: initialTitle.orEmpty() }
+            gstSeed = detail?.get("taxIdentifier")?.toString().orEmpty()
+        } else {
+            companySeed = prefill?.title ?: initialTitle.orEmpty()
+        }
+    }
 
     DisposableEffect(kind) {
         MomentraAnalytics.get().onScreenEnter(kind.analyticsScreen)
@@ -90,16 +105,21 @@ fun BusinessSetupWizardContent(
             submitting = submitting,
             error = error,
             onClose = onClose,
+            initialName = initialTitle.orEmpty(),
+            initialCompanyName = companySeed,
+            initialGstin = gstSeed,
             onActivate = { preferences, title ->
                 createViewModel.submitBusinessSetup(
                     kind = kind,
-                    companyId = companyId?.takeIf { it.isNotBlank() },
+                    companyId = companyId.takeIf { it.isNotBlank() },
                     preferences = preferences,
                     title = title,
                     subtype = subtype.code,
                     editingMomentId = editingMomentId,
                     editingMomentStatus = editingMomentStatus,
                     status = "ACTIVE",
+                    companyName = preferences["companyName"]?.toString(),
+                    taxIdentifier = preferences["gstin"]?.toString(),
                     onSuccess = onCreated,
                 )
             },

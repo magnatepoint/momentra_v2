@@ -67,19 +67,15 @@ struct EditMomentSetupHost: View {
                 onCreated: { _, _, _, _ in onSaved() }
             )
         case .business(let kind):
-            if let companyId, !companyId.isEmpty {
-                BusinessSetupWizardView(
-                    kind: kind,
-                    createModel: createModel,
-                    companyId: companyId,
-                    editingMomentId: momentId,
-                    initialTitle: momentTitle,
-                    onClose: onClose,
-                    onCreated: { _ in onSaved() }
-                )
-            } else {
-                missingCompany
-            }
+            BusinessSetupWizardView(
+                kind: kind,
+                createModel: createModel,
+                companyId: companyId,
+                editingMomentId: momentId,
+                initialTitle: momentTitle,
+                onClose: onClose,
+                onCreated: { _ in onSaved() }
+            )
         case .groupExperience:
             GroupExperienceSetupView(
                 createModel: createModel,
@@ -110,20 +106,4 @@ struct EditMomentSetupHost: View {
         }
     }
 
-    private var missingCompany: some View {
-        VStack(spacing: 12) {
-            Text("Company required")
-                .font(.headline)
-                .foregroundStyle(.white)
-            Text("This business moment needs a company before setup can be edited.")
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.7))
-                .multilineTextAlignment(.center)
-            Button("Close", action: onClose)
-                .buttonStyle(.borderedProminent)
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(hex: "#0C0F15"))
-    }
 }

@@ -70,6 +70,8 @@ final class MomentCreateModel: ObservableObject {
         editingMomentId: String? = nil,
         editingMomentStatus: String? = nil,
         status: String? = nil,
+        companyName: String? = nil,
+        taxIdentifier: String? = nil,
         onSuccess: @escaping (CreateMomentOutcome) -> Void
     ) {
         let catalog = BusinessSetupCatalog.forKind(kind)
@@ -78,21 +80,70 @@ final class MomentCreateModel: ObservableObject {
         let resolvedTitle = title ?? catalog.defaultTitle
         let momentTypeCode = subtype ?? catalog.momentTypeCode
         if let editingMomentId {
-            submitEdit(
-                momentId: editingMomentId,
-                title: resolvedTitle,
-                momentTypeCode: momentTypeCode,
-                activateAfter: status == "ACTIVE" && editingMomentStatus?.caseInsensitiveCompare("DRAFT") == .orderedSame,
-                onSuccess: onSuccess
-            )
+            guard !state.submitting else { return }
+            state = UiState(submitting: true, error: nil)
+            Task {
+                do {
+                    _ = try await ensureBusinessCompany(
+                        companyId: companyId,
+                        companyName: companyName,
+                        taxIdentifier: taxIdentifier,
+                        editingMomentId: editingMomentId
+                    )
+                    let detail = try await APIClient.shared.getMomentDetail(momentId: editingMomentId)
+                    let result = try await APIClient.shared.updateMoment(
+                        momentId: editingMomentId,
+                        title: resolvedTitle,
+                        expectedVersion: detail.version
+                    )
+                    let activateAfter = status == "ACTIVE" && editingMomentStatus?.caseInsensitiveCompare("DRAFT") == .orderedSame
+                    if activateAfter {
+                        let activated = try await APIClient.shared.activateMoment(momentId: editingMomentId)
+                        state = UiState(submitting: false, error: nil)
+                        onSuccess(CreateMomentOutcome(
+                            momentId: activated.momentId,
+                            title: activated.title,
+                            domainCode: activated.domainCode,
+                            status: activated.status,
+                            version: activated.version,
+                            momentTypeCode: momentTypeCode,
+                            setupId: activated.setupId,
+                            projectionHints: []
+                        ))
+                    } else {
+                        state = UiState(submitting: false, error: nil)
+                        onSuccess(CreateMomentOutcome(
+                            momentId: result.momentId,
+                            title: result.title,
+                            domainCode: result.domainCode,
+                            status: result.status,
+                            version: result.version,
+                            momentTypeCode: momentTypeCode,
+                            setupId: nil,
+                            projectionHints: []
+                        ))
+                    }
+                } catch {
+                    state = UiState(
+                        submitting: false,
+                        error: (error as? APIErrorKind).map(Self.message(for:)) ?? error.localizedDescription
+                    )
+                }
+            }
             return
         }
         submit(
             draftKey: "business:\(kind.rawValue):\(companyId ?? "moment")",
             block: { draftKey in
+                let resolvedCompanyId = try await self.ensureBusinessCompany(
+                    companyId: companyId,
+                    companyName: companyName,
+                    taxIdentifier: taxIdentifier,
+                    editingMomentId: nil
+                )
                 let outcome = try await self.repository.createBusinessSetup(
                     draftKey: draftKey,
-                    companyId: companyId,
+                    companyId: resolvedCompanyId,
                     familyCode: kind.rawValue,
                     title: resolvedTitle,
                     description: catalog.subtitle,
@@ -185,6 +236,43 @@ final class MomentCreateModel: ObservableObject {
 
     func getGroupSetupPrefill(momentId: String) async -> GroupSetupPrefill? {
         try? await APIClient.shared.getGroupSetupPrefill(momentId: momentId)
+    }
+
+    private func ensureBusinessCompany(
+        companyId: String?,
+        companyName: String?,
+        taxIdentifier: String?,
+        editingMomentId: String?
+    ) async throws -> String? {
+        let name = companyName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !name.isEmpty else {
+            let existing = companyId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return existing.isEmpty ? nil : existing
+        }
+        let gst = taxIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let existing = companyId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if existing.isEmpty {
+            let created = try await APIClient.shared.createCompany(
+                displayName: name,
+                legalName: name,
+                taxIdentifier: gst.isEmpty ? nil : gst
+            )
+            if let editingMomentId {
+                try await APIClient.shared.linkBusinessMomentCompany(momentId: editingMomentId, companyId: created.companyId)
+            }
+            return created.companyId
+        }
+        let detail = try await APIClient.shared.getCompany(companyId: existing)
+        _ = try await APIClient.shared.patchCompany(
+            companyId: existing,
+            body: [
+                "displayName": name,
+                "legalName": name,
+                "taxIdentifier": gst,
+                "expectedVersion": detail.version,
+            ]
+        )
+        return existing
     }
 
     func getDomainSetupPrefill(momentId: String) async -> DomainSetupPrefill? {

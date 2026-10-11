@@ -8,8 +8,14 @@ struct RetailStoreSetupView: View {
     var onSubtype: (OperatingSubtype) -> Void
     var onClose: () -> Void
     var onActivate: ([String: Any], String) -> Void
+    var initialName: String = ""
+    var initialCompanyName: String = ""
+    var initialGstin: String = ""
 
     @State private var name = ""
+    @State private var companyName = ""
+    @State private var companyEdited = false
+    @State private var gstin = ""
     @State private var currency = "INR"
     @State private var currencyOpen = false
     @State private var start = Date()
@@ -43,6 +49,7 @@ struct RetailStoreSetupView: View {
     private var needsApprover: Bool { policy == "APPROVAL_REQUIRED" && !invites.contains { $0.role == "APPROVER" } }
     private var ready: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !companyName.trimmingCharacters(in: .whitespaces).isEmpty &&
         !selectedChannels.isEmpty &&
         (Double(budget) ?? 0) > 0 &&
         (Double(target) ?? 0) > 0 &&
@@ -94,6 +101,10 @@ struct RetailStoreSetupView: View {
         .onChange(of: subtype.code) { _, _ in
             selectedChannels = selectedChannels.intersection(Set(spec.channels))
         }
+        .onAppear { applyCompanySeed() }
+        .onChange(of: initialCompanyName) { _, _ in applyCompanySeed() }
+        .onChange(of: initialGstin) { _, _ in applyCompanySeed() }
+        .onChange(of: initialName) { _, _ in applyCompanySeed() }
         .sheet(isPresented: $dateOpen) {
             VStack {
                 DatePicker("Tracking start", selection: $start, displayedComponents: .date)
@@ -169,6 +180,30 @@ struct RetailStoreSetupView: View {
         section("01", "Business Basics") {
             Text(spec.basicsLine).font(.plusJakarta(size: 14)).foregroundStyle(spec.secondary)
             editor(spec.nameHint, text: $name, placeholder: spec.nameHint, icon: "rs_setup_pencil")
+                .onChange(of: name) { _, value in
+                    if !companyEdited { companyName = value }
+                }
+            editor(
+                "Company name",
+                text: Binding(
+                    get: { companyName },
+                    set: {
+                        companyEdited = true
+                        companyName = $0
+                    }
+                ),
+                placeholder: "Registered company name",
+                icon: "rs_setup_pencil"
+            )
+            editor(
+                "GSTIN",
+                text: Binding(
+                    get: { gstin },
+                    set: { gstin = String($0.prefix(15)) }
+                ),
+                placeholder: "15-digit GSTIN, if you have one",
+                icon: "rs_setup_pencil"
+            )
             choice("Currency", currencies.first { $0.0 == currency }?.1 ?? currency, icon: "rs_setup_chevron") { currencyOpen.toggle() }
             if currencyOpen {
                 ForEach(currencies, id: \.0) { item in
@@ -303,6 +338,8 @@ struct RetailStoreSetupView: View {
                 Text(name.isEmpty ? spec.nameHint : name).font(.plusJakarta(size: 14)).foregroundStyle(spec.text)
                 Text("\(spec.reviewKind) · \(currency) · From \(dayLabel(start))").font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
             }
+            reviewLine("Company", companyName.trimmingCharacters(in: .whitespaces).isEmpty ? "Not set" : companyName)
+            reviewLine("GSTIN", gstin.trimmingCharacters(in: .whitespaces).isEmpty ? "Not added" : gstin)
             reviewLine("People", ([ "\(owner) · Owner" ] + invites.map { "\($0.name) · \(roleLabel($0.role))" }).joined(separator: ", "))
             Text("Sales channels · \(selectedChannels.sorted().joined(separator: ", ").isEmpty ? "None yet" : selectedChannels.sorted().joined(separator: ", "))")
                 .font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
@@ -383,9 +420,20 @@ struct RetailStoreSetupView: View {
             .clipShape(Capsule())
     }
 
+    private func applyCompanySeed() {
+        if name.isEmpty && !initialName.isEmpty { name = initialName }
+        if !companyEdited && !initialCompanyName.isEmpty {
+            companyName = initialCompanyName
+            companyEdited = true
+        }
+        if gstin.isEmpty && !initialGstin.isEmpty { gstin = initialGstin }
+    }
+
     private func activate() {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
+        let company = companyName.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty { localError = "Add a name."; return }
+        if company.isEmpty { localError = "Add a company name."; return }
         if selectedChannels.isEmpty { localError = "Choose at least one."; return }
         if (Double(budget) ?? 0) <= 0 { localError = "Enter a monthly budget above zero."; return }
         if (Double(target) ?? 0) <= 0 { localError = "Enter a monthly sales target above zero."; return }
@@ -407,6 +455,8 @@ struct RetailStoreSetupView: View {
             "monthlyBudget": budget.trimmingCharacters(in: .whitespaces),
             "monthlyTarget": target.trimmingCharacters(in: .whitespaces),
             "targetMetric": "REVENUE",
+            "companyName": company,
+            "gstin": gstin.trimmingCharacters(in: .whitespaces),
         ]
         onActivate(prefs, trimmed)
     }

@@ -308,9 +308,15 @@ fun RetailStoreSetup(
     onClose: () -> Unit,
     onActivate: (Map<String, Any>, String) -> Unit,
     modifier: Modifier = Modifier,
+    initialName: String = "",
+    initialCompanyName: String = "",
+    initialGstin: String = "",
 ) {
     val owner = PersonLabel.personName(ownerName, fallback = "You")
-    var name by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(initialName) }
+    var companyName by remember { mutableStateOf(initialCompanyName.ifBlank { initialName }) }
+    var companyEdited by remember { mutableStateOf(initialCompanyName.isNotBlank()) }
+    var gstin by remember { mutableStateOf(initialGstin) }
     var currency by remember { mutableStateOf("INR") }
     var currencyOpen by remember { mutableStateOf(false) }
     var start by remember { mutableStateOf(LocalDate.now()) }
@@ -329,11 +335,23 @@ fun RetailStoreSetup(
     var localError by remember { mutableStateOf<String?>(null) }
     val needsApprover = policy == "APPROVAL_REQUIRED" && invites.none { it.role == "APPROVER" }
     val ready = name.isNotBlank() &&
+        companyName.isNotBlank() &&
         selectedChannels.isNotEmpty() &&
         budget.toDoubleOrNull()?.let { it > 0 } == true &&
         target.toDoubleOrNull()?.let { it > 0 } == true &&
         !needsApprover
     val look = setupLook(subtype.code)
+    LaunchedEffect(name) {
+        if (!companyEdited) companyName = name
+    }
+    LaunchedEffect(initialName, initialCompanyName, initialGstin) {
+        if (name.isBlank() && initialName.isNotBlank()) name = initialName
+        if (!companyEdited && initialCompanyName.isNotBlank()) {
+            companyName = initialCompanyName
+            companyEdited = true
+        }
+        if (gstin.isBlank() && initialGstin.isNotBlank()) gstin = initialGstin
+    }
     LaunchedEffect(subtype.code) {
         selectedChannels = selectedChannels.intersect(look.channels.toSet())
     }
@@ -401,6 +419,13 @@ fun RetailStoreSetup(
         SectionCard("01", "Business Basics") {
             Text(look.basicsLine, color = Secondary, fontFamily = PlusJakartaSans, fontSize = 14.sp, lineHeight = 22.sp)
             FieldEditor(look.nameHint, name, look.nameHint, R.drawable.rs_setup_pencil) { name = it }
+            FieldEditor("Company name", companyName, "Registered company name", R.drawable.rs_setup_pencil) {
+                companyEdited = true
+                companyName = it
+            }
+            FieldEditor("GSTIN", gstin, "15-digit GSTIN, if you have one", R.drawable.rs_setup_pencil) {
+                gstin = it.take(15)
+            }
             ChoiceRow("Currency", currencies.firstOrNull { it.first == currency }?.second ?: currency, R.drawable.rs_setup_chevron) { currencyOpen = !currencyOpen }
             if (currencyOpen) {
                 currencies.forEach { (code, label) ->
@@ -521,6 +546,8 @@ fun RetailStoreSetup(
                 Text(name.ifBlank { look.nameHint }, color = Ink, fontFamily = PlusJakartaSans, fontSize = 14.sp)
                 Text("${look.reviewKind} · $currency · From ${start.format(dayFormat)}", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
             }
+            ReviewLine("Company", companyName.ifBlank { "Not set" })
+            ReviewLine("GSTIN", gstin.ifBlank { "Not added" })
             ReviewLine("People", (listOf("$owner · Owner") + invites.map { "${it.name} · ${roleLabel(it.role)}" }).joinToString(", "))
             Text("Sales channels · ${selectedChannels.joinToString().ifBlank { "None yet" }}", color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
             ReviewLine("${start.format(monthFormat)} budget", money(currency, budget))
@@ -542,6 +569,7 @@ fun RetailStoreSetup(
                 .clickable(enabled = !submitting) {
                     val problem = when {
                         name.isBlank() -> "Add a name."
+                        companyName.isBlank() -> "Add a company name."
                         selectedChannels.isEmpty() -> "Choose at least one."
                         budget.toDoubleOrNull()?.let { it > 0 } != true -> "Enter a monthly budget above zero."
                         target.toDoubleOrNull()?.let { it > 0 } != true -> "Enter a monthly sales target above zero."
@@ -567,6 +595,8 @@ fun RetailStoreSetup(
                             "monthlyBudget" to budget.trim(),
                             "monthlyTarget" to target.trim(),
                             "targetMetric" to "REVENUE",
+                            "companyName" to companyName.trim(),
+                            "gstin" to gstin.trim(),
                         ),
                         trimmed,
                     )

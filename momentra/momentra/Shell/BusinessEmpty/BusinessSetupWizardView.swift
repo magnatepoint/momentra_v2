@@ -23,6 +23,8 @@ struct BusinessSetupWizardView: View {
     @State private var target = ""
     @State private var metric: String
     @State private var localError: String?
+    @State private var companySeed = ""
+    @State private var gstSeed = ""
 
     init(
         kind: BusinessSetupKind,
@@ -69,10 +71,16 @@ struct BusinessSetupWizardView: View {
                         subtype: subtype.code,
                         editingMomentId: editingMomentId,
                         status: "ACTIVE",
+                        companyName: prefs["companyName"] as? String,
+                        taxIdentifier: prefs["gstin"] as? String,
                         onSuccess: onCreated
                     )
-                }
+                },
+                initialName: initialTitle ?? "",
+                initialCompanyName: companySeed,
+                initialGstin: gstSeed
             )
+            .task(id: editingMomentId) { await loadCompanySeed() }
             .accessibilityIdentifier(kind.maestroTag)
         } else {
         ScrollView {
@@ -100,6 +108,20 @@ struct BusinessSetupWizardView: View {
         }
         .background(Color(hex: "#0C0F15"))
         .accessibilityIdentifier(kind.maestroTag)
+        }
+    }
+
+    private func loadCompanySeed() async {
+        guard let editingMomentId else { return }
+        let prefill = await createModel.getDomainSetupPrefill(momentId: editingMomentId)
+        let existing = (companyId?.isEmpty == false ? companyId : nil) ?? prefill?.companyId
+        if let existing, !existing.isEmpty {
+            if let detail = try? await APIClient.shared.getCompany(companyId: existing) {
+                companySeed = detail.displayName
+                gstSeed = detail.taxIdentifier ?? ""
+            }
+        } else {
+            companySeed = prefill?.title ?? initialTitle ?? ""
         }
     }
 

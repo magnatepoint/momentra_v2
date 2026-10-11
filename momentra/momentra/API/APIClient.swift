@@ -1311,6 +1311,25 @@ final class APIClient {
     }
 
     /// Duplicate a Group moment (setup + checklist; optionally expenses/contributions/memories).
+    func linkBusinessMomentCompany(momentId: String, companyId: String, idempotencyKey: String = UUID().uuidString) async throws {
+        struct Body: Encodable { let companyId: String }
+        struct Ack: Decodable { let momentId: String? }
+        let _: Ack = try await authorizedPost(
+            path: "v1/business/moments/\(momentId)/company",
+            body: Body(companyId: companyId),
+            idempotencyKey: idempotencyKey
+        )
+    }
+
+    func duplicateBusinessMoment(momentId: String, idempotencyKey: String = UUID().uuidString) async throws -> CreateMomentResult {
+        struct Body: Encodable {}
+        return try await authorizedPost(
+            path: "v1/business/moments/\(momentId)/duplicate",
+            body: Body(),
+            idempotencyKey: idempotencyKey
+        )
+    }
+
     func duplicateGroupMoment(
         momentId: String,
         includeData: Bool = false,
