@@ -260,8 +260,8 @@ final class AppShellModel: ObservableObject {
         if open { life360Open = false }
     }
 
-    func reloadCurrentContext() {
-        refreshBootstrap()
+    func reloadCurrentContext(preserveMomentId: String? = nil) {
+        refreshBootstrap(preserveMomentId: preserveMomentId)
     }
 
     /// After leaving a Group/Business moment or company, drop selection and reload inventory.
@@ -275,7 +275,7 @@ final class AppShellModel: ObservableObject {
         refreshBootstrap()
     }
 
-    private func refreshBootstrap() {
+    private func refreshBootstrap(preserveMomentId: String? = nil) {
         loadTask?.cancel()
         loadTask = Task {
             let hadCache = bootstrap != nil
@@ -287,7 +287,7 @@ final class AppShellModel: ObservableObject {
                 let boot = try await gateway.getBootstrap()
                 guard !Task.isCancelled else { return }
                 bootstrap = boot
-                applyBootstrapInventory(boot, networkRefresh: true)
+                applyBootstrapInventory(boot, networkRefresh: true, preserveMomentId: preserveMomentId)
                 publishOfflineNotice(networkDown: false)
             } catch {
                 guard !Task.isCancelled else { return }
@@ -697,13 +697,13 @@ final class AppShellModel: ObservableObject {
         lastNonCreateDestination = .pulse
         tabByContext[selectedContext] = .pulse
         selectedMomentByContext[selectedContext] = momentId
-        reloadCurrentContext()
         if selectedContext == .group {
             refreshVisibleGroupTab()
         }
         if selectedContext == .business {
             refreshVisibleBusinessTab()
         }
+        reloadCurrentContext(preserveMomentId: momentId)
     }
 
     func flushOfflineQueue() {

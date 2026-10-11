@@ -705,7 +705,13 @@ fun AppShellScreen(
                     ownerName = state.identity?.displayName.orEmpty(),
                     onCreateBack = { newMomentOpen = false },
                     onMomentCreated = { momentId, title, momentTypeCode, status ->
-                        pendingActivation = PendingBusinessActivation(momentId, title, momentTypeCode, status)
+                        if (momentTypeCode == "RETAIL_STORE") {
+                            newMomentOpen = false
+                            shellViewModel.onMomentCreated(momentId, title, momentTypeCode, status)
+                            tourController.onSignal(TourSignal.MOMENT_CREATED)
+                        } else {
+                            pendingActivation = PendingBusinessActivation(momentId, title, momentTypeCode, status)
+                        }
                     },
                 )
             } else {

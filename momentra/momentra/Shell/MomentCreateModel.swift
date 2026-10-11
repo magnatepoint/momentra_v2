@@ -90,7 +90,7 @@ final class MomentCreateModel: ObservableObject {
         submit(
             draftKey: "business:\(kind.rawValue):\(companyId ?? "moment")",
             block: { draftKey in
-                try await self.repository.createBusinessSetup(
+                let outcome = try await self.repository.createBusinessSetup(
                     draftKey: draftKey,
                     companyId: companyId,
                     familyCode: kind.rawValue,
@@ -99,6 +99,16 @@ final class MomentCreateModel: ObservableObject {
                     momentTypeCode: momentTypeCode,
                     preferences: filtered,
                     status: status
+                )
+                return CreateMomentOutcome(
+                    momentId: outcome.momentId,
+                    title: outcome.title,
+                    domainCode: outcome.domainCode,
+                    status: outcome.status,
+                    version: outcome.version,
+                    momentTypeCode: outcome.momentTypeCode ?? momentTypeCode,
+                    setupId: outcome.setupId,
+                    projectionHints: outcome.projectionHints
                 )
             },
             onSuccess: onSuccess

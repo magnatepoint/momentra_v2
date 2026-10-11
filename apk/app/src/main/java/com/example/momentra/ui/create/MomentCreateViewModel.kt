@@ -127,7 +127,7 @@ class MomentCreateViewModel(
                 preferences = prefs,
                 status = status,
             ).fold(
-                onSuccess = { dto -> finishCreateSuccess(dto, catalog.momentTypeCode, onSuccess) },
+                onSuccess = { dto -> finishCreateSuccess(dto, momentTypeCode, onSuccess) },
                 onFailure = { e -> finishCreateFailure(e) },
             )
         }
