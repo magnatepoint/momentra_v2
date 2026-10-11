@@ -1,4 +1,4 @@
-﻿BEGIN;
+BEGIN;
 
 -- Personal life taxonomy (P1-P8 x 6) and master-expense context.
 -- NOW/BUILD is derived from the life area. Mood is optional and never inferred.

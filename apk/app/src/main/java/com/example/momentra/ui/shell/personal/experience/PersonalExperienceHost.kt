@@ -505,11 +505,11 @@ private fun QuickAddsHub(onAddExpense: () -> Unit, onArea: (PersonalLifeArea) ->
         style = PersonalTokens.Type.Caption,
     )
     Spacer(Modifier.height(PersonalTokens.Space.Inner))
-    Text("NOW · Everyday living · P1–P5", color = PersonalTokens.Colors.BrandPrimary, style = PersonalTokens.Type.Metadata)
+    Text("NOW · Everyday living", color = PersonalTokens.Colors.BrandPrimary, style = PersonalTokens.Type.Metadata)
     Spacer(Modifier.height(PersonalTokens.Space.Sm))
     AreaGrid(PersonalLifeTaxonomy.areas.filter { it.layer == PersonalLifeLayer.NOW }, onArea)
     Spacer(Modifier.height(PersonalTokens.Space.Md))
-    Text("BUILD · Longer horizons · P6–P8", color = PersonalTokens.Colors.BrandPrimary, style = PersonalTokens.Type.Metadata)
+    Text("BUILD · Longer horizons", color = PersonalTokens.Colors.BrandPrimary, style = PersonalTokens.Type.Metadata)
     Spacer(Modifier.height(PersonalTokens.Space.Sm))
     AreaGrid(PersonalLifeTaxonomy.areas.filter { it.layer == PersonalLifeLayer.BUILD }, onArea)
     Spacer(Modifier.height(PersonalTokens.Space.Section))
@@ -910,8 +910,8 @@ private fun AreaPicker(draft: ExpenseDraft, onBack: () -> Unit, onClose: () -> U
             Text("What part of life is this for?", color = PersonalTokens.Colors.TextPrimary, style = PersonalTokens.Type.Hero)
             Text("Choose one area. Then pick one of its six subcategories.", color = PersonalTokens.Colors.TextSecondary, style = PersonalTokens.Type.Body)
         }
-        AreaLayer("NOW · Everyday living · P1–P5", PersonalLifeTaxonomy.areas.filter { it.layer == PersonalLifeLayer.NOW }, selected) { selected = it.code }
-        AreaLayer("BUILD · Longer horizons · P6–P8", PersonalLifeTaxonomy.areas.filter { it.layer == PersonalLifeLayer.BUILD }, selected) { selected = it.code }
+        AreaLayer("NOW · Everyday living", PersonalLifeTaxonomy.areas.filter { it.layer == PersonalLifeLayer.NOW }, selected) { selected = it.code }
+        AreaLayer("BUILD · Longer horizons", PersonalLifeTaxonomy.areas.filter { it.layer == PersonalLifeLayer.BUILD }, selected) { selected = it.code }
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
                 Modifier.fillMaxWidth().height(PersonalTokens.Size.ButtonVisual).clip(RoundedCornerShape(PersonalTokens.Radius.Button)).background(if (chosen == null) PersonalTokens.Colors.SurfaceHigh else PersonalTokens.Colors.BrandAccent).clickable(enabled = chosen != null) { chosen?.let(onSelect) },
@@ -1076,7 +1076,7 @@ private fun SubcategoryPicker(
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Text(sub.label, color = PersonalTokens.Colors.TextPrimary, style = PersonalTokens.Type.Body)
-                            Text(if (selected) "Selected · ${sub.code}" else sub.code, color = if (selected) PersonalTokens.Colors.BrandPrimary else PersonalTokens.Colors.TextSubtle, style = PersonalTokens.Type.Caption)
+                            Text(if (selected) "Selected" else sub.detail, color = if (selected) PersonalTokens.Colors.BrandPrimary else PersonalTokens.Colors.TextSubtle, style = PersonalTokens.Type.Caption)
                     }
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
@@ -1995,8 +1995,8 @@ private fun LifeBody(
             if (!cold) {
                 Text(life?.coverageLabel?.ifBlank { null } ?: "Fully classified", color = PersonalTokens.Colors.SignalPositive, style = PersonalTokens.Type.Caption)
             }
-            LifeLayerGrid("NOW · Everyday living · P1–P5", PersonalLifeLayer.NOW, life, cold, currency, onArea)
-            LifeLayerGrid("BUILD · Longer horizons · P6–P8", PersonalLifeLayer.BUILD, life, cold, currency, onArea)
+            LifeLayerGrid("NOW · Everyday living", PersonalLifeLayer.NOW, life, cold, currency, onArea)
+            LifeLayerGrid("BUILD · Longer horizons", PersonalLifeLayer.BUILD, life, cold, currency, onArea)
             if (!cold) {
                 Text(
                     "Tap an area to explore activity and subcategories. Bars show its share of ${inr(life?.total, currency)}.",
@@ -2157,8 +2157,8 @@ private fun LifeBalanceCard(
     Card {
             if (cold) {
                 Row {
-                    LifeBalanceColumn("NOW", "Everyday living", "P1–P5", "0", currency, Modifier.weight(1f))
-                    LifeBalanceColumn("BUILD", "Longer horizons", "P6–P8", "0", currency, Modifier.weight(1f))
+                    LifeBalanceColumn("NOW", "Everyday living", "0", currency, Modifier.weight(1f))
+                    LifeBalanceColumn("BUILD", "Longer horizons", "0", currency, Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(PersonalTokens.Space.Sm))
                 Text("Shares unavailable at ₹0. Derived from Life Areas, never a separate choice.", color = PersonalTokens.Colors.TextSubtle, style = PersonalTokens.Type.Caption)
@@ -2169,8 +2169,8 @@ private fun LifeBalanceCard(
                     LifeShareRing(nowShare, buildShare)
                     Spacer(Modifier.width(16.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        LifeShareLine("NOW", nowShare, "P1–P5", life?.nowBuild?.now, currency, PersonalTokens.Colors.BrandPrimary)
-                        LifeShareLine("BUILD", buildShare, "P6–P8", life?.nowBuild?.build, currency, PersonalTokens.Colors.BrandTertiary)
+                        LifeShareLine("NOW", nowShare, life?.nowBuild?.now, currency, PersonalTokens.Colors.BrandPrimary)
+                        LifeShareLine("BUILD", buildShare, life?.nowBuild?.build, currency, PersonalTokens.Colors.BrandTertiary)
                     }
                 }
                 Spacer(Modifier.height(PersonalTokens.Space.Sm))
@@ -2181,12 +2181,11 @@ private fun LifeBalanceCard(
 }
 
 @Composable
-private fun LifeBalanceColumn(kicker: String, title: String, range: String, amount: String, currency: String?, modifier: Modifier) {
+private fun LifeBalanceColumn(kicker: String, title: String, amount: String, currency: String?, modifier: Modifier) {
     Column(modifier) {
         Text(kicker, color = PersonalTokens.Colors.BrandPrimary, style = PersonalTokens.Type.Metadata)
         Text(title, color = PersonalTokens.Colors.TextSecondary, style = PersonalTokens.Type.Caption)
         Text(inr(amount, currency), color = PersonalTokens.Colors.TextPrimary, style = PersonalTokens.Type.Section)
-        Text(range, color = PersonalTokens.Colors.TextSubtle, style = PersonalTokens.Type.Caption)
     }
 }
 
@@ -2215,9 +2214,9 @@ private fun LifeShareRing(nowShare: Double, buildShare: Double) {
 }
 
 @Composable
-private fun LifeShareLine(label: String, share: Double, range: String, amount: String?, currency: String?, color: Color) {
+private fun LifeShareLine(label: String, share: Double, amount: String?, currency: String?, color: Color) {
     Column {
-        Text("$label · ${sharePercent(share)} · $range", color = color, style = PersonalTokens.Type.Metadata)
+        Text("$label · ${sharePercent(share)}", color = color, style = PersonalTokens.Type.Metadata)
         Text(inr(amount, currency), color = PersonalTokens.Colors.TextPrimary, style = PersonalTokens.Type.Body)
     }
 }

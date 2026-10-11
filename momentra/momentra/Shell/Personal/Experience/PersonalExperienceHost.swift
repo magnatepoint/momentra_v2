@@ -505,9 +505,9 @@ struct PersonalExperienceHost: View {
             }
             Text("Choose an area to preselect it. You’ll pick one of its subcategories next.")
                 .personalText(PersonalTokens.Typography.caption).foregroundStyle(PersonalTokens.Colors.textSecondary)
-            Text("NOW · Everyday living · P1–P5").personalText(PersonalTokens.Typography.metadata).foregroundStyle(PersonalTokens.Colors.brandPrimary)
+            Text("NOW · Everyday living").personalText(PersonalTokens.Typography.metadata).foregroundStyle(PersonalTokens.Colors.brandPrimary)
             areaGrid(PersonalLifeTaxonomy.areas(in: .now))
-            Text("BUILD · Longer horizons · P6–P8").personalText(PersonalTokens.Typography.metadata).foregroundStyle(PersonalTokens.Colors.brandPrimary)
+            Text("BUILD · Longer horizons").personalText(PersonalTokens.Typography.metadata).foregroundStyle(PersonalTokens.Colors.brandPrimary)
             areaGrid(PersonalLifeTaxonomy.areas(in: .build))
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
@@ -1348,8 +1348,8 @@ struct PersonalExperienceHost: View {
                     Text(block?.coverageLabel?.isEmpty == false ? block!.coverageLabel! : "Fully classified")
                         .personalText(PersonalTokens.Typography.caption).foregroundStyle(PersonalTokens.Colors.signalPositive)
                 }
-                lifeLayer("NOW · Everyday living · P1–P5", PersonalLifeTaxonomy.areas(in: .now), block, cold: cold, currency: currency)
-                lifeLayer("BUILD · Longer horizons · P6–P8", PersonalLifeTaxonomy.areas(in: .build), block, cold: cold, currency: currency)
+                lifeLayer("NOW · Everyday living", PersonalLifeTaxonomy.areas(in: .now), block, cold: cold, currency: currency)
+                lifeLayer("BUILD · Longer horizons", PersonalLifeTaxonomy.areas(in: .build), block, cold: cold, currency: currency)
                 if !cold {
                     Text("Tap an area to explore activity and subcategories. Bars show its share of \(inr(block?.total, currency)).")
                         .personalText(PersonalTokens.Typography.caption).foregroundStyle(PersonalTokens.Colors.textSubtle)
@@ -1466,8 +1466,8 @@ struct PersonalExperienceHost: View {
             card {
                 if cold {
                     HStack(alignment: .top) {
-                        lifeBalanceColumn("NOW", "Everyday living", "P1–P5", "0", currency)
-                        lifeBalanceColumn("BUILD", "Longer horizons", "P6–P8", "0", currency)
+                        lifeBalanceColumn("NOW", "Everyday living", "0", currency)
+                        lifeBalanceColumn("BUILD", "Longer horizons", "0", currency)
                     }
                     Text("Shares unavailable at ₹0. Derived from Life Areas, never a separate choice.")
                         .personalText(PersonalTokens.Typography.caption).foregroundStyle(PersonalTokens.Colors.textSubtle)
@@ -1475,8 +1475,8 @@ struct PersonalExperienceHost: View {
                     HStack(alignment: .center, spacing: 16) {
                         lifeRing(block?.nowBuild.nowShare ?? 0, block?.nowBuild.buildShare ?? 0)
                         VStack(alignment: .leading, spacing: 8) {
-                            lifeShareLine("NOW", block?.nowBuild.nowShare ?? 0, "P1–P5", block?.nowBuild.now, currency, PersonalTokens.Colors.brandPrimary)
-                            lifeShareLine("BUILD", block?.nowBuild.buildShare ?? 0, "P6–P8", block?.nowBuild.build, currency, PersonalTokens.Colors.brandTertiary)
+                            lifeShareLine("NOW", block?.nowBuild.nowShare ?? 0, block?.nowBuild.now, currency, PersonalTokens.Colors.brandPrimary)
+                            lifeShareLine("BUILD", block?.nowBuild.buildShare ?? 0, block?.nowBuild.build, currency, PersonalTokens.Colors.brandTertiary)
                         }
                     }
                     Text("Derived from Life Areas. Allocation is context, not a score. Percentages rounded.")
@@ -1486,12 +1486,11 @@ struct PersonalExperienceHost: View {
         }
     }
 
-    private func lifeBalanceColumn(_ kicker: String, _ title: String, _ range: String, _ amount: String, _ currency: String?) -> some View {
+    private func lifeBalanceColumn(_ kicker: String, _ title: String, _ amount: String, _ currency: String?) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(kicker).personalText(PersonalTokens.Typography.metadata).foregroundStyle(PersonalTokens.Colors.brandPrimary)
             Text(title).personalText(PersonalTokens.Typography.caption).foregroundStyle(PersonalTokens.Colors.textSecondary)
             Text(inr(amount, currency)).personalText(PersonalTokens.Typography.section).foregroundStyle(PersonalTokens.Colors.textPrimary)
-            Text(range).personalText(PersonalTokens.Typography.caption).foregroundStyle(PersonalTokens.Colors.textSubtle)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -1515,9 +1514,9 @@ struct PersonalExperienceHost: View {
         .padding(6)
     }
 
-    private func lifeShareLine(_ label: String, _ share: Double, _ range: String, _ amount: String?, _ currency: String?, _ color: Color) -> some View {
+    private func lifeShareLine(_ label: String, _ share: Double, _ amount: String?, _ currency: String?, _ color: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("\(label) · \(lifeSharePercent(share)) · \(range)").personalText(PersonalTokens.Typography.metadata).foregroundStyle(color)
+            Text("\(label) · \(lifeSharePercent(share))").personalText(PersonalTokens.Typography.metadata).foregroundStyle(color)
             Text(inr(amount, currency)).personalText(PersonalTokens.Typography.body).foregroundStyle(PersonalTokens.Colors.textPrimary)
         }
     }
@@ -2642,8 +2641,8 @@ private struct PersonalAreaStep: View {
                     Text("What part of life is this for?").personalText(PersonalTokens.Typography.hero).foregroundStyle(PersonalTokens.Colors.textPrimary)
                     Text("Choose one area. Then pick one of its six subcategories.").personalText(PersonalTokens.Typography.body).foregroundStyle(PersonalTokens.Colors.textSecondary)
                 }
-                layer("NOW · Everyday living · P1–P5", areas: PersonalLifeTaxonomy.areas(in: .now))
-                layer("BUILD · Longer horizons · P6–P8", areas: PersonalLifeTaxonomy.areas(in: .build))
+                layer("NOW · Everyday living", areas: PersonalLifeTaxonomy.areas(in: .now))
+                layer("BUILD · Longer horizons", areas: PersonalLifeTaxonomy.areas(in: .build))
                 VStack(alignment: .leading, spacing: 12) {
                     Button {
                         guard let chosen else { return }
@@ -2798,7 +2797,7 @@ private struct PersonalSubcategoryStep: View {
                         Button { picked = sub.code } label: {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(sub.label).personalText(PersonalTokens.Typography.body).foregroundStyle(PersonalTokens.Colors.textPrimary).multilineTextAlignment(.leading)
-                                    Text(selected ? "Selected · \(sub.code)" : sub.code)
+                                    Text(selected ? "Selected" : sub.detail)
                                         .personalText(PersonalTokens.Typography.caption)
                                         .foregroundStyle(selected ? PersonalTokens.Colors.brandPrimary : PersonalTokens.Colors.textSubtle)
                                 }

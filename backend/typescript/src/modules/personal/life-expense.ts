@@ -300,14 +300,14 @@ export async function createPersonalLifeExpense(
   const inserted = await client.query<{ expense_id: string; version: string; effective_at: Date }>(
     `INSERT INTO finance.expense (
        moment_id, domain_code, financial_account_id, created_by_user_id, merchant_name, description,
-       category_code, subcategory_code, payment_method_code, amount, currency_code, effective_at,
+       payment_method_code, amount, currency_code, effective_at,
        status, posted_at, version, note,
        life_area_code, life_subcategory_code, mood_code, classification_source, origin, economic_kind, payment_source
      ) VALUES (
        $1, 'PERSONAL', $2, $3, $4, $5,
-       $6, $7, $8, $9, $10, COALESCE($11::timestamptz, now()),
-       'POSTED', now(), 1, $12,
-       $6, $7, $13, $14, $15, 'EXPENSE', $16
+       $6, $7, $8, COALESCE($9::timestamptz, now()),
+       'POSTED', now(), 1, $10,
+       $11, $12, $13, $14, $15, 'EXPENSE', $16
      )
      RETURNING expense_id, version, effective_at`,
     [
@@ -316,13 +316,13 @@ export async function createPersonalLifeExpense(
       ctx.userId,
       body.merchantName ?? null,
       body.note ?? null,
-      body.lifeAreaCode,
-      body.lifeSubcategoryCode,
       paymentMethod,
       amount.toFixed(4),
       currencyCode,
       body.effectiveAt ?? null,
       body.note ?? null,
+      body.lifeAreaCode,
+      body.lifeSubcategoryCode,
       body.moodCode ?? null,
       classification,
       body.origin ?? 'QUICK_ADD',
@@ -418,8 +418,6 @@ export async function updatePersonalLifeExpense(
     `UPDATE finance.expense
      SET life_area_code = $2,
          life_subcategory_code = $3,
-         category_code = $2,
-         subcategory_code = $3,
          mood_code = CASE WHEN $7::bool THEN $4 ELSE mood_code END,
          merchant_name = COALESCE($5, merchant_name),
          note = COALESCE($6, note),
@@ -503,11 +501,11 @@ export async function refundPersonalLifeExpense(
   const inserted = await client.query<{ expense_id: string }>(
     `INSERT INTO finance.expense (
        moment_id, domain_code, financial_account_id, created_by_user_id, merchant_name,
-       category_code, subcategory_code, amount, currency_code, status, posted_at, version,
+       amount, currency_code, status, posted_at, version,
        life_area_code, life_subcategory_code, classification_source, origin, economic_kind, reversed_expense_id
      )
      SELECT moment_id, domain_code, $2, created_by_user_id, merchant_name,
-            life_area_code, life_subcategory_code, $3, currency_code, 'POSTED', now(), 1,
+            $3, currency_code, 'POSTED', now(), 1,
             life_area_code, life_subcategory_code, 'corrected', 'REFUND', 'REFUND', expense_id
      FROM finance.expense WHERE expense_id = $1
      RETURNING expense_id`,
