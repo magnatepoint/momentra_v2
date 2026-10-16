@@ -115,6 +115,7 @@ class BusinessSliceRepository(
         channelName: String? = null,
         counterpartyName: String? = null,
         paymentStatus: String? = null,
+        occurredAt: String? = null,
     ): Result<Unit> = runCatching {
         api.recordOperatingEvent(
             momentId = momentId,
@@ -127,6 +128,7 @@ class BusinessSliceRepository(
                 counterpartyName = counterpartyName,
                 channelName = channelName,
                 paymentStatus = paymentStatus,
+                occurredAt = occurredAt,
             ),
         )
         Unit

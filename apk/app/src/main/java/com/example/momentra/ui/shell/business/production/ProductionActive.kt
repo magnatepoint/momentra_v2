@@ -82,7 +82,10 @@ fun ProductionActive(
 ) {
     var activityOpen by remember { mutableStateOf(false) }
     CompositionLocalProvider(LocalJob provides (model.subtype == "MADE_TO_ORDER")) {
-    Box(modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize().background(PlantBg)) {
+    if (tab == OperatingTab.QUICK_ADD) {
+        ProductionQuickAddHub(model, onRecord, onDecide)
+    } else {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -96,8 +99,9 @@ fun ProductionActive(
             OperatingTab.MOMENTS -> ProductionMoments(model, onOpenQuickAdd)
             OperatingTab.LIFE -> ProductionLife(model)
             OperatingTab.MEMORY -> ProductionMemory(model)
-            OperatingTab.QUICK_ADD -> ProductionQuickAddHub(model, onRecord, onDecide)
+            OperatingTab.QUICK_ADD -> Unit
         }
+    }
     }
     if (activityOpen) {
         ActivitySheet(model, onClose = { activityOpen = false })

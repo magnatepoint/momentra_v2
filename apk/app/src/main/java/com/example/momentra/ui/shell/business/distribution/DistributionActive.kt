@@ -60,7 +60,10 @@ fun DistributionActive(
     modifier: Modifier = Modifier,
 ) {
     var activityOpen by remember { mutableStateOf(false) }
-    Box(modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize().background(DistBg)) {
+    if (tab == OperatingTab.QUICK_ADD) {
+        DistributionQuickAddHub(model, onRecord, onDecide)
+    } else {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -74,8 +77,9 @@ fun DistributionActive(
             OperatingTab.MOMENTS -> DistributionMoments(model, onOpenQuickAdd)
             OperatingTab.LIFE -> DistributionLife(model)
             OperatingTab.MEMORY -> DistributionMemory(model)
-            OperatingTab.QUICK_ADD -> DistributionQuickAddHub(model, onRecord, onDecide)
+            OperatingTab.QUICK_ADD -> Unit
         }
+    }
     }
     if (activityOpen) {
         ActivitySheet(model, onClose = { activityOpen = false })

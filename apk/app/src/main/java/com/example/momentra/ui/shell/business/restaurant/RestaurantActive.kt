@@ -60,7 +60,10 @@ fun RestaurantActive(
     modifier: Modifier = Modifier,
 ) {
     var activityOpen by remember { mutableStateOf(false) }
-    Box(modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize().background(RestBg)) {
+    if (tab == OperatingTab.QUICK_ADD) {
+        RestaurantQuickAddHub(model, onRecord, onDecide)
+    } else {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -74,8 +77,9 @@ fun RestaurantActive(
             OperatingTab.MOMENTS -> RestaurantMoments(model, onOpenQuickAdd)
             OperatingTab.LIFE -> RestaurantLife(model)
             OperatingTab.MEMORY -> RestaurantMemory(model)
-            OperatingTab.QUICK_ADD -> RestaurantQuickAddHub(model, onRecord, onDecide)
+            OperatingTab.QUICK_ADD -> Unit
         }
+    }
     }
     if (activityOpen) {
         ActivitySheet(model, onClose = { activityOpen = false })

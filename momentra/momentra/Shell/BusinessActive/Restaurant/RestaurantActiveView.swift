@@ -327,4 +327,5 @@ struct RestaurantEventDraft {
     var channelName: String?
     var counterpartyName: String?
     var paymentStatus: String?
+    var occurredAt: String? = nil
 }

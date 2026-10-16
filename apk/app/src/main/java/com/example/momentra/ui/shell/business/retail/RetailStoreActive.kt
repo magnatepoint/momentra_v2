@@ -60,7 +60,10 @@ fun RetailStoreActive(
     modifier: Modifier = Modifier,
 ) {
     var activityOpen by remember { mutableStateOf(false) }
-    Box(modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize().background(StoreBg)) {
+    if (tab == OperatingTab.QUICK_ADD) {
+        RetailQuickAddHub(model, onRecord, onDecide)
+    } else {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -74,8 +77,9 @@ fun RetailStoreActive(
             OperatingTab.MOMENTS -> RetailMoments(model, onOpenQuickAdd)
             OperatingTab.LIFE -> RetailLife(model)
             OperatingTab.MEMORY -> RetailMemory(model)
-            OperatingTab.QUICK_ADD -> RetailQuickAddHub(model, onRecord, onDecide)
+            OperatingTab.QUICK_ADD -> Unit
         }
+    }
     }
     if (activityOpen) {
         ActivitySheet(model, onClose = { activityOpen = false })

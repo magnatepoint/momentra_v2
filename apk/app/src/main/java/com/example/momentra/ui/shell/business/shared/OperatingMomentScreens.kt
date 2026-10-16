@@ -111,6 +111,7 @@ fun OperatingMomentPage(
                     draft.channelName,
                     draft.counterpartyName,
                     draft.paymentStatus,
+                    draft.occurredAt,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -141,6 +142,7 @@ fun OperatingMomentPage(
                     draft.channelName,
                     draft.counterpartyName,
                     draft.paymentStatus,
+                    draft.occurredAt,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -171,6 +173,7 @@ fun OperatingMomentPage(
                     draft.channelName,
                     draft.counterpartyName,
                     draft.paymentStatus,
+                    draft.occurredAt,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -201,6 +204,7 @@ fun OperatingMomentPage(
                     draft.channelName,
                     draft.counterpartyName,
                     draft.paymentStatus,
+                    draft.occurredAt,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -231,6 +235,7 @@ fun OperatingMomentPage(
                     draft.channelName,
                     draft.counterpartyName,
                     draft.paymentStatus,
+                    draft.occurredAt,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -261,6 +266,7 @@ fun OperatingMomentPage(
                     draft.channelName,
                     draft.counterpartyName,
                     draft.paymentStatus,
+                    draft.occurredAt,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -291,6 +297,7 @@ fun OperatingMomentPage(
                     draft.channelName,
                     draft.counterpartyName,
                     draft.paymentStatus,
+                    draft.occurredAt,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },

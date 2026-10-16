@@ -1376,10 +1376,10 @@ struct PersonalExperienceHost: View {
 
     private func lifeIntro(_ block: PersonalExperiencePayload.LifeBlock?, cold: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(block?.intro?.kicker?.isEmpty == false ? block!.intro!.kicker : (cold ? "A FRESH START" : "YOUR LIFE"))
+            Text(block?.intro?.kicker.isEmpty == false ? block!.intro!.kicker : (cold ? "A FRESH START" : "YOUR LIFE"))
                 .personalText(PersonalTokens.Typography.metadata).foregroundStyle(PersonalTokens.Colors.brandPrimary)
             HStack(alignment: .center) {
-                Text(block?.intro?.title?.isEmpty == false ? block!.intro!.title : (cold ? "All the parts of you." : "Your money, in life"))
+                Text(block?.intro?.title.isEmpty == false ? block!.intro!.title : (cold ? "All the parts of you." : "Your money, in life"))
                     .personalText(PersonalTokens.Typography.hero).foregroundStyle(PersonalTokens.Colors.textPrimary)
                 Spacer()
                 if !cold {
@@ -1394,7 +1394,7 @@ struct PersonalExperienceHost: View {
                     .buttonStyle(.plain)
                 }
             }
-            Text(block?.intro?.subtitle?.isEmpty == false ? block!.intro!.subtitle : (cold ? "Eight areas of life. Explore any one, even before your first expense." : "Eight areas. One connected picture."))
+            Text(block?.intro?.subtitle.isEmpty == false ? block!.intro!.subtitle : (cold ? "Eight areas of life. Explore any one, even before your first expense." : "Eight areas. One connected picture."))
                 .personalText(PersonalTokens.Typography.body).foregroundStyle(PersonalTokens.Colors.textSecondary)
         }
     }
@@ -1728,10 +1728,10 @@ struct PersonalExperienceHost: View {
 
     private func memoryIntro(_ block: PersonalExperiencePayload.MemoryBlock?, hasHistory: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(block?.intro?.kicker?.isEmpty == false ? block!.intro!.kicker : (hasHistory ? "HISTORY" : "A FRESH START"))
+            Text(block?.intro?.kicker.isEmpty == false ? block!.intro!.kicker : (hasHistory ? "HISTORY" : "A FRESH START"))
                 .personalText(PersonalTokens.Typography.metadata).foregroundStyle(PersonalTokens.Colors.brandPrimary)
             HStack {
-                Text(block?.intro?.title?.isEmpty == false ? block!.intro!.title : (hasHistory ? "What stays with you" : "A story worth keeping."))
+                Text(block?.intro?.title.isEmpty == false ? block!.intro!.title : (hasHistory ? "What stays with you" : "A story worth keeping."))
                     .personalText(PersonalTokens.Typography.hero).foregroundStyle(PersonalTokens.Colors.textPrimary)
                 Spacer()
                 if hasHistory {
@@ -1746,13 +1746,13 @@ struct PersonalExperienceHost: View {
                     .buttonStyle(.plain)
                 }
             }
-            Text(block?.intro?.subtitle?.isEmpty == false ? block!.intro!.subtitle : (hasHistory ? "The chapters behind your expenses." : "There's room here for the chapters that will matter."))
+            Text(block?.intro?.subtitle.isEmpty == false ? block!.intro!.subtitle : (hasHistory ? "The chapters behind your expenses." : "There's room here for the chapters that will matter."))
                 .personalText(PersonalTokens.Typography.body).foregroundStyle(PersonalTokens.Colors.textSecondary)
         }
     }
 
     private func memoryOpening(_ block: PersonalExperiencePayload.MemoryBlock?) -> some View {
-        let monthLine = block?.intro?.kicker?.components(separatedBy: " ·").first ?? block?.openMonthShort ?? ""
+        let monthLine = block?.intro?.kicker.components(separatedBy: " ·").first ?? block?.openMonthShort ?? ""
         return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 16) {
                 Image("PersonalArtwork/art_pers_open_beginning")

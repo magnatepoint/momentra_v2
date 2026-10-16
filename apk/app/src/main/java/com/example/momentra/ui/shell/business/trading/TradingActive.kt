@@ -60,7 +60,10 @@ fun TradingActive(
     modifier: Modifier = Modifier,
 ) {
     var activityOpen by remember { mutableStateOf(false) }
-    Box(modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize().background(TradeBg)) {
+    if (tab == OperatingTab.QUICK_ADD) {
+        TradingQuickAddHub(model, onRecord, onDecide)
+    } else {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -74,8 +77,9 @@ fun TradingActive(
             OperatingTab.MOMENTS -> TradingMoments(model, onOpenQuickAdd)
             OperatingTab.LIFE -> TradingLife(model)
             OperatingTab.MEMORY -> TradingMemory(model)
-            OperatingTab.QUICK_ADD -> TradingQuickAddHub(model, onRecord, onDecide)
+            OperatingTab.QUICK_ADD -> Unit
         }
+    }
     }
     if (activityOpen) {
         ActivitySheet(model, onClose = { activityOpen = false })

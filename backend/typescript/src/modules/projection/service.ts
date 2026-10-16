@@ -2141,12 +2141,39 @@ export async function listBusinessMoments(
   };
 }
 
+async function operatingFamilyFacet(
+  client: PoolClient,
+  ctx: RequestContext,
+  momentId: string,
+  facet: 'pulse' | 'life' | 'memory' | 'finance' | 'actions'
+): Promise<Record<string, unknown> | null> {
+  const { getOperatingProjection } = await import('../business/operating-service');
+  const view = await getOperatingProjection(client, ctx, momentId);
+  if ('retired' in view && view.retired) return null;
+  if (facet === 'actions') {
+    return {
+      momentId,
+      businessFamily: view.familyCode,
+      source: 'OPERATING',
+      availableActions: view.quickAdds.map((action) => ({
+        actionCode: action.code,
+        label: action.label,
+        enabled: true,
+      })),
+    };
+  }
+  return { source: 'OPERATING', facet, momentId, ...view };
+}
+
 export async function getBusinessMomentProjection(
   client: PoolClient,
   ctx: RequestContext,
   momentId: string,
   facet: 'pulse' | 'life' | 'memory' | 'finance' | 'actions'
 ): Promise<Record<string, unknown>> {
+  const operating = await operatingFamilyFacet(client, ctx, momentId, facet);
+  if (operating) return operating;
+
   if (facet === 'pulse' || facet === 'finance') {
     return getBusinessPulseOrFinance(client, ctx, momentId, facet);
   }

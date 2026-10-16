@@ -72,7 +72,7 @@ struct MarketingQuickAddHub: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 18))
             HStack(spacing: 10) {
-                Image("qa_search").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
+                Image("biz_qa_search").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
                     .foregroundStyle(MarketingChrome.ink)
                 TextField("Search actions", text: $query).font(.plusJakarta(size: 14))
             }
@@ -107,12 +107,40 @@ struct MarketingQuickAddHub: View {
             if let errorText { Text(errorText).foregroundStyle(Color(hex: "#F87171")) }
         }
         .sheet(item: $sheet) { kind in
-            MarketingEventSheet(kind: kind, model: model) { draft in
-                try await onRecord(draft)
-            }
+            OperatingCaptureSheet(
+                title: kind.sheetTitle(client),
+                icon: kind.icon(client),
+                eventType: kind.eventType,
+                mode: kind.captureMode,
+                model: model,
+                channelLabel: "Channel",
+                variant: client ? "client" : "own",
+                onSubmit: { draft in
+                    try await onRecord(MarketingEventDraft(
+                        eventType: draft.eventType,
+                        title: draft.title,
+                        amount: draft.amount,
+                        note: draft.note,
+                        channelName: draft.channelName,
+                        counterpartyName: draft.counterpartyName,
+                        paymentStatus: draft.paymentStatus,
+                        occurredAt: draft.occurredAt
+                    ))
+                },
+                onDecide: onDecide
+            )
         }
         .sheet(isPresented: $approvalOpen) {
-            ApprovalList(model: model, onDecide: onDecide)
+            OperatingCaptureSheet(
+                title: "Review Approval",
+                icon: "qa_shield",
+                eventType: "APPROVAL",
+                mode: "APPROVAL",
+                model: model,
+                variant: client ? "client" : "own",
+                onSubmit: { _ in },
+                onDecide: onDecide
+            )
         }
     }
 
@@ -192,7 +220,7 @@ enum MarketingSheetKind: String, Identifiable {
     }
     func icon(_ client: Bool) -> String {
         switch self {
-        case .spend: return client ? "qa_receipt" : "qa_wallet"
+        case .spend: return client ? "qa_receipt" : "biz_qa_wallet"
         case .result: return client ? "qa_message" : "qa_budget"
         case .payment: return "qa_credit_card"
         case .collection: return "qa_arrow_left_right"
@@ -202,11 +230,47 @@ enum MarketingSheetKind: String, Identifiable {
         case .issue: return "qa_alert"
         case .approval: return "qa_shield"
         case .deliverable: return client ? "qa_clipboard" : "qa_message"
-        case .vendorCost: return client ? "qa_wallet" : "qa_network"
+        case .vendorCost: return client ? "biz_qa_wallet" : "qa_network"
         case .complete: return client ? "qa_check" : "qa_clipboard"
         case .person: return "qa_user_plus"
-        case .role: return "qa_users"
+        case .role: return "biz_qa_users"
         case .partner: return "qa_network"
+        }
+    }
+    func sheetTitle(_ client: Bool) -> String {
+        switch self {
+        case .spend: return "Add Spend / Expense"
+        case .result: return "Add Result"
+        case .payment: return "Add Payment"
+        case .collection: return client ? "Client Billing / Collection" : "Add Collection"
+        case .budget: return "Add Budget"
+        case .target: return client ? "Target Revision" : "Add Target"
+        case .update: return "Add Update"
+        case .issue: return "Add Issue"
+        case .approval: return "Request Approval"
+        case .deliverable: return "Add Deliverable / Milestone"
+        case .vendorCost: return "Add Vendor / Creator Cost"
+        case .complete: return "Mark Result / Deliverable Complete"
+        case .person, .role: return "Add or invite person"
+        case .partner, .channels: return client ? "Client / Partners / Channels" : "Partners & Channels"
+        }
+    }
+    var captureMode: String {
+        switch self {
+        case .spend: return "SPEND"
+        case .result: return "RESULT"
+        case .payment: return "PAYMENT"
+        case .collection: return "COLLECTION"
+        case .budget: return "BUDGET"
+        case .target: return "TARGET"
+        case .update, .approval: return "UPDATE"
+        case .issue: return "ISSUE"
+        case .deliverable: return "DELIVERABLE"
+        case .vendorCost: return "VENDOR"
+        case .complete: return "COMPLETE"
+        case .person: return "PERSON"
+        case .role: return "ROLE"
+        case .partner, .channels: return "PARTNER"
         }
     }
     var title: String {
@@ -260,115 +324,4 @@ enum MarketingSheetKind: String, Identifiable {
         }
     }
     static let core: [MarketingSheetKind] = [.spend, .result, .payment, .collection, .budget, .target, .update, .issue, .approval, .deliverable, .vendorCost, .complete]
-}
-
-private struct MarketingEventSheet: View {
-    let kind: MarketingSheetKind
-    let model: OperatingProjectionPayload
-    var onSubmit: (MarketingEventDraft) async throws -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var title = ""
-    @State private var amount = ""
-    @State private var channel = ""
-    @State private var party = ""
-    @State private var note = ""
-    @State private var errorText: String?
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text(kind.title).font(.plusJakarta(size: 20, weight: .semibold)).foregroundStyle(MarketingChrome.ink)
-                    Spacer()
-                    Button("Close") { dismiss() }.foregroundStyle(MarketingChrome.secondary)
-                }
-                Text("\(OperatingMomentCatalog.roles.first { $0.0 == model.role }?.1 ?? "Marketing") · \(model.title ?? "")")
-                    .font(.plusJakarta(size: 12)).foregroundStyle(MarketingChrome.secondary)
-                field("Title", text: $title, placeholder: "What happened")
-                if kind.needsAmount { field("Amount", text: $amount, placeholder: "0") }
-                if kind.needsChannel {
-                    Text("Channel").font(.plusJakarta(size: 12)).foregroundStyle(MarketingChrome.secondary)
-                    ForEach(model.life?.channels ?? [], id: \.self) { name in
-                        Button(name) { channel = name }
-                            .foregroundStyle(channel == name ? MarketingChrome.bg : MarketingChrome.secondary)
-                    }
-                }
-                if kind.needsParty { field(kind == .person || kind == .role || kind == .invite ? "Person" : "Name", text: $party, placeholder: "Name") }
-                field("Note", text: $note, placeholder: "Optional")
-                if let errorText { Text(errorText).foregroundStyle(Color(hex: "#F87171")) }
-                Button("Save") { Task { await save() } }
-                    .font(.plusJakarta(size: 15, weight: .semibold))
-                    .foregroundStyle(MarketingChrome.bg)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(MarketingChrome.brand)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .padding(16)
-        }
-        .background(MarketingChrome.bg)
-        .onAppear { channel = model.life?.channels?.first ?? "" }
-    }
-
-    private func field(_ label: String, text: Binding<String>, placeholder: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.plusJakarta(size: 12)).foregroundStyle(MarketingChrome.secondary)
-            TextField(placeholder, text: text)
-                .font(.plusJakarta(size: 14))
-                .padding(12)
-                .background(MarketingChrome.field)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-    }
-
-    private func save() async {
-        let trimmed = title.trimmingCharacters(in: .whitespaces).isEmpty ? party.trimmingCharacters(in: .whitespaces) : title.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty { errorText = "A title is required."; return }
-        if kind.needsAmount, (Double(amount) ?? 0) <= 0 { errorText = "Amount must be positive."; return }
-        do {
-            try await onSubmit(MarketingEventDraft(
-                eventType: kind.eventType,
-                title: trimmed,
-                amount: amount.isEmpty ? nil : amount,
-                note: note.isEmpty ? nil : note,
-                channelName: channel.isEmpty ? nil : channel,
-                counterpartyName: party.isEmpty ? nil : party,
-                paymentStatus: kind.paymentStatus
-            ))
-            dismiss()
-        } catch {
-            errorText = error.localizedDescription
-        }
-    }
-}
-
-private struct ApprovalList: View {
-    let model: OperatingProjectionPayload
-    var onDecide: (String, String) async throws -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Review Approval").font(.plusJakarta(size: 20, weight: .semibold)).foregroundStyle(MarketingChrome.ink)
-                Spacer()
-                Button("Close") { dismiss() }.foregroundStyle(MarketingChrome.secondary)
-            }
-            let pending = (model.attention ?? []).filter { $0.kind == "APPROVAL" }
-            if pending.isEmpty { Text("Nothing is waiting.").foregroundStyle(MarketingChrome.secondary) }
-            ForEach(pending) { item in
-                Text(item.title).foregroundStyle(MarketingChrome.ink)
-                HStack {
-                    Button("Approve") { Task { try? await onDecide(item.id, "APPROVED"); dismiss() } }
-                        .foregroundStyle(MarketingChrome.success)
-                    Button("Reject") { Task { try? await onDecide(item.id, "REJECTED"); dismiss() } }
-                        .foregroundStyle(Color(hex: "#F87171"))
-                }
-            }
-            Spacer()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(MarketingChrome.bg)
-    }
 }

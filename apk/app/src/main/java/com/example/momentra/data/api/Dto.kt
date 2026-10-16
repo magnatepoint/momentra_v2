@@ -1257,6 +1257,7 @@ data class RecordOperatingEventBody(
     val counterpartyName: String? = null,
     val channelName: String? = null,
     val paymentStatus: String? = null,
+    val occurredAt: String? = null,
 )
 
 data class RecordOperatingEventResultDto(

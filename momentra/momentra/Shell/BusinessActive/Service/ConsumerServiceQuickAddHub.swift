@@ -46,7 +46,7 @@ struct ServiceQuickAddHub: View {
             .background(ServiceChrome.notice)
             .clipShape(RoundedRectangle(cornerRadius: 18))
             HStack(spacing: 10) {
-                Image("qa_search").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
+                Image("biz_qa_search").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
                     .foregroundStyle(ServiceChrome.secondary)
                 TextField("Search actions", text: $query).font(.plusJakarta(size: 14))
             }
@@ -76,12 +76,40 @@ struct ServiceQuickAddHub: View {
             if let errorText { Text(errorText).foregroundStyle(Color(hex: "#F87171")) }
         }
         .sheet(item: $sheet) { kind in
-            ServiceEventSheet(kind: kind, model: model) { draft in
-                try await onRecord(draft)
-            }
+            OperatingCaptureSheet(
+                title: kind.title,
+                icon: kind.icon,
+                eventType: kind.eventType,
+                mode: operatingCaptureMode(eventType: kind.eventType, title: kind.title),
+                model: model,
+                channelLabel: kind == .sale ? "Sales channel" : (kind == .collection ? "Received from" : (kind == .service || kind == .appointment ? "Service channel" : "Channel")),
+                variant: "service",
+                onSubmit: { draft in
+                    try await onRecord(ServiceEventDraft(
+                        eventType: draft.eventType,
+                        title: draft.title,
+                        amount: draft.amount,
+                        note: draft.note,
+                        channelName: draft.channelName,
+                        counterpartyName: draft.counterpartyName,
+                        paymentStatus: draft.paymentStatus,
+                        occurredAt: draft.occurredAt
+                    ))
+                },
+                onDecide: onDecide
+            )
         }
         .sheet(isPresented: $approvalOpen) {
-            ApprovalList(model: model, onDecide: onDecide)
+            OperatingCaptureSheet(
+                title: "Review Approval",
+                icon: "qa_shield",
+                eventType: "APPROVAL",
+                mode: "APPROVAL",
+                model: model,
+                variant: "service",
+                onSubmit: { _ in },
+                onDecide: onDecide
+            )
         }
     }
 
@@ -167,9 +195,9 @@ enum ServiceSheetKind: String, Identifiable {
         case .budget: return "qa_budget"
         case .update: return "qa_message"
         case .issue: return "qa_alert"
-        case .reimburse: return "qa_wallet"
+        case .reimburse: return "biz_qa_wallet"
         case .person: return "qa_user_plus"
-        case .role: return "qa_users"
+        case .role: return "biz_qa_users"
         case .invite: return "qa_qr"
         case .supplier: return "qa_network"
         }
@@ -186,10 +214,8 @@ enum ServiceSheetKind: String, Identifiable {
         case .update: return "Post Update"
         case .issue: return "Report Issue"
         case .reimburse: return "Record Reimbursement"
-        case .person: return "Add person"
-        case .role: return "Role & access"
-        case .invite: return "Invite & QR"
-        case .supplier: return "Add supplier"
+        case .person, .role, .invite: return "Add or invite person"
+        case .supplier: return "Add Supplier"
         }
     }
     var eventType: String {
@@ -220,115 +246,4 @@ enum ServiceSheetKind: String, Identifiable {
         }
     }
     static let core: [ServiceSheetKind] = [.service, .appointment, .sale, .spend, .payment, .collection, .budget, .update, .issue]
-}
-
-private struct ServiceEventSheet: View {
-    let kind: ServiceSheetKind
-    let model: OperatingProjectionPayload
-    var onSubmit: (ServiceEventDraft) async throws -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var title = ""
-    @State private var amount = ""
-    @State private var channel = ""
-    @State private var party = ""
-    @State private var note = ""
-    @State private var errorText: String?
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text(kind.title).font(.plusJakarta(size: 20, weight: .semibold)).foregroundStyle(ServiceChrome.ink)
-                    Spacer()
-                    Button("Close") { dismiss() }.foregroundStyle(ServiceChrome.secondary)
-                }
-                Text("\(OperatingMomentCatalog.roles.first { $0.0 == model.role }?.1 ?? "Service") · \(model.title ?? "")")
-                    .font(.plusJakarta(size: 12)).foregroundStyle(ServiceChrome.secondary)
-                field("Title", text: $title, placeholder: "What happened")
-                if kind.needsAmount { field("Amount", text: $amount, placeholder: "0") }
-                if kind.needsChannel {
-                    Text("Channel").font(.plusJakarta(size: 12)).foregroundStyle(ServiceChrome.secondary)
-                    ForEach(model.life?.channels ?? [], id: \.self) { name in
-                        Button(name) { channel = name }
-                            .foregroundStyle(channel == name ? ServiceChrome.bg : ServiceChrome.secondary)
-                    }
-                }
-                if kind.needsParty { field(kind == .person || kind == .role || kind == .invite ? "Person" : "Name", text: $party, placeholder: "Name") }
-                field("Note", text: $note, placeholder: "Optional")
-                if let errorText { Text(errorText).foregroundStyle(Color(hex: "#F87171")) }
-                Button("Save") { Task { await save() } }
-                    .font(.plusJakarta(size: 15, weight: .semibold))
-                    .foregroundStyle(ServiceChrome.bg)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(ServiceChrome.brand)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .padding(16)
-        }
-        .background(ServiceChrome.bg)
-        .onAppear { channel = model.life?.channels?.first ?? "" }
-    }
-
-    private func field(_ label: String, text: Binding<String>, placeholder: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.plusJakarta(size: 12)).foregroundStyle(ServiceChrome.secondary)
-            TextField(placeholder, text: text)
-                .font(.plusJakarta(size: 14))
-                .padding(12)
-                .background(ServiceChrome.field)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-    }
-
-    private func save() async {
-        let trimmed = title.trimmingCharacters(in: .whitespaces).isEmpty ? party.trimmingCharacters(in: .whitespaces) : title.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty { errorText = "A title is required."; return }
-        if kind.needsAmount, (Double(amount) ?? 0) <= 0 { errorText = "Amount must be positive."; return }
-        do {
-            try await onSubmit(ServiceEventDraft(
-                eventType: kind.eventType,
-                title: trimmed,
-                amount: amount.isEmpty ? nil : amount,
-                note: note.isEmpty ? nil : note,
-                channelName: channel.isEmpty ? nil : channel,
-                counterpartyName: party.isEmpty ? nil : party,
-                paymentStatus: kind.paymentStatus
-            ))
-            dismiss()
-        } catch {
-            errorText = error.localizedDescription
-        }
-    }
-}
-
-private struct ApprovalList: View {
-    let model: OperatingProjectionPayload
-    var onDecide: (String, String) async throws -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Review Approval").font(.plusJakarta(size: 20, weight: .semibold)).foregroundStyle(ServiceChrome.ink)
-                Spacer()
-                Button("Close") { dismiss() }.foregroundStyle(ServiceChrome.secondary)
-            }
-            let pending = (model.attention ?? []).filter { $0.kind == "APPROVAL" }
-            if pending.isEmpty { Text("Nothing is waiting.").foregroundStyle(ServiceChrome.secondary) }
-            ForEach(pending) { item in
-                Text(item.title).foregroundStyle(ServiceChrome.ink)
-                HStack {
-                    Button("Approve") { Task { try? await onDecide(item.id, "APPROVED"); dismiss() } }
-                        .foregroundStyle(ServiceChrome.success)
-                    Button("Reject") { Task { try? await onDecide(item.id, "REJECTED"); dismiss() } }
-                        .foregroundStyle(Color(hex: "#F87171"))
-                }
-            }
-            Spacer()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(ServiceChrome.bg)
-    }
 }

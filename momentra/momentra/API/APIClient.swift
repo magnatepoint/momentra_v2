@@ -5208,7 +5208,8 @@ final class APIClient {
         note: String? = nil,
         channelName: String? = nil,
         counterpartyName: String? = nil,
-        paymentStatus: String? = nil
+        paymentStatus: String? = nil,
+        occurredAt: String? = nil
     ) async throws -> RecordOperatingEventResult {
         struct Body: Encodable {
             let eventType: String
@@ -5218,6 +5219,7 @@ final class APIClient {
             let channelName: String?
             let counterpartyName: String?
             let paymentStatus: String?
+            let occurredAt: String?
         }
         return try await authorizedPost(
             path: "v1/business/moments/\(momentId)/operating-events",
@@ -5228,7 +5230,8 @@ final class APIClient {
                 note: note,
                 channelName: channelName,
                 counterpartyName: counterpartyName,
-                paymentStatus: paymentStatus
+                paymentStatus: paymentStatus,
+                occurredAt: occurredAt
             ),
             idempotencyKey: UUID().uuidString
         )

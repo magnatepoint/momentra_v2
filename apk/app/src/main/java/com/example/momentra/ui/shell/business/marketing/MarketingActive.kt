@@ -62,7 +62,10 @@ fun MarketingActive(
     modifier: Modifier = Modifier,
 ) {
     var activityOpen by remember { mutableStateOf(false) }
-    Box(modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize().background(CampBg)) {
+    if (tab == OperatingTab.QUICK_ADD) {
+        MarketingQuickAddHub(model, onRecord, onDecide)
+    } else {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -76,8 +79,9 @@ fun MarketingActive(
             OperatingTab.MOMENTS -> MarketingMoments(model, onOpenQuickAdd)
             OperatingTab.LIFE -> MarketingLife(model)
             OperatingTab.MEMORY -> MarketingMemory(model)
-            OperatingTab.QUICK_ADD -> MarketingQuickAddHub(model, onRecord, onDecide)
+            OperatingTab.QUICK_ADD -> Unit
         }
+    }
     }
     if (activityOpen) {
         ActivitySheet(model, onClose = { activityOpen = false })

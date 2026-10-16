@@ -16,6 +16,7 @@ import {
   projectOperatingMoment,
   quickAddDef,
   resolveRole,
+  validateOperatingAllocation,
   type OperatingEventRow,
   type OperatingPreferences,
   type OperatingProjection,
@@ -33,6 +34,11 @@ export const recordOperatingEventSchema = z
     counterpartyName: z.string().max(200).optional(),
     channelName: z.string().max(120).optional(),
     paymentStatus: z.enum(['NONE', 'PENDING', 'READY', 'PAID', 'COLLECTED']).optional(),
+    occurredAt: z.string().datetime({ offset: true }).nullish(),
+    parentEventId: z.string().uuid().optional(),
+    quantity: amountSchema.optional(),
+    metric: z.enum(['LEADS', 'CONVERSIONS']).optional(),
+    rejectedQuantity: amountSchema.optional(),
   })
   .strict();
 
@@ -81,32 +87,45 @@ async function loadEvents(client: PoolClient, momentId: string): Promise<Operati
     submitted_by_user_id: string;
     decided_by_user_id: string | null;
     occurred_at: Date;
+    parent_event_id: string | null;
+    quantity: string | null;
+    payload: Record<string, unknown> | null;
   }>(
     `SELECT operating_event_id, event_type, title, note, amount::text, currency_code,
             counterparty_name, channel_name, payment_relevance, payment_status, approval_status,
-            submitted_by_user_id, decided_by_user_id, occurred_at
+            submitted_by_user_id, decided_by_user_id, occurred_at, parent_event_id, quantity::text,
+            payload
      FROM business.operating_event
      WHERE moment_id = $1
      ORDER BY occurred_at DESC
      LIMIT 200`,
     [momentId]
   );
-  return rows.rows.map((r) => ({
-    operatingEventId: r.operating_event_id,
-    eventType: r.event_type,
-    title: r.title,
-    note: r.note,
-    amount: r.amount,
-    currencyCode: r.currency_code,
-    counterpartyName: r.counterparty_name,
-    channelName: r.channel_name,
-    paymentRelevance: r.payment_relevance,
-    paymentStatus: r.payment_status,
-    approvalStatus: r.approval_status,
-    submittedByUserId: r.submitted_by_user_id,
-    decidedByUserId: r.decided_by_user_id,
-    occurredAt: r.occurred_at.toISOString(),
-  }));
+  return rows.rows.map((r) => {
+    const payload = r.payload ?? {};
+    const metric = payload.metric === 'LEADS' || payload.metric === 'CONVERSIONS' ? payload.metric : null;
+    const rejected = payload.rejectedQuantity;
+    return {
+      operatingEventId: r.operating_event_id,
+      eventType: r.event_type,
+      title: r.title,
+      note: r.note,
+      amount: r.amount,
+      currencyCode: r.currency_code,
+      counterpartyName: r.counterparty_name,
+      channelName: r.channel_name,
+      paymentRelevance: r.payment_relevance,
+      paymentStatus: r.payment_status,
+      approvalStatus: r.approval_status,
+      submittedByUserId: r.submitted_by_user_id,
+      decidedByUserId: r.decided_by_user_id,
+      occurredAt: r.occurred_at.toISOString(),
+      parentEventId: r.parent_event_id,
+      quantity: r.quantity,
+      metric,
+      rejectedQuantity: rejected == null || rejected === '' ? null : String(rejected),
+    };
+  });
 }
 
 function prefsOf(raw: OperatingPreferences | Record<string, unknown>): OperatingPreferences {
@@ -186,7 +205,15 @@ export async function recordOperatingEvent(
   if (!canSubmit(role, def)) {
     throw new AppError(ErrorCode.GOVERNANCE_DENIED, 'Your role cannot add this.', 403);
   }
-  if (def.needsAmount && !body.amount && def.code !== 'UPDATE') {
+  const quantityCoversAmount =
+    Boolean(body.quantity) &&
+    (def.code === 'RESULT' ||
+      def.code === 'TARGET' ||
+      def.code === 'ORDER' ||
+      def.code === 'SHIPMENT' ||
+      def.code === 'DELIVERY' ||
+      def.code === 'PRODUCTION');
+  if (def.needsAmount && !body.amount && !quantityCoversAmount && def.code !== 'UPDATE') {
     if (def.consumesBudget || def.countsTarget || def.code === 'BUDGET' || def.code === 'TARGET' || def.code === 'PAYMENT' || def.code === 'COLLECTION') {
       throw new AppError(ErrorCode.VALIDATION_FAILED, 'Amount is required.', 400);
     }
@@ -198,12 +225,35 @@ export async function recordOperatingEvent(
     paymentStatus = 'PENDING';
   }
   if (def.paymentRelevance === 'NONE') paymentStatus = 'NONE';
+  const existing = await loadEvents(client, momentId);
+  const parent = body.parentEventId
+    ? existing.find((row) => row.operatingEventId === body.parentEventId) ?? null
+    : null;
+  if (body.parentEventId && !parent) {
+    throw new AppError(ErrorCode.VALIDATION_FAILED, 'Choose a record on this moment.', 400);
+  }
+  const allocation = validateOperatingAllocation({
+    eventType: def.code,
+    parent,
+    siblings: parent ? existing.filter((row) => row.parentEventId === parent.operatingEventId) : [],
+    amount: body.amount ?? null,
+    quantity: body.quantity ?? null,
+  });
+  if (!allocation.ok) {
+    throw new AppError(ErrorCode.VALIDATION_FAILED, allocation.message, 400);
+  }
+  const payload: Record<string, string> = {};
+  if (body.metric) payload.metric = body.metric;
+  if (body.rejectedQuantity) payload.rejectedQuantity = body.rejectedQuantity;
   const inserted = await client.query<{ operating_event_id: string }>(
     `INSERT INTO business.operating_event (
        moment_id, company_id, actor_user_id, event_type, title, note, amount, currency_code,
        counterparty_name, channel_name, payment_relevance, payment_status, approval_status,
-       submitted_by_user_id
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$3)
+       submitted_by_user_id, occurred_at, parent_event_id, quantity, payload
+     ) VALUES (
+       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$3,
+       COALESCE($14::timestamptz, now()), $15, $16, $17::jsonb
+     )
      RETURNING operating_event_id`,
     [
       momentId,
@@ -219,6 +269,10 @@ export async function recordOperatingEvent(
       def.paymentRelevance,
       paymentStatus,
       approvalStatus,
+      body.occurredAt ?? null,
+      body.parentEventId ?? null,
+      body.quantity ?? null,
+      JSON.stringify(payload),
     ]
   );
   const eventId = inserted.rows[0]!.operating_event_id;

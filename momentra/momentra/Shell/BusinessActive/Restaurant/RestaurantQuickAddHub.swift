@@ -46,7 +46,7 @@ struct RestaurantQuickAddHub: View {
             .background(RestaurantChrome.notice)
             .clipShape(RoundedRectangle(cornerRadius: 18))
             HStack(spacing: 10) {
-                Image("qa_search").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
+                Image("biz_qa_search").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
                     .foregroundStyle(RestaurantChrome.secondary)
                 TextField("Search actions", text: $query).font(.plusJakarta(size: 14))
             }
@@ -76,12 +76,40 @@ struct RestaurantQuickAddHub: View {
             if let errorText { Text(errorText).foregroundStyle(Color(hex: "#F87171")) }
         }
         .sheet(item: $sheet) { kind in
-            RestaurantEventSheet(kind: kind, model: model) { draft in
-                try await onRecord(draft)
-            }
+            OperatingCaptureSheet(
+                title: kind.title,
+                icon: kind.icon,
+                eventType: kind.eventType,
+                mode: operatingCaptureMode(eventType: kind.eventType, title: kind.title),
+                model: model,
+                channelLabel: kind == .collection ? "Received from" : (kind == .sale ? "Sales channel" : "Channel"),
+                variant: "restaurant",
+                onSubmit: { draft in
+                    try await onRecord(RestaurantEventDraft(
+                        eventType: draft.eventType,
+                        title: draft.title,
+                        amount: draft.amount,
+                        note: draft.note,
+                        channelName: draft.channelName,
+                        counterpartyName: draft.counterpartyName,
+                        paymentStatus: draft.paymentStatus,
+                        occurredAt: draft.occurredAt
+                    ))
+                },
+                onDecide: onDecide
+            )
         }
         .sheet(isPresented: $approvalOpen) {
-            ApprovalList(model: model, onDecide: onDecide)
+            OperatingCaptureSheet(
+                title: "Review Approval",
+                icon: "qa_shield",
+                eventType: "APPROVAL",
+                mode: "APPROVAL",
+                model: model,
+                variant: "restaurant",
+                onSubmit: { _ in },
+                onDecide: onDecide
+            )
         }
     }
 
@@ -137,7 +165,7 @@ struct RestaurantQuickAddHub: View {
 }
 
 enum RestaurantSheetKind: String, Identifiable {
-    case sale, purchase, spend, payment, collection, budget, update, issue, stock, reimburse, person, role, invite, supplier
+    case sale, purchase, spend, payment, collection, budget, update, issue, order, reimburse, person, role, invite, supplier
     var id: String { rawValue }
     var label: String {
         switch self {
@@ -149,7 +177,7 @@ enum RestaurantSheetKind: String, Identifiable {
         case .budget: return "Budget"
         case .update: return "Update"
         case .issue: return "Issue"
-        case .stock: return "Stock Update"
+        case .order: return "Order Update"
         case .reimburse: return "Reimbursement"
         case .person: return "Add person"
         case .role: return "Role & access"
@@ -160,15 +188,15 @@ enum RestaurantSheetKind: String, Identifiable {
     var icon: String {
         switch self {
         case .sale, .spend: return "qa_receipt"
-        case .purchase: return "qa_wallet"
+        case .purchase: return "biz_qa_wallet"
         case .payment, .reimburse: return "qa_credit_card"
         case .collection: return "qa_arrow_left_right"
         case .budget: return "qa_budget"
         case .update: return "qa_message"
         case .issue: return "qa_alert"
-        case .stock: return "qa_clipboard"
+        case .order: return "qa_clipboard"
         case .person: return "qa_user_plus"
-        case .role: return "qa_users"
+        case .role: return "biz_qa_users"
         case .invite: return "qa_qr"
         case .supplier: return "qa_network"
         }
@@ -183,12 +211,10 @@ enum RestaurantSheetKind: String, Identifiable {
         case .budget: return "Revise Budget"
         case .update: return "Post Update"
         case .issue: return "Report Issue"
-        case .stock: return "Stock Update"
+        case .order: return "Order Update"
         case .reimburse: return "Record Reimbursement"
-        case .person: return "Add person"
-        case .role: return "Role & access"
-        case .invite: return "Invite & QR"
-        case .supplier: return "Add supplier"
+        case .person, .role, .invite: return "Add or invite person"
+        case .supplier: return "Add Supplier"
         }
     }
     var eventType: String {
@@ -200,13 +226,13 @@ enum RestaurantSheetKind: String, Identifiable {
         case .collection: return "COLLECTION"
         case .budget: return "BUDGET"
         case .issue: return "ISSUE"
-        case .stock: return "STOCK"
+        case .order: return "ORDER"
         default: return "UPDATE"
         }
     }
     var needsAmount: Bool {
         switch self {
-        case .update, .issue, .stock, .person, .role, .invite, .supplier: return false
+        case .update, .issue, .order, .person, .role, .invite, .supplier: return false
         default: return true
         }
     }
@@ -218,116 +244,5 @@ enum RestaurantSheetKind: String, Identifiable {
         default: return nil
         }
     }
-    static let core: [RestaurantSheetKind] = [.sale, .purchase, .spend, .payment, .collection, .update, .issue, .stock, .supplier]
-}
-
-private struct RestaurantEventSheet: View {
-    let kind: RestaurantSheetKind
-    let model: OperatingProjectionPayload
-    var onSubmit: (RestaurantEventDraft) async throws -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var title = ""
-    @State private var amount = ""
-    @State private var channel = ""
-    @State private var party = ""
-    @State private var note = ""
-    @State private var errorText: String?
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text(kind.title).font(.plusJakarta(size: 20, weight: .semibold)).foregroundStyle(RestaurantChrome.ink)
-                    Spacer()
-                    Button("Close") { dismiss() }.foregroundStyle(RestaurantChrome.secondary)
-                }
-                Text("\(OperatingMomentCatalog.roles.first { $0.0 == model.role }?.1 ?? "Restaurant") · \(model.title ?? "")")
-                    .font(.plusJakarta(size: 12)).foregroundStyle(RestaurantChrome.secondary)
-                field("Title", text: $title, placeholder: "What happened")
-                if kind.needsAmount { field("Amount", text: $amount, placeholder: "0") }
-                if kind.needsChannel {
-                    Text("Channel").font(.plusJakarta(size: 12)).foregroundStyle(RestaurantChrome.secondary)
-                    ForEach(model.life?.channels ?? [], id: \.self) { name in
-                        Button(name) { channel = name }
-                            .foregroundStyle(channel == name ? RestaurantChrome.bg : RestaurantChrome.secondary)
-                    }
-                }
-                if kind.needsParty { field(kind == .person || kind == .role || kind == .invite ? "Person" : "Name", text: $party, placeholder: "Name") }
-                field("Note", text: $note, placeholder: "Optional")
-                if let errorText { Text(errorText).foregroundStyle(Color(hex: "#F87171")) }
-                Button("Save") { Task { await save() } }
-                    .font(.plusJakarta(size: 15, weight: .semibold))
-                    .foregroundStyle(RestaurantChrome.bg)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(RestaurantChrome.brand)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .padding(16)
-        }
-        .background(RestaurantChrome.bg)
-        .onAppear { channel = model.life?.channels?.first ?? "" }
-    }
-
-    private func field(_ label: String, text: Binding<String>, placeholder: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.plusJakarta(size: 12)).foregroundStyle(RestaurantChrome.secondary)
-            TextField(placeholder, text: text)
-                .font(.plusJakarta(size: 14))
-                .padding(12)
-                .background(RestaurantChrome.field)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-    }
-
-    private func save() async {
-        let trimmed = title.trimmingCharacters(in: .whitespaces).isEmpty ? party.trimmingCharacters(in: .whitespaces) : title.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty { errorText = "A title is required."; return }
-        if kind.needsAmount, (Double(amount) ?? 0) <= 0 { errorText = "Amount must be positive."; return }
-        do {
-            try await onSubmit(RestaurantEventDraft(
-                eventType: kind.eventType,
-                title: trimmed,
-                amount: amount.isEmpty ? nil : amount,
-                note: note.isEmpty ? nil : note,
-                channelName: channel.isEmpty ? nil : channel,
-                counterpartyName: party.isEmpty ? nil : party,
-                paymentStatus: kind.paymentStatus
-            ))
-            dismiss()
-        } catch {
-            errorText = error.localizedDescription
-        }
-    }
-}
-
-private struct ApprovalList: View {
-    let model: OperatingProjectionPayload
-    var onDecide: (String, String) async throws -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Review Approval").font(.plusJakarta(size: 20, weight: .semibold)).foregroundStyle(RestaurantChrome.ink)
-                Spacer()
-                Button("Close") { dismiss() }.foregroundStyle(RestaurantChrome.secondary)
-            }
-            let pending = (model.attention ?? []).filter { $0.kind == "APPROVAL" }
-            if pending.isEmpty { Text("Nothing is waiting.").foregroundStyle(RestaurantChrome.secondary) }
-            ForEach(pending) { item in
-                Text(item.title).foregroundStyle(RestaurantChrome.ink)
-                HStack {
-                    Button("Approve") { Task { try? await onDecide(item.id, "APPROVED"); dismiss() } }
-                        .foregroundStyle(RestaurantChrome.success)
-                    Button("Reject") { Task { try? await onDecide(item.id, "REJECTED"); dismiss() } }
-                        .foregroundStyle(Color(hex: "#F87171"))
-                }
-            }
-            Spacer()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(RestaurantChrome.bg)
-    }
+    static let core: [RestaurantSheetKind] = [.sale, .purchase, .spend, .payment, .collection, .update, .issue, .order, .supplier]
 }

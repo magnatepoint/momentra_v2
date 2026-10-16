@@ -159,7 +159,8 @@ struct OperatingMomentPage: View {
                             note: draft.note,
                             channelName: draft.channelName,
                             counterpartyName: draft.counterpartyName,
-                            paymentStatus: draft.paymentStatus
+                            paymentStatus: draft.paymentStatus,
+                            occurredAt: draft.occurredAt
                         )
                         tick += 1
                     },
@@ -184,7 +185,8 @@ struct OperatingMomentPage: View {
                             note: draft.note,
                             channelName: draft.channelName,
                             counterpartyName: draft.counterpartyName,
-                            paymentStatus: draft.paymentStatus
+                            paymentStatus: draft.paymentStatus,
+                            occurredAt: draft.occurredAt
                         )
                         tick += 1
                     },
@@ -209,7 +211,8 @@ struct OperatingMomentPage: View {
                             note: draft.note,
                             channelName: draft.channelName,
                             counterpartyName: draft.counterpartyName,
-                            paymentStatus: draft.paymentStatus
+                            paymentStatus: draft.paymentStatus,
+                            occurredAt: draft.occurredAt
                         )
                         tick += 1
                     },
@@ -234,7 +237,8 @@ struct OperatingMomentPage: View {
                             note: draft.note,
                             channelName: draft.channelName,
                             counterpartyName: draft.counterpartyName,
-                            paymentStatus: draft.paymentStatus
+                            paymentStatus: draft.paymentStatus,
+                            occurredAt: draft.occurredAt
                         )
                         tick += 1
                     },
@@ -259,7 +263,8 @@ struct OperatingMomentPage: View {
                             note: draft.note,
                             channelName: draft.channelName,
                             counterpartyName: draft.counterpartyName,
-                            paymentStatus: draft.paymentStatus
+                            paymentStatus: draft.paymentStatus,
+                            occurredAt: draft.occurredAt
                         )
                         tick += 1
                     },
@@ -284,7 +289,8 @@ struct OperatingMomentPage: View {
                             note: draft.note,
                             channelName: draft.channelName,
                             counterpartyName: draft.counterpartyName,
-                            paymentStatus: draft.paymentStatus
+                            paymentStatus: draft.paymentStatus,
+                            occurredAt: draft.occurredAt
                         )
                         tick += 1
                     },
@@ -309,7 +315,8 @@ struct OperatingMomentPage: View {
                             note: draft.note,
                             channelName: draft.channelName,
                             counterpartyName: draft.counterpartyName,
-                            paymentStatus: draft.paymentStatus
+                            paymentStatus: draft.paymentStatus,
+                            occurredAt: draft.occurredAt
                         )
                         tick += 1
                     },
