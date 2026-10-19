@@ -84,6 +84,7 @@ fun TradingActive(
     if (activityOpen) {
         ActivitySheet(model, onClose = { activityOpen = false })
     }
+    com.example.momentra.ui.shell.business.shared.OperatingChromeSheets(model)
     }
 }
 
@@ -111,15 +112,26 @@ private fun TradingPulse(model: OperatingProjectionDto, onViewAll: () -> Unit) {
             TradeCard {
                 Text(item.kind, color = TradeAccent, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
                 Text(item.title, color = TradeInk, fontFamily = PlusJakartaSans, fontSize = 15.sp)
+
+                if (item.id.startsWith("open-")) {
+                    val payment = model.paymentReadiness.firstOrNull { it.id == item.id.removePrefix("open-") }
+                    if (payment != null) {
+                        Text(
+                            "Open",
+                            color = Color.White,
+                            fontFamily = PlusJakartaSans,
+                            fontSize = 13.sp,
+                            modifier = Modifier.clickable { com.example.momentra.ui.shell.business.shared.OperatingChromeState.settling = payment },
+                        )
+                    }
+                }
             }
         }
         SectionTitle("Payment Readiness")
-        val ready = model.paymentReadiness.filter { it.status == "READY" }
-        val expected = model.paymentReadiness.filter { it.status == "PENDING" }
-        ReadinessGroup("Ready", ready, model)
-        ReadinessGroup("Expected", expected, model)
-        val held = model.paymentReadiness.filter { it.status != "READY" && it.status != "PENDING" }
-        if (held.isNotEmpty()) ReadinessGroup("Not ready", held, model)
+        val toCollect = model.paymentReadiness.filter { it.relevance == "RECEIVABLE" }
+        val toPay = model.paymentReadiness.filter { it.relevance != "RECEIVABLE" }
+        ReadinessGroup("To collect", toCollect, model)
+        ReadinessGroup("To pay", toPay, model)
         if (model.paymentReadiness.isEmpty()) {
             TradeCard { Text("No open payments or collections.", color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 14.sp) }
         }
@@ -128,9 +140,10 @@ private fun TradingPulse(model: OperatingProjectionDto, onViewAll: () -> Unit) {
             val finance = model.finance
             Line("Recorded sales", money(model, finance?.sales), TradeAccent)
             Line("Received", money(model, finance?.received), TradeSuccess)
-            Line("Outstanding", money(model, finance?.outstanding), Color(0xFFFBBF24))
+            Line("Still to collect", money(model, finance?.outstanding), Color(0xFFFBBF24))
             Line("Eligible cost", money(model, finance?.eligibleCost), TradeInk)
             Line("Business cash paid", money(model, finance?.cashPaid), TradeInk)
+            Line("Still to pay", money(model, finance?.payable), Color(0xFFFBBF24))
         }
     } else {
         StaffPulse(model)
@@ -140,7 +153,7 @@ private fun TradingPulse(model: OperatingProjectionDto, onViewAll: () -> Unit) {
     if (recent.isEmpty()) {
         TradeCard { Text("Nothing recorded yet.", color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 14.sp) }
     }
-    recent.forEach { ActivityRow(it, model.financeVisible) }
+    recent.forEach { ActivityRow(it, model) }
     Text(
         "View all activity",
         color = TradeAccent,
@@ -191,7 +204,7 @@ private fun TradingMoments(model: OperatingProjectionDto, onOpenQuickAdd: () -> 
         Meter("Sales toward target", fraction(model.target?.progress, model.target?.value), TradeBrand)
     }
     (model.boards?.moments ?: emptyList()).forEach { section ->
-        BoardBlock(section, model.financeVisible)
+        BoardBlock(section, model)
     }
     TradeCard {
         Text("Create the next trading moment", color = TradeInk, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
@@ -212,7 +225,7 @@ private fun TradingMoments(model: OperatingProjectionDto, onOpenQuickAdd: () -> 
 @Composable
 private fun TradingLife(model: OperatingProjectionDto) {
     Header(model, "Life", "How the trade is moving today.")
-    (model.boards?.life ?: emptyList()).forEach { BoardBlock(it, model.financeVisible) }
+    (model.boards?.life ?: emptyList()).forEach { BoardBlock(it, model) }
     if (model.boards?.life.isNullOrEmpty()) {
         TradeCard { Text("Nothing recorded yet.", color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 14.sp) }
     }
@@ -225,7 +238,7 @@ private fun TradingMemory(model: OperatingProjectionDto) {
         Pill(periodLabel(model.startDate))
         Pill("Current")
     }
-    (model.boards?.memory ?: emptyList()).forEach { BoardBlock(it, model.financeVisible) }
+    (model.boards?.memory ?: emptyList()).forEach { BoardBlock(it, model) }
 }
 
 @Composable
@@ -255,7 +268,7 @@ private fun ActivitySheet(model: OperatingProjectionDto, onClose: () -> Unit) {
             if (model.activity.isEmpty()) {
                 Text("Nothing recorded yet.", color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 14.sp)
             }
-            model.activity.forEach { ActivityRow(it, model.financeVisible) }
+            model.activity.forEach { ActivityRow(it, model) }
         }
     }
 }
@@ -267,21 +280,21 @@ private fun Header(model: OperatingProjectionDto, title: String, body: String) {
         Pill(roleLabel(model.role))
     }
     Text(body, color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 14.sp)
-    Text(snapshot(model.startDate), color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
+    Text(snapshot(model.startDate, model.endDate), color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
 }
 
 @Composable
-private fun BoardBlock(section: OperatingBoardSectionDto, financeVisible: Boolean) {
+private fun BoardBlock(section: OperatingBoardSectionDto, model: OperatingProjectionDto) {
     SectionTitle(section.title)
     TradeCard {
-        Text(section.detail.ifBlank { "Nothing recorded yet." }, color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
+        Text(com.example.momentra.ui.shell.business.shared.formatOperatingDetail(section.detail.ifBlank { "Nothing recorded yet." }, model.currency), color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
         section.rows.forEach { row ->
             Column(Modifier.padding(vertical = 6.dp)) {
                 Text(row.title, color = TradeInk, fontFamily = PlusJakartaSans, fontSize = 14.sp)
                 val extra = listOfNotNull(row.channelName, row.counterpartyName, row.paymentStatus?.takeIf { it != "NONE" }).joinToString(" · ")
                 if (extra.isNotBlank()) Text(extra, color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
-                if (financeVisible && !row.amount.isNullOrBlank()) {
-                    Text(row.amount, color = TradeAccent, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                if (model.financeVisible && !row.amount.isNullOrBlank()) {
+                    Text(com.example.momentra.ui.shell.business.shared.formatOperatingAmount(model.currency, row.amount, true), color = TradeAccent, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 }
             }
         }
@@ -289,14 +302,25 @@ private fun BoardBlock(section: OperatingBoardSectionDto, financeVisible: Boolea
 }
 
 @Composable
-private fun ActivityRow(row: OperatingActivityDto, financeVisible: Boolean) {
+private fun ActivityRow(row: OperatingActivityDto, model: OperatingProjectionDto) {
     TradeCard {
         Text(row.eventType.replace('_', ' '), color = TradeAccent, fontFamily = PlusJakartaSans, fontSize = 11.sp)
         Text(row.title, color = TradeInk, fontFamily = PlusJakartaSans, fontSize = 14.sp)
+        val qty = listOfNotNull(row.quantity, row.unit).filter { it.isNotBlank() }.joinToString(" ")
         val bits = listOfNotNull(
-            row.channelName,
             row.counterpartyName,
-            if (financeVisible) row.amount else null,
+            qty.ifBlank { null },
+            row.paymentStatus?.takeIf { it != "NONE" },
+            row.occurredAt.take(10).ifBlank { null },
+            if (model.financeVisible) com.example.momentra.ui.shell.business.shared.formatOperatingAmount(model.currency, row.amount, true).takeIf { it != "—" } else null,
+        )
+        Text(
+            "Edit",
+            color = Color.White,
+            fontFamily = PlusJakartaSans,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            fontSize = 13.sp,
+            modifier = Modifier.clickable { com.example.momentra.ui.shell.business.shared.OperatingChromeState.editing = row },
         )
         if (bits.isNotEmpty()) Text(bits.joinToString(" · "), color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
     }
@@ -308,8 +332,11 @@ private fun ReadinessGroup(label: String, rows: List<com.example.momentra.data.a
     TradeCard {
         Text(label, color = TradeAccent, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
         rows.forEach { item ->
-            Line(item.title, money(model, item.amount), TradeInk)
-            Text(item.status, color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
+            Column(Modifier.clickable { com.example.momentra.ui.shell.business.shared.OperatingChromeState.settling = item }) {
+                Line(item.title, money(model, item.amount), TradeInk)
+                val meta = listOfNotNull(item.counterpartyName, item.dueAt?.take(10)).filter { it.isNotBlank() }.joinToString(" · ")
+                if (meta.isNotBlank()) Text(meta, color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
+            }
         }
     }
 }
@@ -385,11 +412,8 @@ private fun Line(label: String, value: String, color: Color) {
 private fun roleLabel(code: String?): String =
     OperatingMomentCatalog.roles.firstOrNull { it.first == code }?.second ?: "Trading"
 
-private fun money(model: OperatingProjectionDto, raw: String?): String {
-    if (!model.financeVisible || raw.isNullOrBlank()) return "—"
-    val number = raw.toBigDecimalOrNull()?.stripTrailingZeros()?.toPlainString() ?: raw
-    return if (model.currency == "INR" || model.currency.isNullOrBlank()) "₹$number" else "${model.currency} $number"
-}
+private fun money(model: OperatingProjectionDto, raw: String?): String =
+    com.example.momentra.ui.shell.business.shared.formatOperatingAmount(model.currency, raw, model.financeVisible)
 
 private fun fraction(part: String?, whole: String?): Float {
     val p = part?.toFloatOrNull() ?: return 0f
@@ -399,12 +423,13 @@ private fun fraction(part: String?, whole: String?): Float {
 }
 
 private fun periodLabel(start: String?): String {
-    val date = start?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() } ?: LocalDate.now()
-    return date.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH))
+    val date = start?.let { runCatching { java.time.LocalDate.parse(it.take(10)) }.getOrNull() } ?: java.time.LocalDate.now()
+    return date.format(java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy", java.util.Locale.ENGLISH))
 }
 
-private fun snapshot(start: String?): String {
-    val today = LocalDate.now().format(dayFormat)
+private fun snapshot(start: String?, end: String? = null): String {
+    val today = java.time.LocalDate.now().format(dayFormat)
     val from = start?.take(10)?.ifBlank { null } ?: today
-    return "Snapshot · from $from · $today"
+    val until = end?.take(10)?.ifBlank { null }
+    return if (until != null) "Snapshot · $from – $until" else "Snapshot · from $from · $today"
 }

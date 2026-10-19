@@ -9,6 +9,7 @@ struct ServiceQuickAddHub: View {
     @State private var sheet: ServiceSheetKind?
     @State private var approvalOpen = false
     @State private var errorText: String?
+    @State private var mastersOpen = false
 
     private var allowed: Set<String> { Set((model.quickAdds ?? []).map(\.code)) }
     private var owner: Bool { model.role == "OWNER_ADMIN" }
@@ -71,9 +72,39 @@ struct ServiceQuickAddHub: View {
                     }
                 }
             }
+            Button("Masters") { mastersOpen = true }.font(.plusJakarta(size: 15, weight: .semibold))
             Text("Support & management").font(.plusJakarta(size: 12)).foregroundStyle(ServiceChrome.secondary)
             supportGrid
             if let errorText { Text(errorText).foregroundStyle(Color(hex: "#F87171")) }
+        }
+        .sheet(isPresented: $mastersOpen) {
+            OperatingCaptureSheet(
+                title: "Masters",
+                icon: "qa_shield",
+                eventType: "UPDATE",
+                mode: "MASTERS",
+                model: model,
+                onSubmit: { draft in
+                    try await onRecord(ServiceEventDraft(
+                        eventType: draft.eventType,
+                        title: draft.title,
+                        amount: draft.amount,
+                        note: draft.note,
+                        channelName: draft.channelName,
+                        counterpartyName: draft.counterpartyName,
+                        paymentStatus: draft.paymentStatus,
+                        occurredAt: draft.occurredAt,
+                        quantity: draft.quantity,
+                        unit: draft.unit,
+                        unitPrice: draft.unitPrice,
+                        itemName: draft.itemName,
+                        parentEventId: draft.parentEventId,
+                        revisesEventId: draft.revisesEventId,
+                        masterKind: draft.masterKind
+                    ))
+                },
+                onDecide: onDecide
+            )
         }
         .sheet(item: $sheet) { kind in
             OperatingCaptureSheet(
@@ -93,7 +124,14 @@ struct ServiceQuickAddHub: View {
                         channelName: draft.channelName,
                         counterpartyName: draft.counterpartyName,
                         paymentStatus: draft.paymentStatus,
-                        occurredAt: draft.occurredAt
+                        occurredAt: draft.occurredAt,
+                        quantity: draft.quantity,
+                        unit: draft.unit,
+                        unitPrice: draft.unitPrice,
+                        itemName: draft.itemName,
+                        parentEventId: draft.parentEventId,
+                        revisesEventId: draft.revisesEventId,
+                        masterKind: draft.masterKind
                     ))
                 },
                 onDecide: onDecide

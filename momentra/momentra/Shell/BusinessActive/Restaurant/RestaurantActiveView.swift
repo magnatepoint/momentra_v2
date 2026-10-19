@@ -48,19 +48,23 @@ struct RestaurantActiveView: View {
                     card {
                         Text(item.kind).font(.plusJakarta(size: 11, weight: .semibold)).foregroundStyle(RestaurantChrome.accent)
                         Text(item.title).foregroundStyle(RestaurantChrome.ink)
+                        if item.id.hasPrefix("open-"), let payment = (model.paymentReadiness ?? []).first(where: { $0.id == String(item.id.dropFirst(5)) }) {
+                            Button("Open") { OperatingChromeState.shared.settling = payment }
+                                .font(.plusJakarta(size: 13, weight: .semibold))
+                        }
                     }
                 }
                 sectionTitle("Payment Readiness")
-                readiness("Ready", (model.paymentReadiness ?? []).filter { $0.status == "READY" })
-                readiness("Expected", (model.paymentReadiness ?? []).filter { $0.status == "PENDING" })
-                readiness("Not ready", (model.paymentReadiness ?? []).filter { $0.status != "READY" && $0.status != "PENDING" })
+                readiness("To collect", (model.paymentReadiness ?? []).filter { $0.relevance == "RECEIVABLE" })
+                readiness("To pay", (model.paymentReadiness ?? []).filter { $0.relevance != "RECEIVABLE" })
                 sectionTitle("Finance")
                 card {
                     line("Recorded sales", money(model.finance?.sales), RestaurantChrome.accent)
                     line("Received", money(model.finance?.received), RestaurantChrome.success)
-                    line("Outstanding", money(model.finance?.outstanding), Color(hex: "#FBBF24"))
+                    line("Still to collect", money(model.finance?.outstanding), Color(hex: "#FBBF24"))
                     line("Eligible cost", money(model.finance?.eligibleCost), RestaurantChrome.ink)
                     line("Business cash paid", money(model.finance?.cashPaid), RestaurantChrome.ink)
+                    line("Still to pay", money(model.finance?.payable), Color(hex: "#FBBF24"))
                 }
             } else {
                 card {
@@ -171,7 +175,7 @@ struct RestaurantActiveView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionTitle(section.title)
             card {
-                Text(section.detail.isEmpty ? "Nothing recorded yet." : section.detail)
+                Text(section.detail.isEmpty ? "Nothing recorded yet." : formatOperatingDetail(section.detail, currency: model.currency))
                     .font(.plusJakarta(size: 12)).foregroundStyle(RestaurantChrome.secondary)
                 ForEach(section.rows ?? []) { row in
                     VStack(alignment: .leading, spacing: 2) {
@@ -181,7 +185,7 @@ struct RestaurantActiveView: View {
                             Text(extra.joined(separator: " · ")).font(.plusJakarta(size: 12)).foregroundStyle(RestaurantChrome.secondary)
                         }
                         if model.financeVisible == true, let amount = row.amount, !amount.isEmpty {
-                            Text(amount).font(.plusJakarta(size: 13, weight: .semibold)).foregroundStyle(RestaurantChrome.accent)
+                            Text(money(amount)).font(.plusJakarta(size: 13, weight: .semibold)).foregroundStyle(RestaurantChrome.accent)
                         }
                     }
                 }
@@ -194,10 +198,13 @@ struct RestaurantActiveView: View {
             Text(row.eventType.replacingOccurrences(of: "_", with: " "))
                 .font(.plusJakarta(size: 11)).foregroundStyle(RestaurantChrome.accent)
             Text(row.title).foregroundStyle(RestaurantChrome.ink)
-            let bits = [row.channelName, row.counterpartyName, model.financeVisible == true ? row.amount : nil].compactMap { $0 }
+            let qty = [row.quantity, row.unit].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
+            let bits = [row.counterpartyName, qty.isEmpty ? nil : qty, row.paymentStatus == "NONE" ? nil : row.paymentStatus, String(row.occurredAt.prefix(10)), model.financeVisible == true ? money(row.amount) : nil].compactMap { $0 }.filter { !$0.isEmpty && $0 != "—" }
             if !bits.isEmpty {
                 Text(bits.joined(separator: " · ")).font(.plusJakarta(size: 12)).foregroundStyle(RestaurantChrome.secondary)
             }
+            Button("Edit") { OperatingChromeState.shared.editing = row }
+                .font(.plusJakarta(size: 13, weight: .semibold))
         }
     }
 
@@ -206,7 +213,14 @@ struct RestaurantActiveView: View {
             card {
                 Text(label).font(.plusJakarta(size: 12, weight: .semibold)).foregroundStyle(RestaurantChrome.accent)
                 ForEach(rows) { item in
-                    line(item.title, money(item.amount), RestaurantChrome.ink)
+                    Button { OperatingChromeState.shared.settling = item } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            line(item.title, money(item.amount), RestaurantChrome.ink)
+                            Text([item.counterpartyName, item.dueAt.map { String($0.prefix(10)) }].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                                .font(.plusJakarta(size: 12))
+                        }
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -286,13 +300,13 @@ struct RestaurantActiveView: View {
         today.locale = Locale(identifier: "en_US_POSIX")
         today.dateFormat = "dd MMM yyyy"
         let from = model.startDate?.prefix(10).description
+        let until = model.endDate?.prefix(10).description
+        if let until, !until.isEmpty { return "Snapshot · \(from?.isEmpty == false ? from! : today.string(from: Date())) – \(until)" }
         return "Snapshot · from \(from?.isEmpty == false ? from! : today.string(from: Date())) · \(today.string(from: Date()))"
     }
 
     private func money(_ raw: String?) -> String {
-        guard model.financeVisible == true, let raw, !raw.isEmpty else { return "—" }
-        let number = raw.split(separator: ".").first.map(String.init) ?? raw
-        return (model.currency ?? "INR") == "INR" ? "₹\(number)" : "\(model.currency ?? "") \(number)"
+        formatOperatingAmount(raw, currency: model.currency, visible: model.financeVisible == true)
     }
 
     private func fraction(_ part: String?, _ whole: String?) -> Double {
@@ -328,4 +342,11 @@ struct RestaurantEventDraft {
     var counterpartyName: String?
     var paymentStatus: String?
     var occurredAt: String? = nil
+    var quantity: String? = nil
+    var unit: String? = nil
+    var unitPrice: String? = nil
+    var itemName: String? = nil
+    var parentEventId: String? = nil
+    var revisesEventId: String? = nil
+    var masterKind: String? = nil
 }

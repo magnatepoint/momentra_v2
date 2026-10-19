@@ -115,6 +115,7 @@ struct OperatingMomentPage: View {
     @State private var projection: OperatingProjectionPayload?
     @State private var errorText: String?
     @State private var tick = 0
+    @ObservedObject private var chrome = OperatingChromeState.shared
 
     var body: some View {
         Group {
@@ -127,6 +128,93 @@ struct OperatingMomentPage: View {
             }
         }
         .task(id: "\(momentId ?? "")-\(refreshToken)-\(tick)") { await load() }
+        .sheet(item: Binding(get: { chrome.editing }, set: { chrome.editing = $0 })) { row in
+            if let projection {
+                OperatingCaptureSheet(
+                    title: "Edit activity",
+                    icon: "qa_message",
+                    eventType: row.eventType,
+                    mode: row.eventType,
+                    model: projection,
+                    seed: row,
+                    onSubmit: { draft in
+                        guard let momentId else { return }
+                        _ = try await APIClient.shared.recordOperatingEvent(
+                            momentId: momentId,
+                            eventType: draft.eventType,
+                            title: draft.title,
+                            amount: draft.amount,
+                            note: draft.note,
+                            channelName: draft.channelName,
+                            counterpartyName: draft.counterpartyName,
+                            paymentStatus: draft.paymentStatus,
+                            occurredAt: draft.occurredAt,
+                            parentEventId: draft.parentEventId,
+                            quantity: draft.quantity,
+                            unit: draft.unit,
+                            itemName: draft.itemName,
+                            unitPrice: draft.unitPrice,
+                            masterKind: draft.masterKind,
+                            revisesEventId: row.id
+                        )
+                        chrome.editing = nil
+                        tick += 1
+                    }
+                )
+            }
+        }
+        .background {
+            Color.clear.sheet(item: Binding(get: { chrome.settling }, set: { chrome.settling = $0 })) { row in
+            if let projection {
+                let collect = row.relevance == "RECEIVABLE"
+                OperatingCaptureSheet(
+                    title: collect ? "Record Collection" : "Record Payment",
+                    icon: "qa_shield",
+                    eventType: collect ? "COLLECTION" : "PAYMENT",
+                    mode: collect ? "COLLECTION" : "PAYMENT",
+                    model: projection,
+                    seed: OperatingActivityPayload(
+                        id: "",
+                        title: row.title,
+                        eventType: collect ? "COLLECTION" : "PAYMENT",
+                        occurredAt: "",
+                        amount: row.amount,
+                        channelName: nil,
+                        counterpartyName: row.counterpartyName,
+                        paymentStatus: nil,
+                        approvalStatus: nil,
+                        note: nil,
+                        quantity: nil,
+                        unit: nil,
+                        parentEventId: row.id
+                    ),
+                    onSubmit: { draft in
+                        guard let momentId else { return }
+                        _ = try await APIClient.shared.recordOperatingEvent(
+                            momentId: momentId,
+                            eventType: draft.eventType,
+                            title: draft.title,
+                            amount: draft.amount,
+                            note: draft.note,
+                            channelName: draft.channelName,
+                            counterpartyName: draft.counterpartyName,
+                            paymentStatus: draft.paymentStatus,
+                            occurredAt: draft.occurredAt,
+                            parentEventId: draft.parentEventId ?? row.id,
+                            quantity: draft.quantity,
+                            unit: draft.unit,
+                            itemName: draft.itemName,
+                            unitPrice: draft.unitPrice,
+                            masterKind: draft.masterKind,
+                            revisesEventId: nil
+                        )
+                        chrome.settling = nil
+                        tick += 1
+                    }
+                )
+            }
+            }
+        }
     }
 
     private var retired: some View {
@@ -160,7 +248,14 @@ struct OperatingMomentPage: View {
                             channelName: draft.channelName,
                             counterpartyName: draft.counterpartyName,
                             paymentStatus: draft.paymentStatus,
-                            occurredAt: draft.occurredAt
+                            occurredAt: draft.occurredAt,
+                            parentEventId: draft.parentEventId,
+                            quantity: draft.quantity,
+                            unit: draft.unit,
+                            itemName: draft.itemName,
+                            unitPrice: draft.unitPrice,
+                            masterKind: draft.masterKind,
+                            revisesEventId: draft.revisesEventId
                         )
                         tick += 1
                     },
@@ -186,7 +281,14 @@ struct OperatingMomentPage: View {
                             channelName: draft.channelName,
                             counterpartyName: draft.counterpartyName,
                             paymentStatus: draft.paymentStatus,
-                            occurredAt: draft.occurredAt
+                            occurredAt: draft.occurredAt,
+                            parentEventId: draft.parentEventId,
+                            quantity: draft.quantity,
+                            unit: draft.unit,
+                            itemName: draft.itemName,
+                            unitPrice: draft.unitPrice,
+                            masterKind: draft.masterKind,
+                            revisesEventId: draft.revisesEventId
                         )
                         tick += 1
                     },
@@ -212,7 +314,14 @@ struct OperatingMomentPage: View {
                             channelName: draft.channelName,
                             counterpartyName: draft.counterpartyName,
                             paymentStatus: draft.paymentStatus,
-                            occurredAt: draft.occurredAt
+                            occurredAt: draft.occurredAt,
+                            parentEventId: draft.parentEventId,
+                            quantity: draft.quantity,
+                            unit: draft.unit,
+                            itemName: draft.itemName,
+                            unitPrice: draft.unitPrice,
+                            masterKind: draft.masterKind,
+                            revisesEventId: draft.revisesEventId
                         )
                         tick += 1
                     },
@@ -238,7 +347,14 @@ struct OperatingMomentPage: View {
                             channelName: draft.channelName,
                             counterpartyName: draft.counterpartyName,
                             paymentStatus: draft.paymentStatus,
-                            occurredAt: draft.occurredAt
+                            occurredAt: draft.occurredAt,
+                            parentEventId: draft.parentEventId,
+                            quantity: draft.quantity,
+                            unit: draft.unit,
+                            itemName: draft.itemName,
+                            unitPrice: draft.unitPrice,
+                            masterKind: draft.masterKind,
+                            revisesEventId: draft.revisesEventId
                         )
                         tick += 1
                     },
@@ -264,7 +380,14 @@ struct OperatingMomentPage: View {
                             channelName: draft.channelName,
                             counterpartyName: draft.counterpartyName,
                             paymentStatus: draft.paymentStatus,
-                            occurredAt: draft.occurredAt
+                            occurredAt: draft.occurredAt,
+                            parentEventId: draft.parentEventId,
+                            quantity: draft.quantity,
+                            unit: draft.unit,
+                            itemName: draft.itemName,
+                            unitPrice: draft.unitPrice,
+                            masterKind: draft.masterKind,
+                            revisesEventId: draft.revisesEventId
                         )
                         tick += 1
                     },
@@ -290,7 +413,14 @@ struct OperatingMomentPage: View {
                             channelName: draft.channelName,
                             counterpartyName: draft.counterpartyName,
                             paymentStatus: draft.paymentStatus,
-                            occurredAt: draft.occurredAt
+                            occurredAt: draft.occurredAt,
+                            parentEventId: draft.parentEventId,
+                            quantity: draft.quantity,
+                            unit: draft.unit,
+                            itemName: draft.itemName,
+                            unitPrice: draft.unitPrice,
+                            masterKind: draft.masterKind,
+                            revisesEventId: draft.revisesEventId
                         )
                         tick += 1
                     },
@@ -316,7 +446,14 @@ struct OperatingMomentPage: View {
                             channelName: draft.channelName,
                             counterpartyName: draft.counterpartyName,
                             paymentStatus: draft.paymentStatus,
-                            occurredAt: draft.occurredAt
+                            occurredAt: draft.occurredAt,
+                            parentEventId: draft.parentEventId,
+                            quantity: draft.quantity,
+                            unit: draft.unit,
+                            itemName: draft.itemName,
+                            unitPrice: draft.unitPrice,
+                            masterKind: draft.masterKind,
+                            revisesEventId: draft.revisesEventId
                         )
                         tick += 1
                     },
@@ -457,6 +594,7 @@ struct OperatingMomentPage: View {
         guard let momentId, !OperatingMomentCatalog.isRetired(momentTypeCode) else { return }
         do {
             projection = try await APIClient.shared.getOperatingMoment(momentId: momentId)
+            chrome.participantNames = projection?.participants ?? []
             errorText = nil
         } catch {
             errorText = error.localizedDescription

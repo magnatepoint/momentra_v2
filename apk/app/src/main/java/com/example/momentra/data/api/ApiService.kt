@@ -946,6 +946,14 @@ interface ApiService {
         @Body body: RecordOperatingEventBody,
     ): SuccessEnvelope<RecordOperatingEventResultDto>
 
+    @PATCH("v1/business/moments/{momentId}/operating-events/{eventId}")
+    suspend fun reviseOperatingEvent(
+        @Path("momentId") momentId: String,
+        @Path("eventId") eventId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: RecordOperatingEventBody,
+    ): SuccessEnvelope<RecordOperatingEventResultDto>
+
     @POST("v1/business/moments/{momentId}/operating-events/{eventId}/decision")
     suspend fun decideOperatingEvent(
         @Path("momentId") momentId: String,

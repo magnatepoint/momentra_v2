@@ -82,10 +82,45 @@ fun OperatingMomentPage(
     var error by remember(momentId) { mutableStateOf<String?>(null) }
     var tick by remember(momentId) { mutableIntStateOf(0) }
     val repo = remember { BusinessSliceRepository() }
+    val activeMomentId = momentId
+    androidx.compose.runtime.SideEffect {
+        OperatingChromeState.record = { draft ->
+            repo.recordOperatingEvent(
+                activeMomentId,
+                draft.eventType,
+                draft.title,
+                draft.amount,
+                draft.note,
+                draft.channelName,
+                draft.counterpartyName,
+                draft.paymentStatus,
+                draft.occurredAt,
+                draft.parentEventId,
+                draft.quantity,
+                draft.unit,
+                if (draft.itemName.isNullOrBlank()) null else listOf(
+                    com.example.momentra.data.api.OperatingLineBody(
+                        draft.itemName,
+                        draft.quantity,
+                        draft.unit,
+                        draft.unitPrice,
+                    ),
+                ),
+                draft.masterKind?.let {
+                    com.example.momentra.data.api.OperatingMasterBody(it, draft.title, draft.unit)
+                },
+                draft.revisesEventId,
+            ).fold(
+                onSuccess = { tick += 1 },
+                onFailure = { error = it.message },
+            )
+        }
+    }
     LaunchedEffect(momentId, refreshToken, tick) {
         repo.getOperating(momentId).fold(
             onSuccess = {
                 projection = it
+                OperatingChromeState.participantNames = it.participants
                 error = null
             },
             onFailure = { error = it.message ?: "Could not load this moment" },
@@ -112,6 +147,21 @@ fun OperatingMomentPage(
                     draft.counterpartyName,
                     draft.paymentStatus,
                     draft.occurredAt,
+                    draft.parentEventId,
+                    draft.quantity,
+                    draft.unit,
+                    if (draft.itemName.isNullOrBlank()) null else listOf(
+                        com.example.momentra.data.api.OperatingLineBody(
+                            draft.itemName,
+                            draft.quantity,
+                            draft.unit,
+                            draft.unitPrice,
+                        ),
+                    ),
+                    draft.masterKind?.let {
+                        com.example.momentra.data.api.OperatingMasterBody(it, draft.title, draft.unit)
+                    },
+                    draft.revisesEventId,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -143,6 +193,21 @@ fun OperatingMomentPage(
                     draft.counterpartyName,
                     draft.paymentStatus,
                     draft.occurredAt,
+                    draft.parentEventId,
+                    draft.quantity,
+                    draft.unit,
+                    if (draft.itemName.isNullOrBlank()) null else listOf(
+                        com.example.momentra.data.api.OperatingLineBody(
+                            draft.itemName,
+                            draft.quantity,
+                            draft.unit,
+                            draft.unitPrice,
+                        ),
+                    ),
+                    draft.masterKind?.let {
+                        com.example.momentra.data.api.OperatingMasterBody(it, draft.title, draft.unit)
+                    },
+                    draft.revisesEventId,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -174,6 +239,21 @@ fun OperatingMomentPage(
                     draft.counterpartyName,
                     draft.paymentStatus,
                     draft.occurredAt,
+                    draft.parentEventId,
+                    draft.quantity,
+                    draft.unit,
+                    if (draft.itemName.isNullOrBlank()) null else listOf(
+                        com.example.momentra.data.api.OperatingLineBody(
+                            draft.itemName,
+                            draft.quantity,
+                            draft.unit,
+                            draft.unitPrice,
+                        ),
+                    ),
+                    draft.masterKind?.let {
+                        com.example.momentra.data.api.OperatingMasterBody(it, draft.title, draft.unit)
+                    },
+                    draft.revisesEventId,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -205,6 +285,21 @@ fun OperatingMomentPage(
                     draft.counterpartyName,
                     draft.paymentStatus,
                     draft.occurredAt,
+                    draft.parentEventId,
+                    draft.quantity,
+                    draft.unit,
+                    if (draft.itemName.isNullOrBlank()) null else listOf(
+                        com.example.momentra.data.api.OperatingLineBody(
+                            draft.itemName,
+                            draft.quantity,
+                            draft.unit,
+                            draft.unitPrice,
+                        ),
+                    ),
+                    draft.masterKind?.let {
+                        com.example.momentra.data.api.OperatingMasterBody(it, draft.title, draft.unit)
+                    },
+                    draft.revisesEventId,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -236,6 +331,21 @@ fun OperatingMomentPage(
                     draft.counterpartyName,
                     draft.paymentStatus,
                     draft.occurredAt,
+                    draft.parentEventId,
+                    draft.quantity,
+                    draft.unit,
+                    if (draft.itemName.isNullOrBlank()) null else listOf(
+                        com.example.momentra.data.api.OperatingLineBody(
+                            draft.itemName,
+                            draft.quantity,
+                            draft.unit,
+                            draft.unitPrice,
+                        ),
+                    ),
+                    draft.masterKind?.let {
+                        com.example.momentra.data.api.OperatingMasterBody(it, draft.title, draft.unit)
+                    },
+                    draft.revisesEventId,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -267,6 +377,21 @@ fun OperatingMomentPage(
                     draft.counterpartyName,
                     draft.paymentStatus,
                     draft.occurredAt,
+                    draft.parentEventId,
+                    draft.quantity,
+                    draft.unit,
+                    if (draft.itemName.isNullOrBlank()) null else listOf(
+                        com.example.momentra.data.api.OperatingLineBody(
+                            draft.itemName,
+                            draft.quantity,
+                            draft.unit,
+                            draft.unitPrice,
+                        ),
+                    ),
+                    draft.masterKind?.let {
+                        com.example.momentra.data.api.OperatingMasterBody(it, draft.title, draft.unit)
+                    },
+                    draft.revisesEventId,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -298,6 +423,21 @@ fun OperatingMomentPage(
                     draft.counterpartyName,
                     draft.paymentStatus,
                     draft.occurredAt,
+                    draft.parentEventId,
+                    draft.quantity,
+                    draft.unit,
+                    if (draft.itemName.isNullOrBlank()) null else listOf(
+                        com.example.momentra.data.api.OperatingLineBody(
+                            draft.itemName,
+                            draft.quantity,
+                            draft.unit,
+                            draft.unitPrice,
+                        ),
+                    ),
+                    draft.masterKind?.let {
+                        com.example.momentra.data.api.OperatingMasterBody(it, draft.title, draft.unit)
+                    },
+                    draft.revisesEventId,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -549,5 +689,50 @@ private fun InfoCard(label: String, body: String) {
     ) {
         Text(label, color = Muted, fontSize = 11.sp)
         Text(body, color = TextPrimary, fontSize = 14.sp)
+    }
+}
+
+@Composable
+internal fun OperatingChromeSheets(model: OperatingProjectionDto) {
+    val editing = OperatingChromeState.editing
+    val settling = OperatingChromeState.settling
+    val record = OperatingChromeState.record
+    if (editing != null && record != null) {
+        OperatingCaptureSheet(
+            title = "Edit activity",
+            icon = com.example.momentra.R.drawable.qa_shield,
+            eventType = editing.eventType,
+            mode = editing.eventType,
+            model = model,
+            seed = editing,
+            onDismiss = { OperatingChromeState.editing = null },
+            onSubmit = { draft ->
+                record(draft)
+                OperatingChromeState.editing = null
+            },
+        )
+    }
+    if (settling != null && record != null) {
+        val collect = settling.relevance == "RECEIVABLE"
+        OperatingCaptureSheet(
+            title = if (collect) "Record Collection" else "Record Payment",
+            icon = com.example.momentra.R.drawable.qa_shield,
+            eventType = if (collect) "COLLECTION" else "PAYMENT",
+            mode = if (collect) "COLLECTION" else "PAYMENT",
+            model = model,
+            seed = com.example.momentra.data.api.OperatingActivityDto(
+                id = "",
+                title = settling.title,
+                eventType = if (collect) "COLLECTION" else "PAYMENT",
+                amount = settling.amount,
+                counterpartyName = settling.counterpartyName,
+                parentEventId = settling.id,
+            ),
+            onDismiss = { OperatingChromeState.settling = null },
+            onSubmit = { draft ->
+                record(draft)
+                OperatingChromeState.settling = null
+            },
+        )
     }
 }

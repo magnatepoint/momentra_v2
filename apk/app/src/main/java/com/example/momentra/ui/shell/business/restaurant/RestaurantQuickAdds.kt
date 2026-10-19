@@ -52,6 +52,13 @@ data class RestaurantEventDraft(
     val counterpartyName: String?,
     val paymentStatus: String?,
     val occurredAt: String? = null,
+    val quantity: String? = null,
+    val unit: String? = null,
+    val unitPrice: String? = null,
+    val itemName: String? = null,
+    val parentEventId: String? = null,
+    val revisesEventId: String? = null,
+    val masterKind: String? = null,
 )
 
 private enum class RestaurantSheet(
@@ -89,6 +96,7 @@ fun RestaurantQuickAddHub(
     var sheet by remember { mutableStateOf<RestaurantSheet?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var approvalOpen by remember { mutableStateOf(false) }
+    var mastersOpen by remember { mutableStateOf(false) }
     val role = model.role.orEmpty()
     val owner = role == "OWNER_ADMIN"
     val approver = role == "APPROVER" || owner
@@ -175,6 +183,13 @@ fun RestaurantQuickAddHub(
             }
         }
     }
+    Text(
+        "Masters",
+        color = Color.White,
+        fontFamily = PlusJakartaSans,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+        modifier = Modifier.clickable { mastersOpen = true }.padding(vertical = 8.dp),
+    )
     Text("Support & management", color = RestSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
     val support = listOf(
         Triple(RestaurantSheet.REIMBURSE, "Reimbursement", if ("PAYMENT" in allowed) null else "Finance only"),
@@ -228,6 +243,20 @@ fun RestaurantQuickAddHub(
                 onDecide = onDecide,
             )
         }
+    }
+    if (mastersOpen) {
+        OperatingCaptureSheet(
+            title = "Masters",
+            icon = R.drawable.qa_shield,
+            eventType = "UPDATE",
+            mode = "MASTERS",
+            model = model,
+            onDismiss = { mastersOpen = false },
+            onSubmit = { draft ->
+                onRecord(draft.toRestaurant())
+                mastersOpen = false
+            },
+        )
     }
     if (approvalOpen) {
         OperatingSheetScrim(onDismiss = { approvalOpen = false }) {
@@ -327,4 +356,11 @@ private fun OperatingCaptureDraft.toRestaurant() = RestaurantEventDraft(
     counterpartyName = counterpartyName,
     paymentStatus = paymentStatus,
     occurredAt = occurredAt,
+    quantity = quantity,
+    unit = unit,
+    unitPrice = unitPrice,
+    itemName = itemName,
+    parentEventId = parentEventId,
+    revisesEventId = revisesEventId,
+    masterKind = masterKind,
 )

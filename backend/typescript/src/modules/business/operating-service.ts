@@ -35,8 +35,28 @@ export const recordOperatingEventSchema = z
     channelName: z.string().max(120).optional(),
     paymentStatus: z.enum(['NONE', 'PENDING', 'READY', 'PAID', 'COLLECTED']).optional(),
     occurredAt: z.string().datetime({ offset: true }).nullish(),
-    parentEventId: z.string().uuid().optional(),
-    quantity: amountSchema.optional(),
+    parentEventId: z.string().uuid().nullish(),
+    quantity: amountSchema.nullish(),
+    unit: z.string().max(24).nullish(),
+    dueAt: z.string().max(40).nullish(),
+    lines: z
+      .array(
+        z.object({
+          itemName: z.string().min(1).max(160),
+          quantity: amountSchema.nullish(),
+          unit: z.string().max(24).nullish(),
+          unitPrice: amountSchema.nullish(),
+        })
+      )
+      .max(12)
+      .nullish(),
+    master: z
+      .object({
+        kind: z.string().min(1).max(40),
+        name: z.string().min(1).max(160),
+        unit: z.string().max(24).nullish(),
+      })
+      .nullish(),
     metric: z.enum(['LEADS', 'CONVERSIONS']).optional(),
     rejectedQuantity: amountSchema.optional(),
   })
@@ -105,6 +125,30 @@ async function loadEvents(client: PoolClient, momentId: string): Promise<Operati
     const payload = r.payload ?? {};
     const metric = payload.metric === 'LEADS' || payload.metric === 'CONVERSIONS' ? payload.metric : null;
     const rejected = payload.rejectedQuantity;
+    const lines = Array.isArray(payload.lines)
+      ? payload.lines.flatMap((line) => {
+          if (!line || typeof line !== 'object') return [];
+          const rec = line as Record<string, unknown>;
+          const itemName = String(rec.itemName ?? '').trim();
+          if (!itemName) return [];
+          return [{
+            itemName,
+            quantity: rec.quantity == null ? null : String(rec.quantity),
+            unit: rec.unit == null ? null : String(rec.unit),
+            unitPrice: rec.unitPrice == null ? null : String(rec.unitPrice),
+          }];
+        })
+      : [];
+    const masterRaw = payload.master;
+    const master = masterRaw && typeof masterRaw === 'object'
+      ? {
+          kind: String((masterRaw as Record<string, unknown>).kind ?? ''),
+          name: String((masterRaw as Record<string, unknown>).name ?? ''),
+          unit: (masterRaw as Record<string, unknown>).unit == null
+            ? null
+            : String((masterRaw as Record<string, unknown>).unit),
+        }
+      : null;
     return {
       operatingEventId: r.operating_event_id,
       eventType: r.event_type,
@@ -122,6 +166,10 @@ async function loadEvents(client: PoolClient, momentId: string): Promise<Operati
       occurredAt: r.occurred_at.toISOString(),
       parentEventId: r.parent_event_id,
       quantity: r.quantity,
+      unit: payload.unit == null ? lines[0]?.unit ?? null : String(payload.unit),
+      lines,
+      dueAt: payload.dueAt == null ? null : String(payload.dueAt),
+      master: master && master.kind && master.name ? master : null,
       metric,
       rejectedQuantity: rejected == null || rejected === '' ? null : String(rejected),
     };
@@ -225,6 +273,11 @@ export async function recordOperatingEvent(
     paymentStatus = 'PENDING';
   }
   if (def.paymentRelevance === 'NONE') paymentStatus = 'NONE';
+  const lineTotal = (body.lines ?? []).reduce(
+    (total, line) => total + Number(line.quantity ?? 1) * Number(line.unitPrice ?? 0),
+    0
+  );
+  const amount = body.amount ?? (lineTotal > 0 ? lineTotal.toFixed(4) : null);
   const existing = await loadEvents(client, momentId);
   const parent = body.parentEventId
     ? existing.find((row) => row.operatingEventId === body.parentEventId) ?? null
@@ -232,19 +285,39 @@ export async function recordOperatingEvent(
   if (body.parentEventId && !parent) {
     throw new AppError(ErrorCode.VALIDATION_FAILED, 'Choose a record on this moment.', 400);
   }
+  const wanted = def.code === 'PAYMENT' || def.code === 'COLLECTION'
+    ? (def.code === 'COLLECTION' ? ['SALE', 'SERVICE', 'CUSTOMER_ORDER'] : ['PURCHASE', 'SPEND', 'VENDOR_COST'])
+    : [];
+  const openParent = existing.some(
+    (row) =>
+      wanted.includes(row.eventType) &&
+      row.approvalStatus !== 'REJECTED' &&
+      row.paymentStatus !== 'PAID' &&
+      row.paymentStatus !== 'COLLECTED' &&
+      row.paymentStatus !== 'SETTLED' &&
+      row.paymentStatus !== 'CANCELLED'
+  );
   const allocation = validateOperatingAllocation({
     eventType: def.code,
     parent,
     siblings: parent ? existing.filter((row) => row.parentEventId === parent.operatingEventId) : [],
-    amount: body.amount ?? null,
+    amount,
     quantity: body.quantity ?? null,
+    allowUnlinked: !openParent,
   });
   if (!allocation.ok) {
     throw new AppError(ErrorCode.VALIDATION_FAILED, allocation.message, 400);
   }
-  const payload: Record<string, string> = {};
+  const payload: Record<string, unknown> = {};
   if (body.metric) payload.metric = body.metric;
   if (body.rejectedQuantity) payload.rejectedQuantity = body.rejectedQuantity;
+  if (body.lines?.length) payload.lines = body.lines;
+  if (body.unit) payload.unit = body.unit;
+  if (body.dueAt) payload.dueAt = body.dueAt;
+  if (body.master) payload.master = body.master;
+  const lineQuantity = body.lines?.reduce((total, line) => total + Number(line.quantity ?? 0), 0) ?? 0;
+  const quantity = body.quantity ?? (lineQuantity > 0 ? lineQuantity.toFixed(4) : null);
+  const title = body.master?.name || body.title;
   const inserted = await client.query<{ operating_event_id: string }>(
     `INSERT INTO business.operating_event (
        moment_id, company_id, actor_user_id, event_type, title, note, amount, currency_code,
@@ -260,9 +333,9 @@ export async function recordOperatingEvent(
       scope.companyId,
       ctx.userId,
       def.code,
-      body.title,
+      title,
       body.note ?? null,
-      body.amount ?? null,
+      amount,
       prefs.currency,
       body.counterpartyName ?? null,
       body.channelName ?? null,
@@ -271,11 +344,21 @@ export async function recordOperatingEvent(
       approvalStatus,
       body.occurredAt ?? null,
       body.parentEventId ?? null,
-      body.quantity ?? null,
+      quantity,
       JSON.stringify(payload),
     ]
   );
   const eventId = inserted.rows[0]!.operating_event_id;
+  await ensureSettlement(client, ctx, momentId, scope.companyId, prefs.currency, {
+    eventId,
+    eventType: def.code,
+    title,
+    amount,
+    paymentStatus,
+    approvalStatus,
+    counterpartyName: body.counterpartyName ?? null,
+    occurredAt: body.occurredAt ?? null,
+  });
   if (approvalStatus !== 'PENDING' && (def.code === 'BUDGET' || def.code === 'TARGET') && body.amount) {
     await applyPlanRevision(client, momentId, def.code, body.amount);
   }
@@ -376,6 +459,151 @@ export async function decideOperatingEvent(
     reason: body.reason ?? null,
   });
   return { eventId, approvalStatus: body.decision };
+}
+
+export async function reviseOperatingEvent(
+  client: PoolClient,
+  ctx: RequestContext,
+  momentId: string,
+  eventId: string,
+  body: RecordOperatingEventInput
+): Promise<{ eventId: string; projection: OperatingProjection }> {
+  const scope = await assertCompanyMomentAccess(client, ctx, momentId);
+  const setup = await loadSetup(client, momentId);
+  if (!setup || !isOperatingFamily(scope.businessFamily)) {
+    throw new AppError(ErrorCode.VALIDATION_FAILED, 'Operating setup was not found.', 400);
+  }
+  const prefs = prefsOf(setup.preferences);
+  const role = await viewerRole(client, ctx.userId, momentId, scope.companyId, prefs);
+  const existing = await loadEvents(client, momentId);
+  const current = existing.find((row) => row.operatingEventId === eventId);
+  if (!current) throw new AppError(ErrorCode.VALIDATION_FAILED, 'Event was not found.', 404);
+  const def = quickAddDef(current.eventType);
+  if (!def || !canSubmit(role, def)) {
+    throw new AppError(ErrorCode.GOVERNANCE_DENIED, 'Your role cannot edit this.', 403);
+  }
+  const payload: Record<string, unknown> = {};
+  if (body.lines?.length) payload.lines = body.lines;
+  if (body.unit) payload.unit = body.unit;
+  if (body.dueAt) payload.dueAt = body.dueAt;
+  if (body.metric) payload.metric = body.metric;
+  const lineQuantity = body.lines?.reduce((total, line) => total + Number(line.quantity ?? 0), 0) ?? 0;
+  await client.query(
+    `UPDATE business.operating_event
+     SET title = $3,
+         note = $4,
+         amount = $5,
+         counterparty_name = $6,
+         channel_name = $7,
+         payment_status = COALESCE($8, payment_status),
+         quantity = $9,
+         payload = COALESCE(payload, '{}'::jsonb) || $10::jsonb,
+         occurred_at = COALESCE($11::timestamptz, occurred_at),
+         parent_event_id = COALESCE($12, parent_event_id),
+         version = version + 1
+     WHERE operating_event_id = $1 AND moment_id = $2`,
+    [
+      eventId,
+      momentId,
+      body.title,
+      body.note ?? null,
+      body.amount ?? null,
+      body.counterpartyName ?? null,
+      body.channelName ?? null,
+      body.paymentStatus ?? null,
+      body.quantity ?? (lineQuantity > 0 ? lineQuantity.toFixed(4) : null),
+      JSON.stringify(payload),
+      body.occurredAt ?? null,
+      body.parentEventId ?? null,
+    ]
+  );
+  const { domainEventId } = await insertDomainEventAndOutbox(client, ctx, {
+    eventName: 'OperatingEventRevised',
+    domainCode: 'BUSINESS',
+    aggregateType: 'OPERATING_EVENT',
+    aggregateId: eventId,
+    scopeType: 'MOMENT',
+    scopeId: momentId,
+    payload: { eventId, momentId },
+  });
+  await insertAudit(client, ctx, 'OPERATING_EVENT_REVISE', 'OPERATING_EVENT', eventId, domainEventId, {
+    momentId,
+    eventType: current.eventType,
+  });
+  await ensureSettlement(client, ctx, momentId, scope.companyId, prefs.currency, {
+    eventId,
+    eventType: current.eventType,
+    title: body.title,
+    amount: body.amount ?? current.amount,
+    paymentStatus: body.paymentStatus ?? current.paymentStatus,
+    approvalStatus: current.approvalStatus,
+    counterpartyName: body.counterpartyName ?? current.counterpartyName,
+    occurredAt: body.occurredAt ?? current.occurredAt,
+  });
+  const projection = await getOperatingProjection(client, ctx, momentId);
+  if ('retired' in projection && projection.retired) {
+    throw new AppError(ErrorCode.VALIDATION_FAILED, 'Operating projection unavailable.', 400);
+  }
+  return { eventId, projection: projection as OperatingProjection };
+}
+
+async function ensureSettlement(
+  client: PoolClient,
+  ctx: RequestContext,
+  momentId: string,
+  companyId: string,
+  currency: string,
+  source: {
+    eventId: string;
+    eventType: string;
+    title: string;
+    amount: string | null;
+    paymentStatus: string;
+    approvalStatus: string;
+    counterpartyName: string | null;
+    occurredAt: string | null;
+  }
+): Promise<void> {
+  if (source.approvalStatus === 'PENDING' || source.approvalStatus === 'REJECTED' || !source.amount) return;
+  const childType =
+    (source.eventType === 'SALE' || source.eventType === 'SERVICE') && source.paymentStatus === 'COLLECTED'
+      ? 'COLLECTION'
+      : (source.eventType === 'PURCHASE' || source.eventType === 'SPEND' || source.eventType === 'VENDOR_COST') &&
+          source.paymentStatus === 'PAID'
+        ? 'PAYMENT'
+        : null;
+  if (!childType) return;
+  const found = await client.query(
+    `SELECT 1 FROM business.operating_event
+     WHERE moment_id = $1 AND parent_event_id = $2 AND event_type = $3
+     LIMIT 1`,
+    [momentId, source.eventId, childType]
+  );
+  if (found.rowCount) return;
+  await client.query(
+    `INSERT INTO business.operating_event (
+       moment_id, company_id, actor_user_id, event_type, title, note, amount, currency_code,
+       counterparty_name, channel_name, payment_relevance, payment_status, approval_status,
+       submitted_by_user_id, occurred_at, parent_event_id, quantity, payload
+     ) VALUES (
+       $1,$2,$3,$4,$5,NULL,$6,$7,$8,NULL,$9,$10,'NONE',$3,
+       COALESCE($11::timestamptz, now()), $12, NULL, '{}'::jsonb
+     )`,
+    [
+      momentId,
+      companyId,
+      ctx.userId,
+      childType,
+      childType === 'COLLECTION' ? `Collected · ${source.title}` : `Paid · ${source.title}`,
+      source.amount,
+      currency,
+      source.counterpartyName,
+      childType === 'COLLECTION' ? 'RECEIVABLE' : 'PAYABLE',
+      childType === 'COLLECTION' ? 'COLLECTED' : 'PAID',
+      source.occurredAt,
+      source.eventId,
+    ]
+  );
 }
 
 export function assertOperatingActivate(familyCode: string): void {

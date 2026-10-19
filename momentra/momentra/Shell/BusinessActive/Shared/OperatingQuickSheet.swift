@@ -9,6 +9,13 @@ struct OperatingCaptureDraft {
     var counterpartyName: String?
     var paymentStatus: String?
     var occurredAt: String?
+    var quantity: String? = nil
+    var unit: String? = nil
+    var unitPrice: String? = nil
+    var itemName: String? = nil
+    var parentEventId: String? = nil
+    var revisesEventId: String? = nil
+    var masterKind: String? = nil
 }
 
 func operatingCaptureMode(eventType: String, title: String) -> String {
@@ -32,6 +39,7 @@ struct OperatingCaptureSheet: View {
     let model: OperatingProjectionPayload
     var channelLabel: String = "Channel"
     var variant: String = ""
+    var seed: OperatingActivityPayload? = nil
     var onSubmit: (OperatingCaptureDraft) async throws -> Void
     var onDecide: ((String, String) async throws -> Void)?
 
@@ -48,6 +56,12 @@ struct OperatingCaptureSheet: View {
     @State private var errorText: String?
     @State private var eventDate = Date()
     @State private var dateOpen = false
+    @State private var itemName = ""
+    @State private var quantity = ""
+    @State private var unit = "piece"
+    @State private var unitPrice = ""
+    @State private var parentId = ""
+    @State private var masterKind = ""
 
     private var restaurant: Bool { variant == "restaurant" }
     private var service: Bool { variant == "service" }
@@ -155,12 +169,25 @@ struct OperatingCaptureSheet: View {
             if marketing && mode == "DELIVERABLE" && detail.isEmpty { detail = "Due" }
             if production && mode == "SPEND" && detail.isEmpty { detail = "No" }
             choice = defaultChoice
+            if let seed {
+                amount = seed.amount ?? ""
+                party = seed.counterpartyName ?? ""
+                channel = seed.channelName ?? channel
+                note = seed.note ?? ""
+                purpose = seed.title
+                itemName = seed.title
+                quantity = seed.quantity ?? ""
+                unit = seed.unit ?? unit
+                parentId = seed.parentEventId ?? ""
+            }
+            if masterKind.isEmpty { masterKind = masterKinds.first ?? "PRODUCT" }
         }
     }
 
     @ViewBuilder private var fields: some View {
         switch mode {
         case "SALE", "SERVICE":
+            lineEditor
             if production && mode == "SALE" {
                 amountBlock("Amount", hint: "Positive amount · 2 decimal places")
                 if !channels.isEmpty {
@@ -188,6 +215,7 @@ struct OperatingCaptureSheet: View {
             summary("After save", saleLines)
             }
         case "PURCHASE", "VENDOR":
+            lineEditor
             if production && mode == "PURCHASE" {
                 amountBlock("Amount", hint: "Positive amount · 2 decimal places")
                 HStack(spacing: 12) { editField("Supplier", text: $party, placeholder: "Required"); dateField("Purchase date") }
@@ -247,6 +275,7 @@ struct OperatingCaptureSheet: View {
             summary("After approval", spendLines)
             }
         case "PAYMENT", "REIMBURSE":
+            obligationPicker
             if marketing && mode == "PAYMENT" {
                 amountBlock("Payment amount", hint: "Positive amount · 2 decimal places")
                 editField("Who paid", text: $detail, placeholder: "Payer")
@@ -262,6 +291,7 @@ struct OperatingCaptureSheet: View {
             summary("After save", ["Business paid moves by the amount you enter.", "This settles an existing claim. It is not a second expense."])
             }
         case "COLLECTION":
+            obligationPicker
             if production {
                 if !channels.isEmpty {
                     choiceBlock("Received from", options: channels, selected: channel) { channel = $0 }
@@ -489,6 +519,15 @@ struct OperatingCaptureSheet: View {
             Text("Saving creates the relationship. It does not create a purchase or an expense.")
                 .font(.plusJakarta(size: 12)).foregroundStyle(Color(hex: "#C9C4D8"))
             }
+        case "MASTERS":
+            choiceBlock("Master", options: masterKinds, selected: masterKind) { masterKind = $0 }
+            editField("Name", text: $itemName, placeholder: "Required")
+            if ["PRODUCT", "MATERIAL", "CONSUMABLE"].contains(masterKind) {
+                choiceBlock("Unit", options: ["piece", "kg", "litre", "count"], selected: unit) { unit = $0 }
+            }
+            editField("Detail", text: $purpose, placeholder: "Optional")
+            Text("Saving adds a selectable record. It does not create a sale or a cost.")
+                .font(.plusJakarta(size: 12)).foregroundStyle(Color(hex: "#C9C4D8"))
         case "APPROVAL":
             approvalFields
         default:
@@ -790,7 +829,84 @@ struct OperatingCaptureSheet: View {
         }
     }
 
+    private var masterKinds: [String] {
+        switch model.subtype {
+        case "CONSUMER_SERVICE": return ["SERVICE", "STAFF", "CUSTOMER", "SUPPLIER", "CONSUMABLE", "CHANNEL"]
+        case "CLIENT_CAMPAIGN", "OWN_BUSINESS_CAMPAIGN": return ["METRIC", "CHANNEL", "BUDGET_CATEGORY", "PARTY"]
+        case "STANDARD_PRODUCTION", "MADE_TO_ORDER": return ["MATERIAL", "PRODUCT", "SUPPLIER", "BUYER", "STAFF"]
+        case "TRADING_WHOLESALE", "DISTRIBUTION_DEALERSHIP": return ["PRODUCT", "SUPPLIER", "BUYER", "CHANNEL"]
+        default: return ["PRODUCT", "SUPPLIER", "CUSTOMER", "CHANNEL", "STAFF"]
+        }
+    }
+
+    private var openObligations: [OperatingPaymentPayload] {
+        let want = mode == "COLLECTION" ? "RECEIVABLE" : "PAYABLE"
+        return (model.paymentReadiness ?? []).filter { row in
+            if mode == "COLLECTION" { return row.relevance == "RECEIVABLE" }
+            return row.relevance == want || row.relevance == "REIMBURSEMENT" || row.relevance == "SETTLEMENT"
+        }
+    }
+
+    @ViewBuilder private var lineEditor: some View {
+        let saved = model.masters ?? []
+        if !saved.isEmpty {
+            Text("Saved items").font(.plusJakarta(size: 12)).foregroundStyle(Color(hex: "#C9C4D8"))
+            ForEach(saved) { master in
+                Button(master.name) {
+                    itemName = master.name
+                    if let unitName = master.unit, !unitName.isEmpty { unit = unitName }
+                }
+                .font(.plusJakarta(size: 13))
+                .foregroundStyle(Color(hex: "#E5E0EE"))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "#938EA1"), lineWidth: 1))
+            }
+        }
+        editField("Item", text: $itemName, placeholder: "Item name")
+        HStack(spacing: 8) {
+            editField("Qty", text: $quantity, placeholder: "1")
+            editField("Unit", text: $unit, placeholder: "piece")
+            editField("Price", text: $unitPrice, placeholder: "0")
+        }
+        Text("Quantity, unit, and price stay on the sale or purchase. Stock changes only when you record that the goods were received or dispatched.")
+            .font(.plusJakarta(size: 12)).foregroundStyle(Color(hex: "#C9C4D8"))
+    }
+
+    @ViewBuilder private var obligationPicker: some View {
+        if openObligations.isEmpty {
+            Text(mode == "COLLECTION" ? "No unpaid sale is open." : "No unpaid purchase or expense is open.")
+                .font(.plusJakarta(size: 12)).foregroundStyle(Color(hex: "#C9C4D8"))
+        } else {
+            Text(mode == "COLLECTION" ? "Unpaid sales" : "Unpaid purchases and expenses")
+                .font(.plusJakarta(size: 12)).foregroundStyle(Color(hex: "#C9C4D8"))
+            ForEach(openObligations) { row in
+                Button {
+                    parentId = row.id
+                    if let name = row.counterpartyName, !name.isEmpty { party = name }
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(row.title).font(.plusJakarta(size: 14, weight: .semibold)).foregroundStyle(Color(hex: "#E5E0EE"))
+                        Text([row.counterpartyName, row.amount, row.dueAt].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                            .font(.plusJakarta(size: 12)).foregroundStyle(Color(hex: "#C9C4D8"))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(parentId == row.id ? Color(hex: "#35333E") : Color.clear)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(parentId == row.id ? Color(hex: "#B7B8FF") : Color(hex: "#938EA1"), lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
     private func buildDraft() -> OperatingCaptureDraft? {
+        if mode == "MASTERS" {
+            let name = itemName.trimmingCharacters(in: .whitespaces)
+            if name.isEmpty { return nil }
+            return captured(eventType: "UPDATE", title: name, amount: nil, note: purpose, channelName: nil, counterpartyName: nil, payment: nil)
+        }
         let needsAmount = ["SALE", "SERVICE", "PURCHASE", "VENDOR", "SPEND", "PAYMENT", "REIMBURSE", "COLLECTION", "BUDGET", "TARGET", "RESULT", "PRODUCTION"].contains(mode)
         let value = Decimal(string: amount) ?? 0
         if needsAmount, value <= 0 { return nil }
@@ -822,6 +938,7 @@ struct OperatingCaptureSheet: View {
         if production, mode == "BUDGET", purpose.trimmingCharacters(in: .whitespaces).isEmpty { return nil }
         if production, mode == "ISSUE", purpose.trimmingCharacters(in: .whitespaces).isEmpty || party.trimmingCharacters(in: .whitespaces).isEmpty { return nil }
         if ["PERSON", "ROLE", "INVITE", "SUPPLIER", "PARTNER"].contains(mode), party.trimmingCharacters(in: .whitespaces).isEmpty { return nil }
+        if ["PAYMENT", "REIMBURSE", "COLLECTION"].contains(mode), !openObligations.isEmpty, parentId.isEmpty, !(client && mode == "COLLECTION" && choice == "Create Receivable") { return nil }
         let savedTitle: String = {
             switch mode {
             case "PERSON", "ROLE", "INVITE", "SUPPLIER", "PARTNER": return party.trimmingCharacters(in: .whitespaces)
@@ -862,15 +979,14 @@ struct OperatingCaptureSheet: View {
             }
             if let parts {
                 let saved = parts.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: " · ")
-                return OperatingCaptureDraft(
+                return captured(
                     eventType: eventType,
                     title: savedTitle.isEmpty ? title : savedTitle,
                     amount: amount.isEmpty ? nil : amount,
                     note: saved.isEmpty ? nil : saved,
                     channelName: channel.isEmpty ? nil : channel,
                     counterpartyName: party.trimmingCharacters(in: .whitespaces).isEmpty ? nil : party.trimmingCharacters(in: .whitespaces),
-                    paymentStatus: payment,
-                    occurredAt: occurredAtValue
+                    payment: payment
                 )
             }
         }
@@ -890,15 +1006,14 @@ struct OperatingCaptureSheet: View {
             }
             if let parts {
                 let saved = parts.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: " · ")
-                return OperatingCaptureDraft(
+                return captured(
                     eventType: mode == "BUDGET" && choice == "Target" ? "TARGET" : eventType,
                     title: savedTitle.isEmpty ? title : savedTitle,
                     amount: amount.isEmpty ? nil : amount,
                     note: saved.isEmpty ? nil : saved,
                     channelName: channel.isEmpty ? nil : channel,
                     counterpartyName: mode == "PRODUCTION" || party.trimmingCharacters(in: .whitespaces).isEmpty ? nil : party.trimmingCharacters(in: .whitespaces),
-                    paymentStatus: payment,
-                    occurredAt: occurredAtValue
+                    payment: payment
                 )
             }
         }
@@ -907,15 +1022,45 @@ struct OperatingCaptureSheet: View {
             .filter { !$0.isEmpty }
         let skipPurpose = ["PURCHASE", "VENDOR", "SPEND", "UPDATE", "ISSUE"].contains(mode)
         let savedNote = (skipPurpose ? noteParts.filter { $0 != purpose.trimmingCharacters(in: .whitespaces) } : noteParts).joined(separator: " · ")
-        return OperatingCaptureDraft(
+        return captured(
             eventType: eventType,
             title: savedTitle.isEmpty ? title : savedTitle,
             amount: amount.isEmpty ? nil : amount,
             note: savedNote.isEmpty ? nil : savedNote,
             channelName: channel.isEmpty ? nil : channel,
             counterpartyName: party.trimmingCharacters(in: .whitespaces).isEmpty ? nil : party.trimmingCharacters(in: .whitespaces),
+            payment: payment
+        )
+    }
+
+    private func captured(
+        eventType: String,
+        title: String,
+        amount: String?,
+        note: String?,
+        channelName: String?,
+        counterpartyName: String?,
+        payment: String?
+    ) -> OperatingCaptureDraft {
+        let item = itemName.trimmingCharacters(in: .whitespaces)
+        let priced = ["SALE", "SERVICE", "PURCHASE", "VENDOR"].contains(mode) && !item.isEmpty
+        let shown = priced ? item : title
+        return OperatingCaptureDraft(
+            eventType: eventType,
+            title: shown.isEmpty ? self.title : shown,
+            amount: amount,
+            note: note,
+            channelName: channelName,
+            counterpartyName: counterpartyName,
             paymentStatus: payment,
-            occurredAt: occurredAtValue
+            occurredAt: occurredAtValue,
+            quantity: quantity.trimmingCharacters(in: .whitespaces).isEmpty ? nil : quantity,
+            unit: unit.trimmingCharacters(in: .whitespaces).isEmpty ? nil : unit,
+            unitPrice: unitPrice.trimmingCharacters(in: .whitespaces).isEmpty ? nil : unitPrice,
+            itemName: item.isEmpty ? nil : item,
+            parentEventId: parentId.isEmpty ? nil : parentId,
+            revisesEventId: seed?.id.isEmpty == false ? seed?.id : nil,
+            masterKind: mode == "MASTERS" ? masterKind : nil
         )
     }
 

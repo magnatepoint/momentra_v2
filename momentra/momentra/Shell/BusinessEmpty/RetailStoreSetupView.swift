@@ -19,7 +19,9 @@ struct RetailStoreSetupView: View {
     @State private var currency = "INR"
     @State private var currencyOpen = false
     @State private var start = Date()
+    @State private var end: Date? = nil
     @State private var dateOpen = false
+    @State private var editingEnd = false
     @State private var details = ""
     @State private var location = ""
     @State private var invites: [StoreInvite] = []
@@ -121,9 +123,21 @@ struct RetailStoreSetupView: View {
         .onChange(of: initialName) { _, _ in applyCompanySeed() }
         .sheet(isPresented: $dateOpen) {
             VStack {
-                DatePicker("Tracking start", selection: $start, displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .padding()
+                DatePicker(
+                    editingEnd ? "End date" : "Tracking start",
+                    selection: Binding(
+                        get: { editingEnd ? (end ?? start) : start },
+                        set: { value in
+                            if editingEnd { end = value } else { start = value }
+                        }
+                    ),
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.graphical)
+                .padding()
+                if editingEnd {
+                    Button("Clear") { end = nil; dateOpen = false }
+                }
                 Button("Done") { dateOpen = false }.padding(.bottom, 20)
             }
             .presentationDetents([.medium])
@@ -226,7 +240,8 @@ struct RetailStoreSetupView: View {
                         .foregroundStyle(item.0 == currency ? spec.accent : .white)
                 }
             }
-            choice("Start date", dayLabel(start), icon: "rs_setup_calendar") { dateOpen = true }
+            choice("Start date", dayLabel(start), icon: "rs_setup_calendar") { editingEnd = false; dateOpen = true }
+            choice("End date", end.map(dayLabel) ?? "Still open", icon: "rs_setup_calendar") { editingEnd = true; dateOpen = true }
             editor("Description", text: $details, placeholder: spec.descriptionHint, icon: "rs_setup_pencil")
             editor("Location", text: $location, placeholder: spec.locationHint, icon: "rs_setup_pin")
             if !spec.tradeReach.isEmpty {
@@ -371,7 +386,7 @@ struct RetailStoreSetupView: View {
                  ? (spec.channelsOptional ? spec.channelHelp : "Choose at least one.")
                  : "\(selectedChannels.count) selected. \(spec.channelHelp)")
                 .font(.plusJakarta(size: 12)).foregroundStyle(spec.secondary)
-            choice("Month", monthLabel(start), icon: "rs_setup_calendar") { dateOpen = true }
+            choice("Month", monthLabel(start), icon: "rs_setup_calendar") { editingEnd = false; dateOpen = true }
             editor("Monthly budget", text: $budget, placeholder: "Amount", icon: "rs_setup_pencil")
             editor("Monthly sales target", text: $target, placeholder: "Amount", icon: "rs_setup_pencil")
             if spec.targetMetrics.count > 1 {
@@ -515,6 +530,7 @@ struct RetailStoreSetupView: View {
             "description": details.trimmingCharacters(in: .whitespaces),
             "currency": currency,
             "startDate": isoDay(start),
+            "endDate": end.map(isoDay) ?? "",
             "location": location.trimmingCharacters(in: .whitespaces),
             "activationPolicy": policy,
             "participants": participants,

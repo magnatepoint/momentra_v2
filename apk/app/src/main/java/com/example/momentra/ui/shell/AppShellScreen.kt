@@ -118,6 +118,7 @@ import com.example.momentra.ui.shell.business.gap.PendingBusinessActivation
 import com.example.momentra.ui.shell.business.gap.VendorOperationsScreen
 import com.example.momentra.ui.shell.business.shared.BusinessMomentFamilyConfig
 import com.example.momentra.ui.shell.business.shared.BusinessQuickAddKind
+import com.example.momentra.ui.shell.business.shared.OperatingChromeState
 import com.example.momentra.ui.shell.business.shared.OperatingMomentCatalog
 import com.example.momentra.ui.shell.business.shared.OperatingMomentPage
 import com.example.momentra.ui.shell.business.shared.OperatingTab
@@ -665,6 +666,11 @@ fun AppShellScreen(
                         useDirectorySelector = state.selectedContext == AppContext.GROUP ||
                             state.selectedContext == AppContext.BUSINESS,
                         startExpanded = false,
+                        participantNames = if (state.selectedContext == AppContext.BUSINESS) {
+                            OperatingChromeState.participantNames
+                        } else {
+                            emptyList()
+                        },
                         onOpenDirectory = {
                             if (state.selectedContext == AppContext.BUSINESS) {
                                 businessGap = BusinessGapPage.Moments

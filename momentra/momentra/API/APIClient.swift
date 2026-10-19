@@ -25,12 +25,15 @@ struct OperatingPaymentPayload: Decodable, Identifiable {
     let amount: String
     let relevance: String
     let status: String
+    let counterpartyName: String?
+    let dueAt: String?
 }
 
 struct OperatingFinancePayload: Decodable {
     let sales: String
     let received: String
     let outstanding: String
+    let payable: String?
     let eligibleCost: String
     let cashPaid: String
 }
@@ -46,6 +49,9 @@ struct OperatingActivityPayload: Decodable, Identifiable {
     let paymentStatus: String?
     let approvalStatus: String?
     let note: String?
+    let quantity: String?
+    let unit: String?
+    let parentEventId: String?
 }
 
 struct OperatingLifePayload: Decodable {
@@ -56,6 +62,13 @@ struct OperatingLifePayload: Decodable {
 
 struct OperatingMemoryPayload: Decodable {
     let revisions: [OperatingAttentionPayload]
+}
+
+struct OperatingMasterPayload: Decodable, Identifiable {
+    let id: String
+    let kind: String
+    let name: String
+    let unit: String?
 }
 
 struct OperatingQuickAddPayload: Decodable, Identifiable {
@@ -90,6 +103,9 @@ struct OperatingProjectionPayload: Decodable {
     let financeVisible: Bool?
     let currency: String?
     let startDate: String?
+    let endDate: String?
+    let participants: [String]?
+    let masters: [OperatingMasterPayload]?
     let location: String?
     let budget: OperatingMoneyPayload?
     let target: OperatingTargetPayload?
@@ -5209,8 +5225,26 @@ final class APIClient {
         channelName: String? = nil,
         counterpartyName: String? = nil,
         paymentStatus: String? = nil,
-        occurredAt: String? = nil
+        occurredAt: String? = nil,
+        parentEventId: String? = nil,
+        quantity: String? = nil,
+        unit: String? = nil,
+        itemName: String? = nil,
+        unitPrice: String? = nil,
+        masterKind: String? = nil,
+        revisesEventId: String? = nil
     ) async throws -> RecordOperatingEventResult {
+        struct Line: Encodable {
+            let itemName: String
+            let quantity: String?
+            let unit: String?
+            let unitPrice: String?
+        }
+        struct Master: Encodable {
+            let kind: String
+            let name: String
+            let unit: String?
+        }
         struct Body: Encodable {
             let eventType: String
             let title: String
@@ -5220,19 +5254,43 @@ final class APIClient {
             let counterpartyName: String?
             let paymentStatus: String?
             let occurredAt: String?
+            let parentEventId: String?
+            let quantity: String?
+            let unit: String?
+            let lines: [Line]?
+            let master: Master?
+        }
+        let lines = itemName?.trimmingCharacters(in: .whitespaces).isEmpty == false
+            ? [Line(itemName: itemName!.trimmingCharacters(in: .whitespaces), quantity: quantity, unit: unit, unitPrice: unitPrice)]
+            : nil
+        let master = masterKind?.isEmpty == false
+            ? Master(kind: masterKind!, name: title, unit: unit)
+            : nil
+        let body = Body(
+            eventType: eventType,
+            title: title,
+            amount: amount,
+            note: note,
+            channelName: channelName,
+            counterpartyName: counterpartyName,
+            paymentStatus: paymentStatus,
+            occurredAt: occurredAt,
+            parentEventId: parentEventId,
+            quantity: quantity,
+            unit: unit,
+            lines: lines,
+            master: master
+        )
+        if let revisesEventId, !revisesEventId.isEmpty {
+            return try await authorizedPatch(
+                path: "v1/business/moments/\(momentId)/operating-events/\(revisesEventId)",
+                body: body,
+                idempotencyKey: UUID().uuidString
+            )
         }
         return try await authorizedPost(
             path: "v1/business/moments/\(momentId)/operating-events",
-            body: Body(
-                eventType: eventType,
-                title: title,
-                amount: amount,
-                note: note,
-                channelName: channelName,
-                counterpartyName: counterpartyName,
-                paymentStatus: paymentStatus,
-                occurredAt: occurredAt
-            ),
+            body: body,
             idempotencyKey: UUID().uuidString
         )
     }

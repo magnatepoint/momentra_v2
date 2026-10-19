@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +46,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.momentra.data.api.OperatingActivityDto
+import com.example.momentra.data.api.OperatingMasterDto
+import com.example.momentra.data.api.OperatingPaymentDto
 import com.example.momentra.data.api.OperatingProjectionDto
 import com.example.momentra.ui.theme.PlusJakartaSans
 import kotlinx.coroutines.launch
@@ -78,6 +82,13 @@ data class OperatingCaptureDraft(
     val counterpartyName: String?,
     val paymentStatus: String?,
     val occurredAt: String?,
+    val quantity: String? = null,
+    val unit: String? = null,
+    val unitPrice: String? = null,
+    val itemName: String? = null,
+    val parentEventId: String? = null,
+    val revisesEventId: String? = null,
+    val masterKind: String? = null,
 )
 
 private val dayFormat = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH)
@@ -135,6 +146,7 @@ fun OperatingCaptureSheet(
     onDismiss: () -> Unit,
     onSubmit: suspend (OperatingCaptureDraft) -> Unit,
     onDecide: (suspend (String, String) -> Unit)? = null,
+    seed: OperatingActivityDto? = null,
 ) {
     val currency = model.currency?.ifBlank { null } ?: "INR"
     var eventDate by remember { mutableStateOf(LocalDate.now()) }
@@ -189,6 +201,24 @@ fun OperatingCaptureSheet(
     val job = variant == "job"
     val production = standard || job
     var link by remember { mutableStateOf("") }
+    var itemName by remember { mutableStateOf("") }
+    var quantity by remember { mutableStateOf("") }
+    var unit by remember { mutableStateOf("piece") }
+    var unitPrice by remember { mutableStateOf("") }
+    var parentId by remember { mutableStateOf("") }
+    var masterKind by remember { mutableStateOf(masterKinds(model.subtype).first()) }
+    LaunchedEffect(seed?.id, seed?.parentEventId) {
+        val row = seed ?: return@LaunchedEffect
+        amount = row.amount.orEmpty()
+        party = row.counterpartyName.orEmpty()
+        channel = row.channelName ?: channel
+        note = row.note.orEmpty()
+        purpose = row.title
+        itemName = row.title
+        quantity = row.quantity.orEmpty()
+        unit = row.unit ?: unit
+        parentId = row.parentEventId.orEmpty()
+    }
     var detail by remember(mode, variant) {
         mutableStateOf(if ((variant == "client" || variant == "own") && mode == "DELIVERABLE") "Due" else "")
     }
@@ -234,6 +264,7 @@ fun OperatingCaptureSheet(
 
             when (mode) {
                 "SALE", "SERVICE" -> if (production && mode == "SALE") {
+                    ItemLine(itemName, quantity, unit, unitPrice, { itemName = it }, { quantity = it }, { unit = it }, { unitPrice = it }, model.masters.orEmpty())
                     AmountBlock("Amount", currency, amount, "Positive amount · 2 decimal places") { amount = it }
                     if (channels.isNotEmpty()) {
                         ChoiceBlock("Buyer / channel", channels, channel) { channel = it }
@@ -255,6 +286,7 @@ fun OperatingCaptureSheet(
                     if (moreOpen) NoteField("Note", note, "Optional") { note = it }
                     SummaryCard("After save", saleSummary(model, currency, typed, choice == "Paid"))
                 } else {
+                    ItemLine(itemName, quantity, unit, unitPrice, { itemName = it }, { quantity = it }, { unit = it }, { unitPrice = it }, model.masters.orEmpty())
                     AmountBlock("Amount", currency, amount, "Positive amount · 2 decimal places") { amount = it }
                     if (channels.isNotEmpty()) ChoiceBlock(channelLabel, channels, channel) { channel = it }
                     if (distribution && mode == "SALE") EditField("Buyer / dealer", party, "Required") { party = it }
@@ -291,6 +323,7 @@ fun OperatingCaptureSheet(
                     )
                 }
                 "PURCHASE", "VENDOR" -> if (production && mode == "PURCHASE") {
+                    ItemLine(itemName, quantity, unit, unitPrice, { itemName = it }, { quantity = it }, { unit = it }, { unitPrice = it }, model.masters.orEmpty())
                     AmountBlock("Amount", currency, amount, "Positive amount · 2 decimal places") { amount = it }
                     FieldRow {
                         EditField("Supplier", party, "Required", Modifier.weight(1f)) { party = it }
@@ -303,6 +336,7 @@ fun OperatingCaptureSheet(
                     if (moreOpen) NoteField("Note", note, "Optional") { note = it }
                     SummaryCard("After approval", purchaseSummary(model, currency, typed, choice.startsWith("Pending")))
                 } else if (marketing && mode == "VENDOR") {
+                    ItemLine(itemName, quantity, unit, unitPrice, { itemName = it }, { quantity = it }, { unit = it }, { unitPrice = it }, model.masters.orEmpty())
                     AmountBlock("Amount", currency, amount, "Positive amount · 2 decimal places") { amount = it }
                     EditField("Counterparty", party, "Required") { party = it }
                     EditField("Purpose", purpose, "What this covers") { purpose = it }
@@ -310,6 +344,7 @@ fun OperatingCaptureSheet(
                     Text("Pending approval. Submission is not payment.", color = SheetMuted, fontFamily = PlusJakartaSans, fontSize = 12.sp)
                     SummaryCard("After approval", purchaseSummary(model, currency, typed, choice.startsWith("Pending")))
                 } else {
+                    ItemLine(itemName, quantity, unit, unitPrice, { itemName = it }, { quantity = it }, { unit = it }, { unitPrice = it }, model.masters.orEmpty())
                     AmountBlock("Amount", currency, amount, "Positive amount · 2 decimal places") { amount = it }
                     FieldRow {
                         EditField(if (distribution) "Principal · Optional" else "Supplier · Optional", party, "Name", Modifier.weight(1f)) { party = it }
@@ -368,6 +403,10 @@ fun OperatingCaptureSheet(
                     SummaryCard("After approval", spendSummary(model, currency, typed))
                 }
                 "PAYMENT", "REIMBURSE" -> if (marketing && mode == "PAYMENT") {
+                    OpenRecords(mode, model.paymentReadiness, parentId) { row ->
+                        parentId = row.id
+                        row.counterpartyName?.takeIf { it.isNotBlank() }?.let { party = it }
+                    }
                     AmountBlock("Payment amount", currency, amount, "Positive amount · 2 decimal places") { amount = it }
                     EditField("Who paid", detail, "Payer") { detail = it }
                     EditField("Paid to", party, "Required") { party = it }
@@ -375,6 +414,10 @@ fun OperatingCaptureSheet(
                     ReadField("Date", dateText) { dateOpen = true }
                     Text("Manual confirmation only. This is not a live transfer.", color = SheetMuted, fontFamily = PlusJakartaSans, fontSize = 12.sp)
                 } else {
+                    OpenRecords(mode, model.paymentReadiness, parentId) { row ->
+                        parentId = row.id
+                        row.counterpartyName?.takeIf { it.isNotBlank() }?.let { party = it }
+                    }
                     AmountBlock(if (mode == "REIMBURSE") "Reimbursement amount" else "Amount", currency, amount, "Positive amount · 2 decimal places") { amount = it }
                     EditField(
                         when {
@@ -393,6 +436,10 @@ fun OperatingCaptureSheet(
                     )
                 }
                 "COLLECTION" -> if (production) {
+                    OpenRecords(mode, model.paymentReadiness, parentId) { row ->
+                        parentId = row.id
+                        row.counterpartyName?.takeIf { it.isNotBlank() }?.let { party = it }
+                    }
                     if (channels.isNotEmpty()) {
                         ChoiceBlock("Received from", channels, channel) { channel = it }
                     } else {
@@ -407,6 +454,10 @@ fun OperatingCaptureSheet(
                     Text("Records the receipt. This is not a live transfer.", color = SheetMuted, fontFamily = PlusJakartaSans, fontSize = 12.sp)
                     SummaryCard("After mark received", collectionSummary(model, currency, typed))
                 } else if (client) {
+                    OpenRecords(mode, model.paymentReadiness, parentId) { row ->
+                        parentId = row.id
+                        row.counterpartyName?.takeIf { it.isNotBlank() }?.let { party = it }
+                    }
                     ChoiceBlock("Collection path", listOf("Mark Received / Collect", "Create Receivable"), choice) { choice = it }
                     Text(
                         "Mark Received records a receipt. Create Receivable records the obligation.",
@@ -423,6 +474,10 @@ fun OperatingCaptureSheet(
                     EditField("Purpose / reference", purpose, "Required") { purpose = it }
                     SummaryCard("After mark received", collectionSummary(model, currency, typed))
                 } else if (own) {
+                    OpenRecords(mode, model.paymentReadiness, parentId) { row ->
+                        parentId = row.id
+                        row.counterpartyName?.takeIf { it.isNotBlank() }?.let { party = it }
+                    }
                     ChoiceBlock("Received from", listOf("Linked campaign receipt", "Other campaign receipt"), choice) { choice = it }
                     Text(
                         "Campaign-linked receipt only. No client billing or receivable.",
@@ -438,6 +493,10 @@ fun OperatingCaptureSheet(
                     EditField("Purpose / reference", purpose, "Required") { purpose = it }
                     SummaryCard("After mark received", collectionSummary(model, currency, typed))
                 } else {
+                    OpenRecords(mode, model.paymentReadiness, parentId) { row ->
+                        parentId = row.id
+                        row.counterpartyName?.takeIf { it.isNotBlank() }?.let { party = it }
+                    }
                     if (channels.isNotEmpty()) ChoiceBlock(if (distribution) "Buyer / dealer" else "Received from", channels, channel) { channel = it }
                     AmountBlock("Amount received", currency, amount, "Positive amount") { amount = it }
                     FieldRow {
@@ -937,6 +996,15 @@ fun OperatingCaptureSheet(
                     if (channels.isNotEmpty()) ChoiceBlock(if (restaurant || service || trading || distribution) "Where you sell" else "Channel", channels, channel) { channel = it }
                     Text("Saving creates the relationship. It does not create a purchase or an expense.", color = SheetMuted, fontFamily = PlusJakartaSans, fontSize = 12.sp)
                 }
+                "MASTERS" -> {
+                    ChoiceBlock("Master", masterKinds(model.subtype), masterKind) { masterKind = it }
+                    EditField("Name", itemName, "Required") { itemName = it }
+                    if (masterKind in setOf("PRODUCT", "MATERIAL", "CONSUMABLE")) {
+                        ChoiceBlock("Unit", listOf("piece", "kg", "litre", "count"), unit) { unit = it }
+                    }
+                    EditField("Detail", purpose, "Optional") { purpose = it }
+                    Text("Saving adds a selectable record. It does not create a sale or a cost.", color = SheetMuted, fontFamily = PlusJakartaSans, fontSize = 12.sp)
+                }
                 "APPROVAL" -> ApprovalBody(
                     model,
                     currency,
@@ -1024,7 +1092,8 @@ fun OperatingCaptureSheet(
                         val draft = buildDraft(
                             mode, eventType, title, amount, channel, party, purpose, draftNote, choice,
                             occurredAtValue(eventDate), trading, distribution, client, own, detail,
-                            standard, job, link,
+                            standard, job, link, itemName, quantity, unit, unitPrice, parentId,
+                            seed?.id, masterKind, model.paymentReadiness,
                         )
                         if (draft == null) {
                             error = requiredMessage(mode)
@@ -1243,11 +1312,39 @@ private fun buildDraft(
     standard: Boolean = false,
     job: Boolean = false,
     link: String = "",
+    itemName: String = "",
+    quantity: String = "",
+    unit: String = "",
+    unitPrice: String = "",
+    parentId: String = "",
+    revisesEventId: String? = null,
+    masterKind: String = "",
+    readiness: List<OperatingPaymentDto> = emptyList(),
 ): OperatingCaptureDraft? {
+    if (mode == "MASTERS") {
+        if (itemName.isBlank()) return null
+        return OperatingCaptureDraft(
+            eventType = "UPDATE",
+            title = itemName.trim(),
+            amount = null,
+            note = purpose.ifBlank { null },
+            channelName = null,
+            counterpartyName = null,
+            paymentStatus = null,
+            occurredAt = occurredAt,
+            unit = unit.ifBlank { null },
+            itemName = itemName.trim(),
+            masterKind = masterKind,
+        )
+    }
     val marketing = client || own
     val production = standard || job
     val needsAmount = mode in setOf("SALE", "SERVICE", "PURCHASE", "VENDOR", "SPEND", "PAYMENT", "REIMBURSE", "COLLECTION", "BUDGET", "TARGET", "RESULT", "PRODUCTION")
-    val value = amount.toBigDecimalOrNull()
+    val computed = quantity.toBigDecimalOrNull()?.multiply(unitPrice.toBigDecimalOrNull() ?: BigDecimal.ZERO)
+    val resolvedAmount = amount.ifBlank {
+        computed?.takeIf { it > BigDecimal.ZERO }?.setScale(2, RoundingMode.HALF_UP)?.toPlainString() ?: ""
+    }
+    val value = resolvedAmount.toBigDecimalOrNull()
     if (needsAmount && (value == null || value <= BigDecimal.ZERO)) return null
     val needsText = mode in setOf("UPDATE", "ISSUE", "STOCK", "ORDER", "SHIPMENT", "DELIVERY", "APPOINTMENT", "DELIVERABLE", "COMPLETE")
     if (needsText && !(production && mode == "ORDER") && purpose.isBlank() && note.isBlank()) return null
@@ -1277,12 +1374,17 @@ private fun buildDraft(
     if (production && mode == "BUDGET" && purpose.isBlank()) return null
     if (production && mode == "ISSUE" && (purpose.isBlank() || party.isBlank())) return null
     if (mode in setOf("PERSON", "ROLE", "INVITE", "SUPPLIER", "PARTNER") && party.isBlank()) return null
+    val open = readiness.filter { row ->
+        if (mode == "COLLECTION") row.relevance == "RECEIVABLE" else row.relevance == "PAYABLE" || row.relevance == "REIMBURSEMENT"
+    }
+    if (mode in setOf("PAYMENT", "REIMBURSE", "COLLECTION") && open.isNotEmpty() && parentId.isBlank() && !(client && mode == "COLLECTION" && choice == "Create Receivable")) return null
     val savedTitle = when (mode) {
         "PERSON", "ROLE", "INVITE", "SUPPLIER", "PARTNER" -> party.trim()
         "UPDATE", "ISSUE", "ORDER", "SHIPMENT", "DELIVERY", "APPOINTMENT", "DELIVERABLE", "COMPLETE" ->
             if (production && mode == "ORDER") party.trim() else purpose.trim().take(80)
         "STOCK" -> purpose.trim().ifBlank { title }
-        "PURCHASE", "VENDOR", "SPEND" -> purpose.trim().ifBlank { title }
+        "PURCHASE", "VENDOR", "SPEND" -> itemName.trim().ifBlank { purpose.trim() }.ifBlank { title }
+        "SALE", "SERVICE" -> itemName.trim().ifBlank { title }
         else -> title
     }
     val payment = when (mode) {
@@ -1339,12 +1441,19 @@ private fun buildDraft(
     return OperatingCaptureDraft(
         eventType = if (production && mode == "BUDGET" && choice == "Target") "TARGET" else eventType,
         title = savedTitle.ifBlank { title },
-        amount = amount.ifBlank { null },
+        amount = resolvedAmount.ifBlank { null },
         note = savedNote,
         channelName = channel.ifBlank { null },
         counterpartyName = if (production && mode == "PRODUCTION") null else party.ifBlank { null },
         paymentStatus = payment,
         occurredAt = occurredAt,
+        quantity = quantity.ifBlank { null },
+        unit = unit.ifBlank { null },
+        unitPrice = unitPrice.ifBlank { null },
+        itemName = itemName.ifBlank { null },
+        parentEventId = parentId.ifBlank { null },
+        revisesEventId = revisesEventId?.takeIf { it.isNotBlank() },
+        masterKind = if (mode == "MASTERS") masterKind.ifBlank { null } else null,
     )
 }
 
@@ -1530,5 +1639,111 @@ private fun SummaryCard(title: String, lines: List<String>) {
     ) {
         Text(title, color = SheetAccent, fontFamily = PlusJakartaSans, fontSize = 14.sp)
         lines.forEach { Text(it, color = SheetInk, fontFamily = PlusJakartaSans, fontSize = 14.sp) }
+    }
+}
+
+internal fun masterKinds(subtype: String?): List<String> = when (subtype) {
+    "CONSUMER_SERVICE" -> listOf("SERVICE", "STAFF", "CUSTOMER", "SUPPLIER", "CONSUMABLE", "CHANNEL")
+    "CLIENT_CAMPAIGN", "OWN_BUSINESS_CAMPAIGN" -> listOf("METRIC", "CHANNEL", "BUDGET_CATEGORY", "PARTY")
+    "STANDARD_PRODUCTION", "MADE_TO_ORDER" -> listOf("MATERIAL", "PRODUCT", "SUPPLIER", "BUYER", "STAFF")
+    "TRADING_WHOLESALE", "DISTRIBUTION_DEALERSHIP" -> listOf("PRODUCT", "SUPPLIER", "BUYER", "CHANNEL")
+    else -> listOf("PRODUCT", "SUPPLIER", "CUSTOMER", "CHANNEL", "STAFF")
+}
+
+fun formatOperatingAmount(currency: String?, raw: String?, visible: Boolean = true): String {
+    if (!visible || raw.isNullOrBlank()) return "—"
+    val value = raw.toBigDecimalOrNull() ?: return raw
+    val locale = if (currency.isNullOrBlank() || currency == "INR") Locale("en", "IN") else Locale.US
+    val format = NumberFormat.getNumberInstance(locale).apply {
+        minimumFractionDigits = 0
+        maximumFractionDigits = 2
+    }
+    val text = format.format(value)
+    return if (currency.isNullOrBlank() || currency == "INR") "₹$text" else "$text $currency"
+}
+
+fun formatOperatingDetail(detail: String, currency: String?): String {
+    return Regex("""\d+\.\d{4}(?:\s+[A-Z]{3})?""").replace(detail) { match ->
+        val token = match.value.substringBefore(' ')
+        formatOperatingAmount(currency, token, true)
+    }
+}
+
+@Composable
+private fun ItemLine(
+    itemName: String,
+    quantity: String,
+    unit: String,
+    unitPrice: String,
+    onItem: (String) -> Unit,
+    onQuantity: (String) -> Unit,
+    onUnit: (String) -> Unit,
+    onPrice: (String) -> Unit,
+    masters: List<OperatingMasterDto> = emptyList(),
+) {
+    if (masters.isNotEmpty()) {
+        Text("Saved items", color = SheetMuted, fontFamily = PlusJakartaSans, fontSize = 12.sp)
+        masters.forEach { master ->
+            Text(
+                master.name,
+                color = SheetInk,
+                fontFamily = PlusJakartaSans,
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .border(1.dp, SheetBorder, RoundedCornerShape(8.dp))
+                    .clickable {
+                        onItem(master.name)
+                        master.unit?.let(onUnit)
+                    }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+            )
+        }
+    }
+    EditField("Item", itemName, "Item name") { onItem(it) }
+    FieldRow {
+        EditField("Qty", quantity, "1", Modifier.weight(1f)) { onQuantity(it) }
+        EditField("Unit", unit, "piece", Modifier.weight(1f)) { onUnit(it) }
+        EditField("Price", unitPrice, "0", Modifier.weight(1f)) { onPrice(it) }
+    }
+    Text("Quantity, unit, and price stay on the sale or purchase. Stock changes only when you record that the goods were received or dispatched.", color = SheetMuted, fontFamily = PlusJakartaSans, fontSize = 12.sp)
+}
+
+@Composable
+private fun OpenRecords(
+    mode: String,
+    readiness: List<OperatingPaymentDto>,
+    selected: String,
+    onPick: (OperatingPaymentDto) -> Unit,
+) {
+    val rows = readiness.filter { row ->
+        if (mode == "COLLECTION") row.relevance == "RECEIVABLE" else row.relevance == "PAYABLE" || row.relevance == "REIMBURSEMENT"
+    }
+    Text(
+        if (rows.isEmpty()) {
+            if (mode == "COLLECTION") "No unpaid sale is open." else "No unpaid purchase or expense is open."
+        } else if (mode == "COLLECTION") "Unpaid sales" else "Unpaid purchases and expenses",
+        color = SheetMuted,
+        fontFamily = PlusJakartaSans,
+        fontSize = 12.sp,
+    )
+    rows.forEach { row ->
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (selected == row.id) SheetHigh else Color.Transparent)
+                .border(1.dp, if (selected == row.id) SheetAccent else SheetBorder, RoundedCornerShape(12.dp))
+                .clickable { onPick(row) }
+                .padding(10.dp),
+        ) {
+            Text(row.title, color = SheetInk, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(
+                listOfNotNull(row.counterpartyName, row.amount, row.dueAt).filter { it.isNotBlank() }.joinToString(" · "),
+                color = SheetMuted,
+                fontFamily = PlusJakartaSans,
+                fontSize = 12.sp,
+            )
+        }
     }
 }
