@@ -59,6 +59,8 @@ data class RetailEventDraft(
     val parentEventId: String? = null,
     val revisesEventId: String? = null,
     val masterKind: String? = null,
+    val dueAt: String? = null,
+    val contract: com.example.momentra.data.api.OperatingContractBody? = null,
 )
 
 private enum class RetailSheet(
@@ -355,4 +357,6 @@ private fun OperatingCaptureDraft.toRetail() = RetailEventDraft(
     parentEventId = parentEventId,
     revisesEventId = revisesEventId,
     masterKind = masterKind,
+    dueAt = dueAt,
+    contract = contract,
 )

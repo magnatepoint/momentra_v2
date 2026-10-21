@@ -1153,18 +1153,26 @@ data class OperatingMoneyDto(
     val amount: String = "0",
     val spent: String = "0",
     val remaining: String = "0",
+    val configured: Boolean? = null,
 )
 
 data class OperatingTargetDto(
     val metric: String = "",
     val value: String = "0",
     val progress: String = "0",
+    val configured: Boolean? = null,
 )
 
 data class OperatingAttentionDto(
     val id: String = "",
     val title: String = "",
     val kind: String = "",
+    val severity: String? = null,
+    val amount: String? = null,
+    val dueAt: String? = null,
+    val counterpartyName: String? = null,
+    val sourceEventId: String? = null,
+    val cta: String? = null,
 )
 
 data class OperatingPaymentDto(
@@ -1217,6 +1225,7 @@ data class OperatingBoardSectionDto(
     val title: String = "",
     val detail: String = "",
     val rows: List<OperatingActivityDto> = emptyList(),
+    val coverage: String? = null,
 )
 
 data class OperatingBoardsDto(
@@ -1278,6 +1287,31 @@ data class OperatingMasterBody(
     val unit: String? = null,
 )
 
+data class OperatingAllocationBody(
+    val sourceId: String,
+    val amount: String,
+)
+
+data class OperatingContractBody(
+    val entryMode: String? = null,
+    val paymentState: String? = null,
+    val receiptState: String? = null,
+    val receivedAmount: String? = null,
+    val quantityReceived: String? = null,
+    val stockAction: String? = null,
+    val stockReason: String? = null,
+    val expenseCategory: String? = null,
+    val appointmentStatus: String? = null,
+    val appointmentAction: String? = null,
+    val orderStatus: String? = null,
+    val clientKey: String? = null,
+    val allocations: List<OperatingAllocationBody>? = null,
+    val reorderPoint: String? = null,
+    val staffName: String? = null,
+    val estimatedAmount: String? = null,
+    val followUp: Boolean? = null,
+)
+
 data class RecordOperatingEventBody(
     val eventType: String,
     val title: String,
@@ -1292,6 +1326,8 @@ data class RecordOperatingEventBody(
     val unit: String? = null,
     val lines: List<OperatingLineBody>? = null,
     val master: OperatingMasterBody? = null,
+    val dueAt: String? = null,
+    val contract: OperatingContractBody? = null,
 )
 
 data class RecordOperatingEventResultDto(

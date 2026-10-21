@@ -35,24 +35,25 @@ struct RestaurantActiveView: View {
                 card {
                     Text("Recorded sales").font(.plusJakarta(size: 12)).foregroundStyle(RestaurantChrome.secondary)
                     Text(money(model.target?.progress)).font(.plusJakarta(size: 28, weight: .semibold)).foregroundStyle(RestaurantChrome.ink)
-                    Text("of \(money(model.target?.value)) sales target").font(.plusJakarta(size: 13)).foregroundStyle(RestaurantChrome.secondary)
-                    meter("Sales progress", fraction(model.target?.progress, model.target?.value), RestaurantChrome.brand)
-                    meter("Budget used", fraction(model.budget?.spent, model.budget?.amount), RestaurantChrome.success)
-                    line("Budget remaining", money(model.budget?.remaining), RestaurantChrome.success)
+                    if model.target?.configured == true {
+                        Text("of \(money(model.target?.value)) sales target").font(.plusJakarta(size: 13)).foregroundStyle(RestaurantChrome.secondary)
+                        meter("Sales progress", fraction(model.target?.progress, model.target?.value), RestaurantChrome.brand)
+                    } else {
+                        Text("No sales target set for this period.").font(.plusJakarta(size: 13)).foregroundStyle(RestaurantChrome.secondary)
+                    }
+                    if model.budget?.configured == true {
+                        meter("Budget used", fraction(model.budget?.spent, model.budget?.amount), RestaurantChrome.success)
+                        line("Budget remaining", money(model.budget?.remaining), RestaurantChrome.success)
+                    } else {
+                        Text("No period budget set.").font(.plusJakarta(size: 13)).foregroundStyle(RestaurantChrome.secondary)
+                    }
                 }
                 sectionTitle("Needs Attention")
                 if (model.attention ?? []).isEmpty {
                     card { Text("Nothing is waiting.").foregroundStyle(RestaurantChrome.secondary) }
                 }
                 ForEach(model.attention ?? []) { item in
-                    card {
-                        Text(item.kind).font(.plusJakarta(size: 11, weight: .semibold)).foregroundStyle(RestaurantChrome.accent)
-                        Text(item.title).foregroundStyle(RestaurantChrome.ink)
-                        if item.id.hasPrefix("open-"), let payment = (model.paymentReadiness ?? []).first(where: { $0.id == String(item.id.dropFirst(5)) }) {
-                            Button("Open") { OperatingChromeState.shared.settling = payment }
-                                .font(.plusJakarta(size: 13, weight: .semibold))
-                        }
-                    }
+                    attentionCard(item)
                 }
                 sectionTitle("Payment Readiness")
                 readiness("To collect", (model.paymentReadiness ?? []).filter { $0.relevance == "RECEIVABLE" })
@@ -72,7 +73,7 @@ struct RestaurantActiveView: View {
                         .foregroundStyle(RestaurantChrome.ink)
                 }
                 ForEach(model.attention ?? []) { item in
-                    card { Text(item.title).foregroundStyle(RestaurantChrome.ink) }
+                    attentionCard(item)
                 }
             }
             sectionTitle("Activity")
@@ -97,18 +98,18 @@ struct RestaurantActiveView: View {
                 Text("This month, in motion").font(.plusJakarta(size: 22, weight: .semibold)).foregroundStyle(RestaurantChrome.ink)
                 HStack {
                     metric("Sales", money(model.finance?.sales ?? model.target?.progress))
-                    metric("Target", money(model.target?.value))
+                    metric("Target", model.target?.configured == true ? money(model.target?.value) : "—")
                 }
                 HStack {
-                    metric("Spent", money(model.budget?.spent))
-                    metric("Remaining", money(model.budget?.remaining))
+                    metric("Spent", model.budget?.configured == true ? money(model.budget?.spent) : "—")
+                    metric("Remaining", model.budget?.configured == true ? money(model.budget?.remaining) : "—")
                 }
-                meter("Sales toward target", fraction(model.target?.progress, model.target?.value), RestaurantChrome.brand)
+                if model.target?.configured == true {
+                    meter("Sales toward target", fraction(model.target?.progress, model.target?.value), RestaurantChrome.brand)
+                }
             }
-            ForEach(["sales", "purchases", "updates", "stock", "issues", "expenses", "payments", "channels"], id: \.self) { code in
-                if let section = model.boards?.moments?.first(where: { $0.code == code }) {
-                    board(section)
-                }
+            ForEach(model.boards?.moments ?? []) { section in
+                board(section)
             }
             card {
                 Text("Create the next restaurant moment").font(.plusJakarta(size: 16, weight: .semibold)).foregroundStyle(RestaurantChrome.ink)
@@ -171,12 +172,37 @@ struct RestaurantActiveView: View {
         }
     }
 
+    private func attentionCard(_ item: OperatingAttentionPayload) -> some View {
+        card {
+            Text(item.kind).font(.plusJakarta(size: 11, weight: .semibold)).foregroundStyle(RestaurantChrome.accent)
+            Text(item.title).foregroundStyle(RestaurantChrome.ink)
+            let meta = [
+                item.counterpartyName,
+                item.dueAt.map { String($0.prefix(10)) },
+                model.financeVisible == true ? money(item.amount) : nil,
+            ].compactMap { $0 }.filter { !$0.isEmpty && $0 != "—" }
+            if !meta.isEmpty {
+                Text(meta.joined(separator: " · ")).font(.plusJakarta(size: 12)).foregroundStyle(RestaurantChrome.secondary)
+            }
+            if item.cta != nil || item.id.hasPrefix("open-") || item.sourceEventId != nil {
+                Button(operatingAttentionCtaLabel(item)) {
+                    openOperatingAttention(item, model: model, onOpenQuickAdd: onOpenQuickAdd)
+                }
+                .font(.plusJakarta(size: 13, weight: .semibold))
+                .foregroundStyle(RestaurantChrome.accent)
+            }
+        }
+    }
+
     private func board(_ section: OperatingBoardSectionPayload) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionTitle(section.title)
             card {
                 Text(section.detail.isEmpty ? "Nothing recorded yet." : formatOperatingDetail(section.detail, currency: model.currency))
                     .font(.plusJakarta(size: 12)).foregroundStyle(RestaurantChrome.secondary)
+                if let coverage = section.coverage, !coverage.isEmpty {
+                    Text(coverage).font(.plusJakarta(size: 11, weight: .semibold)).foregroundStyle(RestaurantChrome.accent)
+                }
                 ForEach(section.rows ?? []) { row in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(row.title).foregroundStyle(RestaurantChrome.ink)
@@ -349,4 +375,7 @@ struct RestaurantEventDraft {
     var parentEventId: String? = nil
     var revisesEventId: String? = nil
     var masterKind: String? = nil
+    var dueAt: String? = nil
+    var contract: OperatingContractInput? = nil
+    var lineItems: [(itemName: String, quantity: String?, unit: String?, unitPrice: String?)]? = nil
 }

@@ -35,24 +35,25 @@ struct RetailStoreActiveView: View {
                 card {
                     Text("Recorded sales").font(.plusJakarta(size: 12)).foregroundStyle(RetailStoreChrome.secondary)
                     Text(money(model.target?.progress)).font(.plusJakarta(size: 28, weight: .semibold)).foregroundStyle(.white)
-                    Text("of \(money(model.target?.value)) sales target").font(.plusJakarta(size: 13)).foregroundStyle(RetailStoreChrome.secondary)
-                    meter("Sales progress", fraction(model.target?.progress, model.target?.value), RetailStoreChrome.brand)
-                    meter("Budget used", fraction(model.budget?.spent, model.budget?.amount), RetailStoreChrome.success)
-                    line("Budget remaining", money(model.budget?.remaining), RetailStoreChrome.success)
+                    if model.target?.configured == true {
+                        Text("of \(money(model.target?.value)) sales target").font(.plusJakarta(size: 13)).foregroundStyle(RetailStoreChrome.secondary)
+                        meter("Sales progress", fraction(model.target?.progress, model.target?.value), RetailStoreChrome.brand)
+                    } else {
+                        Text("No sales target set for this period.").font(.plusJakarta(size: 13)).foregroundStyle(RetailStoreChrome.secondary)
+                    }
+                    if model.budget?.configured == true {
+                        meter("Budget used", fraction(model.budget?.spent, model.budget?.amount), RetailStoreChrome.success)
+                        line("Budget remaining", money(model.budget?.remaining), RetailStoreChrome.success)
+                    } else {
+                        Text("No period budget set.").font(.plusJakarta(size: 13)).foregroundStyle(RetailStoreChrome.secondary)
+                    }
                 }
                 sectionTitle("Needs Attention")
                 if (model.attention ?? []).isEmpty {
                     card { Text("Nothing is waiting.").foregroundStyle(RetailStoreChrome.secondary) }
                 }
                 ForEach(model.attention ?? []) { item in
-                    card {
-                        Text(item.kind).font(.plusJakarta(size: 11, weight: .semibold)).foregroundStyle(RetailStoreChrome.accent)
-                        Text(item.title).foregroundStyle(.white)
-                        if item.id.hasPrefix("open-"), let payment = (model.paymentReadiness ?? []).first(where: { $0.id == String(item.id.dropFirst(5)) }) {
-                            Button("Open") { OperatingChromeState.shared.settling = payment }
-                                .font(.plusJakarta(size: 13, weight: .semibold))
-                        }
-                    }
+                    attentionCard(item)
                 }
                 sectionTitle("Payment Readiness")
                 readiness("To collect", (model.paymentReadiness ?? []).filter { $0.relevance == "RECEIVABLE" })
@@ -72,7 +73,7 @@ struct RetailStoreActiveView: View {
                         .foregroundStyle(.white)
                 }
                 ForEach(model.attention ?? []) { item in
-                    card { Text(item.title).foregroundStyle(.white) }
+                    attentionCard(item)
                 }
             }
             sectionTitle("Activity")
@@ -97,18 +98,18 @@ struct RetailStoreActiveView: View {
                 Text("This month, in motion").font(.plusJakarta(size: 22, weight: .semibold)).foregroundStyle(.white)
                 HStack {
                     metric("Sales", money(model.finance?.sales ?? model.target?.progress))
-                    metric("Target", money(model.target?.value))
+                    metric("Target", model.target?.configured == true ? money(model.target?.value) : "—")
                 }
                 HStack {
-                    metric("Spent", money(model.budget?.spent))
-                    metric("Remaining", money(model.budget?.remaining))
+                    metric("Spent", model.budget?.configured == true ? money(model.budget?.spent) : "—")
+                    metric("Remaining", model.budget?.configured == true ? money(model.budget?.remaining) : "—")
                 }
-                meter("Sales toward target", fraction(model.target?.progress, model.target?.value), RetailStoreChrome.brand)
+                if model.target?.configured == true {
+                    meter("Sales toward target", fraction(model.target?.progress, model.target?.value), RetailStoreChrome.brand)
+                }
             }
-            ForEach(["sales", "purchases", "updates", "stock", "issues", "expenses", "payments", "channels"], id: \.self) { code in
-                if let section = model.boards?.moments?.first(where: { $0.code == code }) {
-                    board(section)
-                }
+            ForEach(model.boards?.moments ?? []) { section in
+                board(section)
             }
             card {
                 Text("Create the next store moment").font(.plusJakarta(size: 16, weight: .semibold)).foregroundStyle(.white)
@@ -171,12 +172,37 @@ struct RetailStoreActiveView: View {
         }
     }
 
+    private func attentionCard(_ item: OperatingAttentionPayload) -> some View {
+        card {
+            Text(item.kind).font(.plusJakarta(size: 11, weight: .semibold)).foregroundStyle(RetailStoreChrome.accent)
+            Text(item.title).foregroundStyle(.white)
+            let meta = [
+                item.counterpartyName,
+                item.dueAt.map { String($0.prefix(10)) },
+                model.financeVisible == true ? money(item.amount) : nil,
+            ].compactMap { $0 }.filter { !$0.isEmpty && $0 != "—" }
+            if !meta.isEmpty {
+                Text(meta.joined(separator: " · ")).font(.plusJakarta(size: 12)).foregroundStyle(RetailStoreChrome.secondary)
+            }
+            if item.cta != nil || item.id.hasPrefix("open-") || item.sourceEventId != nil {
+                Button(operatingAttentionCtaLabel(item)) {
+                    openOperatingAttention(item, model: model, onOpenQuickAdd: onOpenQuickAdd)
+                }
+                .font(.plusJakarta(size: 13, weight: .semibold))
+                .foregroundStyle(RetailStoreChrome.accent)
+            }
+        }
+    }
+
     private func board(_ section: OperatingBoardSectionPayload) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionTitle(section.title)
             card {
                 Text(section.detail.isEmpty ? "Nothing recorded yet." : formatOperatingDetail(section.detail, currency: model.currency))
                     .font(.plusJakarta(size: 12)).foregroundStyle(RetailStoreChrome.secondary)
+                if let coverage = section.coverage, !coverage.isEmpty {
+                    Text(coverage).font(.plusJakarta(size: 11, weight: .semibold)).foregroundStyle(RetailStoreChrome.accent)
+                }
                 ForEach(section.rows ?? []) { row in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(row.title).foregroundStyle(.white)
@@ -348,4 +374,7 @@ struct RetailEventDraft {
     var parentEventId: String? = nil
     var revisesEventId: String? = nil
     var masterKind: String? = nil
+    var dueAt: String? = nil
+    var contract: OperatingContractInput? = nil
+    var lineItems: [(itemName: String, quantity: String?, unit: String?, unitPrice: String?)]? = nil
 }

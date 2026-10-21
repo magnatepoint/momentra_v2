@@ -110,6 +110,8 @@ fun OperatingMomentPage(
                     com.example.momentra.data.api.OperatingMasterBody(it, draft.title, draft.unit)
                 },
                 draft.revisesEventId,
+                draft.dueAt,
+                draft.contract,
             ).fold(
                 onSuccess = { tick += 1 },
                 onFailure = { error = it.message },
@@ -162,6 +164,8 @@ fun OperatingMomentPage(
                         com.example.momentra.data.api.OperatingMasterBody(it, draft.title, draft.unit)
                     },
                     draft.revisesEventId,
+                    draft.dueAt,
+                    draft.contract,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -208,6 +212,8 @@ fun OperatingMomentPage(
                         com.example.momentra.data.api.OperatingMasterBody(it, draft.title, draft.unit)
                     },
                     draft.revisesEventId,
+                    draft.dueAt,
+                    draft.contract,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -254,6 +260,8 @@ fun OperatingMomentPage(
                         com.example.momentra.data.api.OperatingMasterBody(it, draft.title, draft.unit)
                     },
                     draft.revisesEventId,
+                    draft.dueAt,
+                    draft.contract,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -300,6 +308,8 @@ fun OperatingMomentPage(
                         com.example.momentra.data.api.OperatingMasterBody(it, draft.title, draft.unit)
                     },
                     draft.revisesEventId,
+                    draft.dueAt,
+                    draft.contract,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -346,6 +356,8 @@ fun OperatingMomentPage(
                         com.example.momentra.data.api.OperatingMasterBody(it, draft.title, draft.unit)
                     },
                     draft.revisesEventId,
+                    draft.dueAt,
+                    draft.contract,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -392,6 +404,8 @@ fun OperatingMomentPage(
                         com.example.momentra.data.api.OperatingMasterBody(it, draft.title, draft.unit)
                     },
                     draft.revisesEventId,
+                    draft.dueAt,
+                    draft.contract,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -438,6 +452,8 @@ fun OperatingMomentPage(
                         com.example.momentra.data.api.OperatingMasterBody(it, draft.title, draft.unit)
                     },
                     draft.revisesEventId,
+                    draft.dueAt,
+                    draft.contract,
                 ).fold(
                     onSuccess = { tick += 1 },
                     onFailure = { error = it.message },
@@ -696,6 +712,7 @@ private fun InfoCard(label: String, body: String) {
 internal fun OperatingChromeSheets(model: OperatingProjectionDto) {
     val editing = OperatingChromeState.editing
     val settling = OperatingChromeState.settling
+    val charging = OperatingChromeState.charging
     val record = OperatingChromeState.record
     if (editing != null && record != null) {
         OperatingCaptureSheet(
@@ -732,6 +749,29 @@ internal fun OperatingChromeSheets(model: OperatingProjectionDto) {
             onSubmit = { draft ->
                 record(draft)
                 OperatingChromeState.settling = null
+            },
+        )
+    }
+    if (charging != null && record != null) {
+        val serviceMode = if (model.subtype == "CONSUMER_SERVICE") "SERVICE" else "SALE"
+        OperatingCaptureSheet(
+            title = if (serviceMode == "SERVICE") "Finalize Charge" else "Record Sale",
+            icon = com.example.momentra.R.drawable.qa_shield,
+            eventType = serviceMode,
+            mode = serviceMode,
+            model = model,
+            seed = com.example.momentra.data.api.OperatingActivityDto(
+                id = "",
+                title = charging.title,
+                eventType = serviceMode,
+                channelName = charging.channelName,
+                counterpartyName = charging.counterpartyName,
+                parentEventId = charging.id,
+            ),
+            onDismiss = { OperatingChromeState.charging = null },
+            onSubmit = { draft ->
+                record(draft)
+                OperatingChromeState.charging = null
             },
         )
     }
