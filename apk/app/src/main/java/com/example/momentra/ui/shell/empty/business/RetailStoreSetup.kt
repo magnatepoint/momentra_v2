@@ -632,7 +632,8 @@ fun RetailStoreSetup(
     var currency by remember { mutableStateOf("INR") }
     var currencyOpen by remember { mutableStateOf(false) }
     var start by remember { mutableStateOf(LocalDate.now()) }
-    var dateOpen by remember { mutableStateOf(false) }
+    var end by remember { mutableStateOf<LocalDate?>(null) }
+    var dateTarget by remember { mutableStateOf<String?>(null) }
     var description by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
     var invites by remember { mutableStateOf(listOf<StoreInvite>()) }
@@ -755,7 +756,8 @@ fun RetailStoreSetup(
                     Text(label, color = if (code == currency) Accent else Ink, fontFamily = PlusJakartaSans, fontSize = 14.sp, modifier = Modifier.clickable { currency = code; currencyOpen = false }.padding(vertical = 6.dp))
                 }
             }
-            ChoiceRow("Start date", start.format(dayFormat), R.drawable.rs_setup_calendar) { dateOpen = true }
+            ChoiceRow("Start date", start.format(dayFormat), R.drawable.rs_setup_calendar) { dateTarget = "start" }
+            ChoiceRow("End date", end?.format(dayFormat) ?: "Still open", R.drawable.rs_setup_calendar) { dateTarget = "end" }
             FieldEditor("Description", description, look.descriptionHint, R.drawable.rs_setup_pencil) { description = it }
             FieldEditor("Location", location, look.locationHint, R.drawable.rs_setup_pin) { location = it }
             if (look.tradeReach.isNotEmpty()) {
@@ -898,7 +900,7 @@ fun RetailStoreSetup(
                 fontFamily = PlusJakartaSans,
                 fontSize = 12.sp,
             )
-            ChoiceRow("Month", start.format(monthFormat), R.drawable.rs_setup_calendar) { dateOpen = true }
+            ChoiceRow("Month", start.format(monthFormat), R.drawable.rs_setup_calendar) { dateTarget = "start" }
             FieldEditor("Monthly budget", budget, "Amount", R.drawable.rs_setup_pencil) { budget = it.filter { ch -> ch.isDigit() || ch == '.' } }
             FieldEditor("Monthly sales target", target, "Amount", R.drawable.rs_setup_pencil) { target = it.filter { ch -> ch.isDigit() || ch == '.' } }
             if (look.targetMetrics.size > 1) {
@@ -965,6 +967,7 @@ fun RetailStoreSetup(
                             "description" to description.trim(),
                             "currency" to currency,
                             "startDate" to start.toString(),
+                            "endDate" to (end?.toString() ?: ""),
                             "location" to location.trim(),
                             "activationPolicy" to policy,
                             "participants" to invites.map { mapOf("displayName" to it.name, "role" to it.role) },
@@ -993,17 +996,29 @@ fun RetailStoreSetup(
         Text(look.footer, color = Secondary, fontFamily = PlusJakartaSans, fontSize = 12.sp, lineHeight = 18.sp)
     }
 
-    if (dateOpen) {
-        val state = rememberDatePickerState(initialSelectedDateMillis = SetupDateTimeUtils.localDateToMillis(start))
+    if (dateTarget != null) {
+        val editingEnd = dateTarget == "end"
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = SetupDateTimeUtils.localDateToMillis(if (editingEnd) end ?: start else start),
+        )
         DatePickerDialog(
-            onDismissRequest = { dateOpen = false },
+            onDismissRequest = { dateTarget = null },
             confirmButton = {
                 TextButton(onClick = {
-                    state.selectedDateMillis?.let { start = SetupDateTimeUtils.millisToLocalDate(it) }
-                    dateOpen = false
+                    state.selectedDateMillis?.let {
+                        val picked = SetupDateTimeUtils.millisToLocalDate(it)
+                        if (editingEnd) end = picked else start = picked
+                    }
+                    dateTarget = null
                 }) { Text("Done") }
             },
-            dismissButton = { TextButton(onClick = { dateOpen = false }) { Text("Cancel") } },
+            dismissButton = {
+                if (editingEnd) {
+                    TextButton(onClick = { end = null; dateTarget = null }) { Text("Clear") }
+                } else {
+                    TextButton(onClick = { dateTarget = null }) { Text("Cancel") }
+                }
+            },
         ) { DatePicker(state = state) }
     }
     }

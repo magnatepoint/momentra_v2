@@ -1173,12 +1173,15 @@ data class OperatingPaymentDto(
     val amount: String = "",
     val relevance: String = "",
     val status: String = "",
+    val counterpartyName: String? = null,
+    val dueAt: String? = null,
 )
 
 data class OperatingFinanceDto(
     val sales: String = "0.0000",
     val received: String = "0.0000",
     val outstanding: String = "0.0000",
+    val payable: String = "0.0000",
     val eligibleCost: String = "0.0000",
     val cashPaid: String = "0.0000",
 )
@@ -1194,6 +1197,9 @@ data class OperatingActivityDto(
     val paymentStatus: String? = null,
     val approvalStatus: String? = null,
     val note: String? = null,
+    val quantity: String? = null,
+    val unit: String? = null,
+    val parentEventId: String? = null,
 )
 
 data class OperatingLifeDto(
@@ -1236,6 +1242,9 @@ data class OperatingProjectionDto(
     val financeVisible: Boolean = false,
     val currency: String? = null,
     val startDate: String? = null,
+    val endDate: String? = null,
+    val participants: List<String> = emptyList(),
+    val masters: List<OperatingMasterDto>? = null,
     val location: String? = null,
     val budget: OperatingMoneyDto? = null,
     val finance: OperatingFinanceDto? = null,
@@ -1249,6 +1258,26 @@ data class OperatingProjectionDto(
     val quickAdds: List<OperatingQuickAddDto> = emptyList(),
 )
 
+data class OperatingMasterDto(
+    val id: String = "",
+    val kind: String = "",
+    val name: String = "",
+    val unit: String? = null,
+)
+
+data class OperatingLineBody(
+    val itemName: String,
+    val quantity: String? = null,
+    val unit: String? = null,
+    val unitPrice: String? = null,
+)
+
+data class OperatingMasterBody(
+    val kind: String,
+    val name: String,
+    val unit: String? = null,
+)
+
 data class RecordOperatingEventBody(
     val eventType: String,
     val title: String,
@@ -1257,6 +1286,12 @@ data class RecordOperatingEventBody(
     val counterpartyName: String? = null,
     val channelName: String? = null,
     val paymentStatus: String? = null,
+    val occurredAt: String? = null,
+    val parentEventId: String? = null,
+    val quantity: String? = null,
+    val unit: String? = null,
+    val lines: List<OperatingLineBody>? = null,
+    val master: OperatingMasterBody? = null,
 )
 
 data class RecordOperatingEventResultDto(

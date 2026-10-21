@@ -54,6 +54,10 @@ struct ProductionActiveView: View {
                     card {
                         Text(item.kind).font(.plusJakarta(size: 11, weight: .semibold)).foregroundStyle(chrome.accent)
                         Text(item.title).foregroundStyle(chrome.ink)
+                        if item.id.hasPrefix("open-"), let payment = (model.paymentReadiness ?? []).first(where: { $0.id == String(item.id.dropFirst(5)) }) {
+                            Button("Open") { OperatingChromeState.shared.settling = payment }
+                                .font(.plusJakarta(size: 13, weight: .semibold))
+                        }
                         if item.kind == "APPROVAL" && (model.role == "OWNER_ADMIN" || model.role == "APPROVER") {
                             HStack {
                                 Button("Approve") { Task { try? await onDecide(item.id, "APPROVED") } }
@@ -65,16 +69,16 @@ struct ProductionActiveView: View {
                     }
                 }
                 sectionTitle("Payment Readiness")
-                readiness("Ready", (model.paymentReadiness ?? []).filter { $0.status == "READY" })
-                readiness("Expected", (model.paymentReadiness ?? []).filter { $0.status == "PENDING" })
-                readiness("Not ready", (model.paymentReadiness ?? []).filter { $0.status != "READY" && $0.status != "PENDING" })
+                readiness("To collect", (model.paymentReadiness ?? []).filter { $0.relevance == "RECEIVABLE" })
+                readiness("To pay", (model.paymentReadiness ?? []).filter { $0.relevance != "RECEIVABLE" })
                 sectionTitle("Finance")
                 card {
                     line("Qualifying revenue", money(model.target?.progress), chrome.accent)
                     line("Received", money(model.finance?.received), chrome.success)
-                    line("Outstanding", money(model.finance?.outstanding), Color(hex: "#FBBF24"))
+                    line("Still to collect", money(model.finance?.outstanding), Color(hex: "#FBBF24"))
                     line("Eligible cost", money(model.finance?.eligibleCost), chrome.ink)
                     line("Business cash paid", money(model.finance?.cashPaid), chrome.ink)
+                    line("Still to pay", money(model.finance?.payable), Color(hex: "#FBBF24"))
                 }
             } else {
                 Text("Production status, with the work you're allowed to see.")
@@ -191,7 +195,7 @@ struct ProductionActiveView: View {
         VStack(alignment: .leading, spacing: 8) {
             sectionTitle(section.title)
             card {
-                Text(section.detail.isEmpty ? "Nothing recorded yet." : section.detail)
+                Text(section.detail.isEmpty ? "Nothing recorded yet." : formatOperatingDetail(section.detail, currency: model.currency))
                     .font(.plusJakarta(size: 12)).foregroundStyle(chrome.secondary)
                 ForEach(section.rows ?? []) { row in
                     VStack(alignment: .leading, spacing: 2) {
@@ -201,7 +205,7 @@ struct ProductionActiveView: View {
                             Text(extra.joined(separator: " · ")).font(.plusJakarta(size: 12)).foregroundStyle(chrome.secondary)
                         }
                         if model.financeVisible == true, let amount = row.amount, !amount.isEmpty {
-                            Text(amount).font(.plusJakarta(size: 13, weight: .semibold)).foregroundStyle(chrome.accent)
+                            Text(money(amount)).font(.plusJakarta(size: 13, weight: .semibold)).foregroundStyle(chrome.accent)
                         }
                     }
                 }
@@ -227,10 +231,13 @@ struct ProductionActiveView: View {
             Text(row.eventType.replacingOccurrences(of: "_", with: " "))
                 .font(.plusJakarta(size: 11)).foregroundStyle(chrome.accent)
             Text(row.title).foregroundStyle(chrome.ink)
-            let bits = [row.channelName, row.counterpartyName, model.financeVisible == true ? row.amount : nil].compactMap { $0 }
+            let qty = [row.quantity, row.unit].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
+            let bits = [row.counterpartyName, qty.isEmpty ? nil : qty, row.paymentStatus == "NONE" ? nil : row.paymentStatus, String(row.occurredAt.prefix(10)), model.financeVisible == true ? money(row.amount) : nil].compactMap { $0 }.filter { !$0.isEmpty && $0 != "—" }
             if !bits.isEmpty {
                 Text(bits.joined(separator: " · ")).font(.plusJakarta(size: 12)).foregroundStyle(chrome.secondary)
             }
+            Button("Edit") { OperatingChromeState.shared.editing = row }
+                .font(.plusJakarta(size: 13, weight: .semibold))
         }
     }
 
@@ -239,7 +246,14 @@ struct ProductionActiveView: View {
             card {
                 Text(label).font(.plusJakarta(size: 12, weight: .semibold)).foregroundStyle(chrome.accent)
                 ForEach(rows) { item in
-                    line(item.title, money(item.amount), chrome.ink)
+                    Button { OperatingChromeState.shared.settling = item } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            line(item.title, money(item.amount), chrome.ink)
+                            Text([item.counterpartyName, item.dueAt.map { String($0.prefix(10)) }].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                                .font(.plusJakarta(size: 12))
+                        }
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -319,13 +333,13 @@ struct ProductionActiveView: View {
         today.locale = Locale(identifier: "en_US_POSIX")
         today.dateFormat = "dd MMM yyyy"
         let from = model.startDate?.prefix(10).description
+        let until = model.endDate?.prefix(10).description
+        if let until, !until.isEmpty { return "Snapshot · \(from?.isEmpty == false ? from! : today.string(from: Date())) – \(until)" }
         return "Snapshot · from \(from?.isEmpty == false ? from! : today.string(from: Date())) · \(today.string(from: Date()))"
     }
 
     private func money(_ raw: String?) -> String {
-        guard model.financeVisible == true, let raw, !raw.isEmpty else { return "—" }
-        let number = raw.split(separator: ".").first.map(String.init) ?? raw
-        return (model.currency ?? "INR") == "INR" ? "₹\(number)" : "\(model.currency ?? "") \(number)"
+        formatOperatingAmount(raw, currency: model.currency, visible: model.financeVisible == true)
     }
 
     private func fraction(_ part: String?, _ whole: String?) -> Double {
@@ -384,4 +398,12 @@ struct ProductionEventDraft {
     var channelName: String?
     var counterpartyName: String?
     var paymentStatus: String?
+    var occurredAt: String? = nil
+    var quantity: String? = nil
+    var unit: String? = nil
+    var unitPrice: String? = nil
+    var itemName: String? = nil
+    var parentEventId: String? = nil
+    var revisesEventId: String? = nil
+    var masterKind: String? = nil
 }

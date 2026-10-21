@@ -320,6 +320,7 @@ struct MomentSwitcherView: View {
     var onOpenDirectory: (() -> Void)? = nil
     var selectedIsCompleted: Bool = false
     var startExpanded: Bool = false
+    var participantNames: [String] = []
 
     @State private var expanded = false
 
@@ -387,6 +388,15 @@ struct MomentSwitcherView: View {
                     .opacity(canOpenSettings ? 1 : 0.4)
                     .accessibilityLabel("Invite people")
                     .accessibilityIdentifier("moment.switcher.invite")
+                }
+
+                if !participantNames.isEmpty {
+                    Text(participantNames.joined(separator: ", "))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(MomentraBrandTokens.textOnDark.opacity(0.8))
+                        .lineLimit(1)
+                        .frame(maxWidth: 140, alignment: .trailing)
+                        .accessibilityLabel("Participants")
                 }
 
                 Button(action: onSettings) {

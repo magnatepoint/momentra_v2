@@ -9,6 +9,7 @@ struct ProductionQuickAddHub: View {
     @State private var sheet: ProductionSheetKind?
     @State private var approvalOpen = false
     @State private var errorText: String?
+    @State private var mastersOpen = false
     @Environment(\.productionChrome) private var chrome
 
     private var allowed: Set<String> { Set((model.quickAdds ?? []).map(\.code)) }
@@ -53,7 +54,7 @@ struct ProductionQuickAddHub: View {
             .background(chrome.card)
             .clipShape(RoundedRectangle(cornerRadius: 18))
             HStack(spacing: 10) {
-                Image("qa_search").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
+                Image("biz_qa_search").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
                     .foregroundStyle(chrome.ink)
                 TextField("Search actions", text: $query).font(.plusJakarta(size: 14))
             }
@@ -78,6 +79,7 @@ struct ProductionQuickAddHub: View {
                     }
                 }
             }
+            Button("Masters") { mastersOpen = true }.font(.plusJakarta(size: 15, weight: .semibold))
             Text("Support & management").font(.plusJakarta(size: 12)).foregroundStyle(chrome.secondary)
             supportGrid
             if approver {
@@ -87,13 +89,77 @@ struct ProductionQuickAddHub: View {
             }
             if let errorText { Text(errorText).foregroundStyle(Color(hex: "#F87171")) }
         }
+        .sheet(isPresented: $mastersOpen) {
+            OperatingCaptureSheet(
+                title: "Masters",
+                icon: "qa_shield",
+                eventType: "UPDATE",
+                mode: "MASTERS",
+                model: model,
+                onSubmit: { draft in
+                    try await onRecord(ProductionEventDraft(
+                        eventType: draft.eventType,
+                        title: draft.title,
+                        amount: draft.amount,
+                        note: draft.note,
+                        channelName: draft.channelName,
+                        counterpartyName: draft.counterpartyName,
+                        paymentStatus: draft.paymentStatus,
+                        occurredAt: draft.occurredAt,
+                        quantity: draft.quantity,
+                        unit: draft.unit,
+                        unitPrice: draft.unitPrice,
+                        itemName: draft.itemName,
+                        parentEventId: draft.parentEventId,
+                        revisesEventId: draft.revisesEventId,
+                        masterKind: draft.masterKind
+                    ))
+                },
+                onDecide: onDecide
+            )
+        }
         .sheet(item: $sheet) { kind in
-            ProductionEventSheet(kind: kind, model: model) { draft in
-                try await onRecord(draft)
-            }
+            OperatingCaptureSheet(
+                title: kind.sheetTitle,
+                icon: kind.icon,
+                eventType: kind.eventType,
+                mode: kind.captureMode,
+                model: model,
+                channelLabel: "Channel",
+                variant: job ? "job" : "standard",
+                onSubmit: { draft in
+                    try await onRecord(ProductionEventDraft(
+                        eventType: draft.eventType,
+                        title: draft.title,
+                        amount: draft.amount,
+                        note: draft.note,
+                        channelName: draft.channelName,
+                        counterpartyName: draft.counterpartyName,
+                        paymentStatus: draft.paymentStatus,
+                        occurredAt: draft.occurredAt,
+                        quantity: draft.quantity,
+                        unit: draft.unit,
+                        unitPrice: draft.unitPrice,
+                        itemName: draft.itemName,
+                        parentEventId: draft.parentEventId,
+                        revisesEventId: draft.revisesEventId,
+                        masterKind: draft.masterKind
+                    ))
+                },
+                onDecide: onDecide
+            )
         }
         .sheet(isPresented: $approvalOpen) {
-            ApprovalList(model: model, onDecide: onDecide)
+            OperatingCaptureSheet(
+                title: "Review Approval",
+                icon: "qa_shield",
+                eventType: "APPROVAL",
+                mode: "APPROVAL",
+                model: model,
+                variant: job ? "job" : "standard",
+                onSubmit: { _ in },
+                onDecide: onDecide
+            )
         }
     }
 
@@ -177,7 +243,7 @@ enum ProductionSheetKind: String, Identifiable {
     var icon: String {
         switch self {
         case .production: return "qa_factory"
-        case .purchase: return "qa_wallet"
+        case .purchase: return "biz_qa_wallet"
         case .spend, .sale: return "qa_receipt"
         case .payment: return "qa_credit_card"
         case .collection: return "qa_arrow_left_right"
@@ -189,12 +255,56 @@ enum ProductionSheetKind: String, Identifiable {
         case .reimburse: return "qa_receipt"
         case .approval: return "qa_shield"
         case .person: return "qa_user_plus"
-        case .role: return "qa_users"
+        case .role: return "biz_qa_users"
         case .partner: return "qa_network"
         case .invite: return "qa_qr"
         }
     }
     var title: String { label }
+    var sheetTitle: String {
+        switch self {
+        case .production: return "Record Production"
+        case .purchase: return "Material Purchase"
+        case .spend: return "Record Expense"
+        case .sale: return "Sale / Dispatch"
+        case .customerOrder: return "Customer Order"
+        case .delivery: return "Delivery"
+        case .payment: return "Record Payment"
+        case .collection: return "Record Collection"
+        case .budget: return "Budget / Target"
+        case .update: return "Post Update"
+        case .issue: return "Report Issue"
+        case .stock: return "Material / Stock Update"
+        case .reimburse: return "Record Reimbursement"
+        case .person, .role, .invite: return "Add or invite person"
+        case .partner: return "Add Supplier"
+        case .target: return "Target"
+        case .approval: return "Review Approval"
+        }
+    }
+    var captureMode: String {
+        switch self {
+        case .production: return "PRODUCTION"
+        case .purchase: return "PURCHASE"
+        case .spend: return "SPEND"
+        case .sale: return "SALE"
+        case .customerOrder: return "ORDER"
+        case .delivery: return "DELIVERY"
+        case .payment: return "PAYMENT"
+        case .collection: return "COLLECTION"
+        case .budget: return "BUDGET"
+        case .target: return "TARGET"
+        case .update: return "UPDATE"
+        case .issue: return "ISSUE"
+        case .stock: return "STOCK"
+        case .reimburse: return "REIMBURSE"
+        case .approval: return "APPROVAL"
+        case .person: return "PERSON"
+        case .role: return "ROLE"
+        case .partner: return "PARTNER"
+        case .invite: return "INVITE"
+        }
+    }
     var eventType: String {
         switch self {
         case .production: return "PRODUCTION"
@@ -234,117 +344,4 @@ enum ProductionSheetKind: String, Identifiable {
         }
     }
     static let core: [ProductionSheetKind] = [.customerOrder, .production, .purchase, .spend, .sale, .delivery, .payment, .collection, .budget, .update, .issue, .stock]
-}
-
-private struct ProductionEventSheet: View {
-    let kind: ProductionSheetKind
-    let model: OperatingProjectionPayload
-    var onSubmit: (ProductionEventDraft) async throws -> Void
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.productionChrome) private var chrome
-    @State private var title = ""
-    @State private var amount = ""
-    @State private var channel = ""
-    @State private var party = ""
-    @State private var note = ""
-    @State private var errorText: String?
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text(kind.title).font(.plusJakarta(size: 20, weight: .semibold)).foregroundStyle(chrome.ink)
-                    Spacer()
-                    Button("Close") { dismiss() }.foregroundStyle(chrome.secondary)
-                }
-                Text("\(OperatingMomentCatalog.roles.first { $0.0 == model.role }?.1 ?? "Production") · \(model.title ?? "")")
-                    .font(.plusJakarta(size: 12)).foregroundStyle(chrome.secondary)
-                field("Title", text: $title, placeholder: "What happened")
-                if kind.needsAmount { field("Amount", text: $amount, placeholder: "0") }
-                if kind.needsChannel {
-                    Text("Channel").font(.plusJakarta(size: 12)).foregroundStyle(chrome.secondary)
-                    ForEach(model.life?.channels ?? [], id: \.self) { name in
-                        Button(name) { channel = name }
-                            .foregroundStyle(channel == name ? chrome.bg : chrome.secondary)
-                    }
-                }
-                if kind.needsParty { field(kind == .person || kind == .role || kind == .invite ? "Person" : "Name", text: $party, placeholder: "Name") }
-                field("Note", text: $note, placeholder: "Optional")
-                if let errorText { Text(errorText).foregroundStyle(Color(hex: "#F87171")) }
-                Button("Save") { Task { await save() } }
-                    .font(.plusJakarta(size: 15, weight: .semibold))
-                    .foregroundStyle(chrome.bg)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(chrome.brand)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .padding(16)
-        }
-        .background(chrome.bg)
-        .onAppear { channel = model.life?.channels?.first ?? "" }
-    }
-
-    private func field(_ label: String, text: Binding<String>, placeholder: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.plusJakarta(size: 12)).foregroundStyle(chrome.secondary)
-            TextField(placeholder, text: text)
-                .font(.plusJakarta(size: 14))
-                .padding(12)
-                .background(chrome.field)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-    }
-
-    private func save() async {
-        let trimmed = title.trimmingCharacters(in: .whitespaces).isEmpty ? party.trimmingCharacters(in: .whitespaces) : title.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty { errorText = "A title is required."; return }
-        if kind.needsAmount, (Double(amount) ?? 0) <= 0 { errorText = "Amount must be positive."; return }
-        do {
-            try await onSubmit(ProductionEventDraft(
-                eventType: kind.eventType,
-                title: trimmed,
-                amount: amount.isEmpty ? nil : amount,
-                note: note.isEmpty ? nil : note,
-                channelName: channel.isEmpty ? nil : channel,
-                counterpartyName: party.isEmpty ? nil : party,
-                paymentStatus: kind.paymentStatus
-            ))
-            dismiss()
-        } catch {
-            errorText = error.localizedDescription
-        }
-    }
-}
-
-private struct ApprovalList: View {
-    let model: OperatingProjectionPayload
-    var onDecide: (String, String) async throws -> Void
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.productionChrome) private var chrome
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Review Approval").font(.plusJakarta(size: 20, weight: .semibold)).foregroundStyle(chrome.ink)
-                Spacer()
-                Button("Close") { dismiss() }.foregroundStyle(chrome.secondary)
-            }
-            let pending = (model.attention ?? []).filter { $0.kind == "APPROVAL" }
-            if pending.isEmpty { Text("Nothing is waiting.").foregroundStyle(chrome.secondary) }
-            ForEach(pending) { item in
-                Text(item.title).foregroundStyle(chrome.ink)
-                HStack {
-                    Button("Approve") { Task { try? await onDecide(item.id, "APPROVED"); dismiss() } }
-                        .foregroundStyle(chrome.success)
-                    Button("Reject") { Task { try? await onDecide(item.id, "REJECTED"); dismiss() } }
-                        .foregroundStyle(Color(hex: "#F87171"))
-                }
-            }
-            Spacer()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(chrome.bg)
-    }
 }

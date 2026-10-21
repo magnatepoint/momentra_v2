@@ -3,9 +3,13 @@ package com.example.momentra.ui.shell.business.marketing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,7 +36,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.momentra.R
 import com.example.momentra.data.api.OperatingProjectionDto
+import com.example.momentra.ui.shell.business.shared.OperatingCaptureDraft
+import com.example.momentra.ui.shell.business.shared.OperatingCaptureSheet
 import com.example.momentra.ui.shell.business.shared.OperatingMomentCatalog
+import com.example.momentra.ui.shell.business.shared.OperatingSheetScrim
 import com.example.momentra.ui.theme.PlusJakartaSans
 import kotlinx.coroutines.launch
 
@@ -44,6 +51,14 @@ data class MarketingEventDraft(
     val channelName: String?,
     val counterpartyName: String?,
     val paymentStatus: String?,
+    val occurredAt: String? = null,
+    val quantity: String? = null,
+    val unit: String? = null,
+    val unitPrice: String? = null,
+    val itemName: String? = null,
+    val parentEventId: String? = null,
+    val revisesEventId: String? = null,
+    val masterKind: String? = null,
 )
 
 private enum class MarketingSheet(
@@ -82,10 +97,20 @@ fun MarketingQuickAddHub(
     var query by remember { mutableStateOf("") }
     var sheet by remember { mutableStateOf<MarketingSheet?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var approvalOpen by remember { mutableStateOf(false) }
+    var mastersOpen by remember { mutableStateOf(false) }
     val role = model.role.orEmpty()
     val owner = role == "OWNER_ADMIN"
     val approver = role == "APPROVER" || owner
     val client = model.subtype != "OWN_BUSINESS_CAMPAIGN"
+    Box(Modifier.fillMaxSize()) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 17.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
     Text("Quick Adds", color = CampInk, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 28.sp)
     Text("Record what happened · ${model.title.orEmpty()}", color = CampSecondary, fontFamily = PlusJakartaSans, fontSize = 13.sp)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -192,6 +217,13 @@ fun MarketingQuickAddHub(
             }
         }
     }
+    Text(
+        "Masters",
+        color = Color.White,
+        fontFamily = PlusJakartaSans,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+        modifier = Modifier.clickable { mastersOpen = true }.padding(vertical = 8.dp),
+    )
     Text("Support & management", color = CampSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
     val support = if (client) {
         listOf(
@@ -205,7 +237,6 @@ fun MarketingQuickAddHub(
             Triple(MarketingSheet.PARTNER, "Partners & Channels", if (owner) null else "Owner only"),
         )
     }.filter { (_, label, _) -> label.contains(query, ignoreCase = true) }
-    var approvalOpen by remember { mutableStateOf(false) }
     support.chunked(3).forEach { row ->
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             row.forEach { (kind, label, lock) ->
@@ -225,17 +256,60 @@ fun MarketingQuickAddHub(
         Text("Some support actions stay with the Owner or Approver.", color = CampSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
     }
     if (error != null) Text(error ?: "", color = Color(0xFFF87171), fontFamily = PlusJakartaSans, fontSize = 13.sp)
+    }
     val open = sheet
     if (open != null) {
-        MarketingEventSheet(open, model, onDismiss = { sheet = null }) { draft ->
-            onRecord(draft)
-            sheet = null
+        OperatingSheetScrim(onDismiss = { sheet = null }) {
+            OperatingCaptureSheet(
+                title = open.sheetTitle(client),
+                icon = open.icon(client),
+                eventType = open.eventType,
+                mode = open.captureMode,
+                model = model,
+                channelLabel = "Channel",
+                variant = if (client) "client" else "own",
+                onDismiss = { sheet = null },
+                onSubmit = { draft ->
+                    onRecord(draft.toMarketing())
+                    sheet = null
+                },
+                onDecide = onDecide,
+            )
         }
     }
+    if (mastersOpen) {
+        OperatingCaptureSheet(
+            title = "Masters",
+            icon = R.drawable.qa_shield,
+            eventType = "UPDATE",
+            mode = "MASTERS",
+            model = model,
+            onDismiss = { mastersOpen = false },
+            onSubmit = { draft ->
+                onRecord(draft.toMarketing())
+                mastersOpen = false
+            },
+        )
+    }
     if (approvalOpen) {
-        ApprovalSheet(model, onDismiss = { approvalOpen = false }, onDecide = onDecide)
+        OperatingSheetScrim(onDismiss = { approvalOpen = false }) {
+            OperatingCaptureSheet(
+                title = "Review Approval",
+                icon = R.drawable.qa_shield,
+                eventType = "APPROVAL",
+                mode = "APPROVAL",
+                model = model,
+                variant = if (client) "client" else "own",
+                onDismiss = { approvalOpen = false },
+                onSubmit = {},
+                onDecide = onDecide,
+            )
+        }
+    }
     }
 }
+
+
 
 private fun MarketingSheet.icon(client: Boolean): Int = when (this) {
     MarketingSheet.SPEND -> if (client) R.drawable.qa_receipt else R.drawable.qa_wallet
@@ -289,155 +363,58 @@ private fun HubChip(text: String, filled: Boolean) {
     )
 }
 
-@Composable
-private fun MarketingEventSheet(
-    kind: MarketingSheet,
-    model: OperatingProjectionDto,
-    onDismiss: () -> Unit,
-    onSubmit: suspend (MarketingEventDraft) -> Unit,
-) {
-    var title by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var channel by remember { mutableStateOf(model.life?.channels?.firstOrNull().orEmpty()) }
-    var party by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-    var localError by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(CampNotice)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(kind.title, color = CampInk, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-            Text("Close", color = CampSecondary, modifier = Modifier.clickable(onClick = onDismiss))
-        }
-        Text("${OperatingMomentCatalog.roles.firstOrNull { it.first == model.role }?.second ?: "Marketing"} · ${model.title.orEmpty()}", color = CampSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
-        Field("Title", title, "What happened") { title = it }
-        if (kind.needsAmount) Field("Amount", amount, "0") { amount = it.filter { ch -> ch.isDigit() || ch == '.' } }
-        if (kind.needsChannel) {
-            Text("Channel", color = CampSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                (model.life?.channels ?: emptyList()).forEach { name ->
-                    Text(
-                        name,
-                        color = if (name == channel) CampBg else CampSecondary,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(if (name == channel) CampBrand else Color.Transparent)
-                            .border(1.dp, CampBorder, RoundedCornerShape(999.dp))
-                            .clickable { channel = name }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                    )
-                }
-            }
-        }
-        if (kind.needsParty) {
-            Field(
-                if (kind == MarketingSheet.PERSON || kind == MarketingSheet.ROLE || kind == MarketingSheet.PARTNER) "Person" else "Name",
-                party,
-                "Name",
-            ) { party = it }
-        }
-        Field("Note", note, "Optional") { note = it }
-        if (localError != null) Text(localError ?: "", color = Color(0xFFF87171), fontSize = 12.sp)
-        Text(
-            "Save",
-            color = CampBg,
-            fontFamily = PlusJakartaSans,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(CampBrand)
-                .clickable {
-                    val trimmed = title.trim().ifBlank { party.trim() }
-                    if (trimmed.isEmpty()) {
-                        localError = "A title is required."
-                        return@clickable
-                    }
-                    if (kind.needsAmount && amount.toDoubleOrNull()?.let { it > 0 } != true) {
-                        localError = "Amount must be positive."
-                        return@clickable
-                    }
-                    localError = null
-                    scope.launch {
-                        onSubmit(
-                            MarketingEventDraft(
-                                eventType = kind.eventType,
-                                title = trimmed,
-                                amount = amount.ifBlank { null },
-                                note = note.ifBlank { null },
-                                channelName = channel.ifBlank { null },
-                                counterpartyName = party.ifBlank { null },
-                                paymentStatus = kind.paymentStatus,
-                            )
-                        )
-                    }
-                }
-                .padding(vertical = 14.dp),
-        )
+
+private val MarketingSheet.captureMode: String
+    get() = when (this) {
+        MarketingSheet.SPEND -> "SPEND"
+        MarketingSheet.RESULT -> "RESULT"
+        MarketingSheet.PAYMENT -> "PAYMENT"
+        MarketingSheet.COLLECTION -> "COLLECTION"
+        MarketingSheet.BUDGET -> "BUDGET"
+        MarketingSheet.TARGET -> "TARGET"
+        MarketingSheet.UPDATE -> "UPDATE"
+        MarketingSheet.ISSUE -> "ISSUE"
+        MarketingSheet.APPROVAL -> "UPDATE"
+        MarketingSheet.DELIVERABLE -> "DELIVERABLE"
+        MarketingSheet.VENDOR_COST -> "VENDOR"
+        MarketingSheet.COMPLETE -> "COMPLETE"
+        MarketingSheet.PERSON -> "PERSON"
+        MarketingSheet.ROLE -> "ROLE"
+        MarketingSheet.PARTNER -> "PARTNER"
+        MarketingSheet.CHANNELS -> "PARTNER"
     }
+
+private fun MarketingSheet.sheetTitle(client: Boolean): String = when (this) {
+    MarketingSheet.SPEND -> "Add Spend / Expense"
+    MarketingSheet.RESULT -> "Add Result"
+    MarketingSheet.PAYMENT -> "Add Payment"
+    MarketingSheet.COLLECTION -> if (client) "Client Billing / Collection" else "Add Collection"
+    MarketingSheet.BUDGET -> "Add Budget"
+    MarketingSheet.TARGET -> if (client) "Target Revision" else "Add Target"
+    MarketingSheet.UPDATE -> "Add Update"
+    MarketingSheet.ISSUE -> "Add Issue"
+    MarketingSheet.APPROVAL -> "Request Approval"
+    MarketingSheet.DELIVERABLE -> "Add Deliverable / Milestone"
+    MarketingSheet.VENDOR_COST -> "Add Vendor / Creator Cost"
+    MarketingSheet.COMPLETE -> "Mark Result / Deliverable Complete"
+    MarketingSheet.PERSON, MarketingSheet.ROLE -> "Add or invite person"
+    MarketingSheet.PARTNER, MarketingSheet.CHANNELS -> if (client) "Client / Partners / Channels" else "Partners & Channels"
 }
 
-@Composable
-private fun ApprovalSheet(
-    model: OperatingProjectionDto,
-    onDismiss: () -> Unit,
-    onDecide: suspend (String, String) -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    val pending = model.attention.filter { it.kind == "APPROVAL" }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(CampNotice)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Review Approval", color = CampInk, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-            Text("Close", color = CampSecondary, modifier = Modifier.clickable(onClick = onDismiss))
-        }
-        if (pending.isEmpty()) Text("Nothing is waiting.", color = CampSecondary, fontFamily = PlusJakartaSans, fontSize = 14.sp)
-        pending.forEach { item ->
-            Text(item.title, color = CampInk, fontFamily = PlusJakartaSans, fontSize = 14.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Approve", color = CampSuccess, modifier = Modifier.clickable {
-                    scope.launch { onDecide(item.id, "APPROVED"); onDismiss() }
-                })
-                Text("Reject", color = Color(0xFFF87171), modifier = Modifier.clickable {
-                    scope.launch { onDecide(item.id, "REJECTED"); onDismiss() }
-                })
-            }
-        }
-    }
-}
-
-@Composable
-private fun Field(label: String, value: String, placeholder: String, onValue: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, color = CampSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
-        BasicTextField(
-            value = value,
-            onValueChange = onValue,
-            textStyle = TextStyle(color = CampInk, fontFamily = PlusJakartaSans, fontSize = 14.sp),
-            cursorBrush = SolidColor(CampBrand),
-            decorationBox = { inner ->
-                if (value.isEmpty()) Text(placeholder, color = CampSecondary, fontFamily = PlusJakartaSans, fontSize = 14.sp)
-                inner()
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(CampField)
-                .border(1.dp, CampBorder, RoundedCornerShape(8.dp))
-                .padding(12.dp),
-        )
-    }
-}
+private fun OperatingCaptureDraft.toMarketing() = MarketingEventDraft(
+    eventType = eventType,
+    title = title,
+    amount = amount,
+    note = note,
+    channelName = channelName,
+    counterpartyName = counterpartyName,
+    paymentStatus = paymentStatus,
+    occurredAt = occurredAt,
+    quantity = quantity,
+    unit = unit,
+    unitPrice = unitPrice,
+    itemName = itemName,
+    parentEventId = parentEventId,
+    revisesEventId = revisesEventId,
+    masterKind = masterKind,
+)

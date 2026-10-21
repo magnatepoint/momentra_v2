@@ -3,9 +3,13 @@ package com.example.momentra.ui.shell.business.retail
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,7 +36,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.momentra.R
 import com.example.momentra.data.api.OperatingProjectionDto
+import com.example.momentra.ui.shell.business.shared.OperatingCaptureDraft
+import com.example.momentra.ui.shell.business.shared.OperatingCaptureSheet
 import com.example.momentra.ui.shell.business.shared.OperatingMomentCatalog
+import com.example.momentra.ui.shell.business.shared.OperatingSheetScrim
 import com.example.momentra.ui.theme.PlusJakartaSans
 import kotlinx.coroutines.launch
 
@@ -44,6 +51,14 @@ data class RetailEventDraft(
     val channelName: String?,
     val counterpartyName: String?,
     val paymentStatus: String?,
+    val occurredAt: String? = null,
+    val quantity: String? = null,
+    val unit: String? = null,
+    val unitPrice: String? = null,
+    val itemName: String? = null,
+    val parentEventId: String? = null,
+    val revisesEventId: String? = null,
+    val masterKind: String? = null,
 )
 
 private enum class RetailSheet(
@@ -80,9 +95,19 @@ fun RetailQuickAddHub(
     var query by remember { mutableStateOf("") }
     var sheet by remember { mutableStateOf<RetailSheet?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var approvalOpen by remember { mutableStateOf(false) }
+    var mastersOpen by remember { mutableStateOf(false) }
     val role = model.role.orEmpty()
     val owner = role == "OWNER_ADMIN"
     val approver = role == "APPROVER" || owner
+    Box(Modifier.fillMaxSize()) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 17.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
     Text("Quick Adds", color = Color.White, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 28.sp)
     Text("Record what happened · ${model.title.orEmpty()}", color = StoreSecondary, fontFamily = PlusJakartaSans, fontSize = 13.sp)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -158,6 +183,13 @@ fun RetailQuickAddHub(
             }
         }
     }
+    Text(
+        "Masters",
+        color = Color.White,
+        fontFamily = PlusJakartaSans,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+        modifier = Modifier.clickable { mastersOpen = true }.padding(vertical = 8.dp),
+    )
     Text("Support & management", color = StoreSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
     val support = listOf(
         Triple(RetailSheet.REIMBURSE, "Reimbursement", if ("PAYMENT" in allowed) null else "Finance only"),
@@ -167,7 +199,6 @@ fun RetailQuickAddHub(
         Triple(RetailSheet.SUPPLIER, "Suppliers & channels", if ("UPDATE" in allowed) null else "View only"),
         Triple(RetailSheet.INVITE, "Invite & QR", if (owner && "UPDATE" in allowed) null else "Owner only"),
     ).filter { (_, label, _) -> label.contains(query, ignoreCase = true) }
-    var approvalOpen by remember { mutableStateOf(false) }
     support.chunked(3).forEach { row ->
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             row.forEach { (kind, label, lock) ->
@@ -188,17 +219,56 @@ fun RetailQuickAddHub(
         Text("Some support actions stay with the Owner or Approver.", color = StoreSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
     }
     if (error != null) Text(error ?: "", color = Color(0xFFF87171), fontFamily = PlusJakartaSans, fontSize = 13.sp)
+    }
     val open = sheet
     if (open != null) {
-        RetailEventSheet(open, model, onDismiss = { sheet = null }) { draft ->
-            onRecord(draft)
-            sheet = null
+        OperatingSheetScrim(onDismiss = { sheet = null }) {
+            OperatingCaptureSheet(
+                title = open.title,
+                icon = open.hubIcon,
+                eventType = open.eventType,
+                mode = open.captureMode,
+                model = model,
+                channelLabel = if (open == RetailSheet.SALE || open == RetailSheet.COLLECTION) "Sales channel" else "Channel",
+                onDismiss = { sheet = null },
+                onSubmit = { draft ->
+                    onRecord(draft.toRetail())
+                    sheet = null
+                },
+            )
         }
     }
+    if (mastersOpen) {
+        OperatingCaptureSheet(
+            title = "Masters",
+            icon = R.drawable.qa_shield,
+            eventType = "UPDATE",
+            mode = "MASTERS",
+            model = model,
+            onDismiss = { mastersOpen = false },
+            onSubmit = { draft ->
+                onRecord(draft.toRetail())
+                mastersOpen = false
+            },
+        )
+    }
     if (approvalOpen) {
-        ApprovalSheet(model, onDismiss = { approvalOpen = false }, onDecide = onDecide)
+        OperatingSheetScrim(onDismiss = { approvalOpen = false }) {
+            OperatingCaptureSheet(
+                title = "Review Approval",
+                icon = R.drawable.qa_shield,
+                eventType = "APPROVAL",
+                mode = "APPROVAL",
+                model = model,
+                onDismiss = { approvalOpen = false },
+                onSubmit = {},
+                onDecide = onDecide,
+            )
+        }
+    }
     }
 }
+
 
 private val RetailSheet.hubIcon: Int
     get() = when (this) {
@@ -250,155 +320,39 @@ private fun HubChip(text: String, filled: Boolean) {
     )
 }
 
-@Composable
-private fun RetailEventSheet(
-    kind: RetailSheet,
-    model: OperatingProjectionDto,
-    onDismiss: () -> Unit,
-    onSubmit: suspend (RetailEventDraft) -> Unit,
-) {
-    var title by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var channel by remember { mutableStateOf(model.life?.channels?.firstOrNull().orEmpty()) }
-    var party by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-    var localError by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(StoreNotice)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(kind.title, color = Color.White, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-            Text("Close", color = StoreSecondary, modifier = Modifier.clickable(onClick = onDismiss))
-        }
-        Text("${OperatingMomentCatalog.roles.firstOrNull { it.first == model.role }?.second ?: "Retail"} · ${model.title.orEmpty()}", color = StoreSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
-        Field("Title", title, "What happened") { title = it }
-        if (kind.needsAmount) Field("Amount", amount, "0") { amount = it.filter { ch -> ch.isDigit() || ch == '.' } }
-        if (kind.needsChannel) {
-            Text("Channel", color = StoreSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                (model.life?.channels ?: emptyList()).forEach { name ->
-                    Text(
-                        name,
-                        color = if (name == channel) StoreBg else StoreSecondary,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(if (name == channel) StoreBrand else Color.Transparent)
-                            .border(1.dp, StoreBorder, RoundedCornerShape(999.dp))
-                            .clickable { channel = name }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                    )
-                }
-            }
-        }
-        if (kind.needsParty) {
-            Field(
-                if (kind == RetailSheet.PERSON || kind == RetailSheet.ROLE || kind == RetailSheet.INVITE) "Person" else "Name",
-                party,
-                "Name",
-            ) { party = it }
-        }
-        Field("Note", note, "Optional") { note = it }
-        if (localError != null) Text(localError ?: "", color = Color(0xFFF87171), fontSize = 12.sp)
-        Text(
-            "Save",
-            color = Color.White,
-            fontFamily = PlusJakartaSans,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(StoreBrand)
-                .clickable {
-                    val trimmed = title.trim().ifBlank { party.trim() }
-                    if (trimmed.isEmpty()) {
-                        localError = "A title is required."
-                        return@clickable
-                    }
-                    if (kind.needsAmount && amount.toDoubleOrNull()?.let { it > 0 } != true) {
-                        localError = "Amount must be positive."
-                        return@clickable
-                    }
-                    localError = null
-                    scope.launch {
-                        onSubmit(
-                            RetailEventDraft(
-                                eventType = kind.eventType,
-                                title = trimmed,
-                                amount = amount.ifBlank { null },
-                                note = note.ifBlank { null },
-                                channelName = channel.ifBlank { null },
-                                counterpartyName = party.ifBlank { null },
-                                paymentStatus = kind.paymentStatus,
-                            )
-                        )
-                    }
-                }
-                .padding(vertical = 14.dp),
-        )
-    }
-}
 
-@Composable
-private fun ApprovalSheet(
-    model: OperatingProjectionDto,
-    onDismiss: () -> Unit,
-    onDecide: suspend (String, String) -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    val pending = model.attention.filter { it.kind == "APPROVAL" }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(StoreNotice)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Review Approval", color = Color.White, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-            Text("Close", color = StoreSecondary, modifier = Modifier.clickable(onClick = onDismiss))
-        }
-        if (pending.isEmpty()) Text("Nothing is waiting.", color = StoreSecondary, fontFamily = PlusJakartaSans, fontSize = 14.sp)
-        pending.forEach { item ->
-            Text(item.title, color = Color.White, fontFamily = PlusJakartaSans, fontSize = 14.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Approve", color = StoreSuccess, modifier = Modifier.clickable {
-                    scope.launch { onDecide(item.id, "APPROVED"); onDismiss() }
-                })
-                Text("Reject", color = Color(0xFFF87171), modifier = Modifier.clickable {
-                    scope.launch { onDecide(item.id, "REJECTED"); onDismiss() }
-                })
-            }
-        }
+private val RetailSheet.captureMode: String
+    get() = when (this) {
+        RetailSheet.SALE -> "SALE"
+        RetailSheet.PURCHASE -> "PURCHASE"
+        RetailSheet.SPEND -> "SPEND"
+        RetailSheet.PAYMENT -> "PAYMENT"
+        RetailSheet.COLLECTION -> "COLLECTION"
+        RetailSheet.BUDGET -> "BUDGET"
+        RetailSheet.UPDATE -> "UPDATE"
+        RetailSheet.ISSUE -> "ISSUE"
+        RetailSheet.STOCK -> "STOCK"
+        RetailSheet.REIMBURSE -> "REIMBURSE"
+        RetailSheet.PERSON -> "PERSON"
+        RetailSheet.ROLE -> "ROLE"
+        RetailSheet.INVITE -> "INVITE"
+        RetailSheet.SUPPLIER -> "SUPPLIER"
     }
-}
 
-@Composable
-private fun Field(label: String, value: String, placeholder: String, onValue: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, color = StoreSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
-        BasicTextField(
-            value = value,
-            onValueChange = onValue,
-            textStyle = TextStyle(color = Color.White, fontFamily = PlusJakartaSans, fontSize = 14.sp),
-            cursorBrush = SolidColor(StoreBrand),
-            decorationBox = { inner ->
-                if (value.isEmpty()) Text(placeholder, color = StoreSecondary, fontFamily = PlusJakartaSans, fontSize = 14.sp)
-                inner()
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(StoreField)
-                .border(1.dp, StoreBorder, RoundedCornerShape(8.dp))
-                .padding(12.dp),
-        )
-    }
-}
+private fun OperatingCaptureDraft.toRetail() = RetailEventDraft(
+    eventType = eventType,
+    title = title,
+    amount = amount,
+    note = note,
+    channelName = channelName,
+    counterpartyName = counterpartyName,
+    paymentStatus = paymentStatus,
+    occurredAt = occurredAt,
+    quantity = quantity,
+    unit = unit,
+    unitPrice = unitPrice,
+    itemName = itemName,
+    parentEventId = parentEventId,
+    revisesEventId = revisesEventId,
+    masterKind = masterKind,
+)

@@ -332,6 +332,16 @@ export async function listBusinessMomentTimeline(
   momentId: string,
   limit = 50
 ) {
+  const { getOperatingProjection } = await import('./operating-service');
+  const operating = await getOperatingProjection(client, ctx, momentId);
+  if (!('retired' in operating && operating.retired)) {
+    return {
+      momentId,
+      source: 'OPERATING' as const,
+      ...operating,
+    };
+  }
+
   const scope = await assertCompanyMomentAccess(client, ctx, momentId);
 
   const [expenses, issues, improvements, updates, proj] = await Promise.all([

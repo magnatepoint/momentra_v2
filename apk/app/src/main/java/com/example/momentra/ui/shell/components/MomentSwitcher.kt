@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -70,6 +71,7 @@ fun MomentSwitcher(
     selectedIsCompleted: Boolean = false,
     accent: Color = MomentraBrandColors.Cta,
     startExpanded: Boolean = false,
+    participantNames: List<String> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember(startExpanded) { mutableStateOf(startExpanded) }
@@ -167,6 +169,17 @@ fun MomentSwitcher(
                             .clickable(enabled = canOpenSettings, onClick = onInvite)
                             .padding(6.dp)
                             .testTag(MaestroIds.MOMENT_SWITCHER_INVITE),
+                    )
+                }
+                if (participantNames.isNotEmpty()) {
+                    Text(
+                        participantNames.joinToString(", "),
+                        color = MomentraBrandColors.TextOnDark.copy(alpha = 0.8f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 140.dp),
                     )
                 }
                 Icon(

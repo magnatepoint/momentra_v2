@@ -173,7 +173,6 @@ struct AuthOnlyView: View {
                 AppShellView(
                     identity: identity,
                     model: shellModel,
-                    onDisplayNameSaved: { viewModel.applyDisplayName($0) },
                     onSignOut: {
                         shellModel.clearForLogout()
                         AppLockSession.unlocked = false
@@ -182,7 +181,8 @@ struct AuthOnlyView: View {
                     onSessionExpired: {
                         shellModel.clearForLogout()
                         viewModel.onSessionExpired()
-                    }
+                    },
+                    onDisplayNameSaved: { viewModel.applyDisplayName($0) }
                 )
                 .trackScreen(AnalyticsScreens.home)
             } else if viewModel.isRestoringSession {

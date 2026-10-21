@@ -85,6 +85,18 @@ async function withDb<T>(fn: (client: import('pg').PoolClient) => Promise<T>): P
   return withUserConnection(userId, fn);
 }
 
+function stripNulls(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripNulls);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, item]) => item !== null)
+        .map(([key, item]) => [key, stripNulls(item)])
+    );
+  }
+  return value;
+}
+
 function parseBody<T>(schema: z.ZodSchema<T>, body: unknown): T {
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
@@ -1349,7 +1361,7 @@ v1Router.post('/business/moments/:momentId/operating-events', requireIdempotency
   try {
     const ctx = req.requestContext!;
     const momentId = param(req.params.momentId);
-    const body = parseBody(operatingService.recordOperatingEventSchema, req.body);
+    const body = parseBody(operatingService.recordOperatingEventSchema, stripNulls(req.body));
     const result = await runCommand({
       operationCode: 'OPERATING_EVENT_RECORD',
       idempotencyKey: req.idempotencyKey!,
@@ -1371,6 +1383,39 @@ v1Router.post('/business/moments/:momentId/operating-events', requireIdempotency
     next(e);
   }
 });
+
+v1Router.patch(
+  '/business/moments/:momentId/operating-events/:eventId',
+  requireIdempotencyKey,
+  async (req, res, next) => {
+    try {
+      const ctx = req.requestContext!;
+      const momentId = param(req.params.momentId);
+      const eventId = param(req.params.eventId);
+      const body = parseBody(operatingService.recordOperatingEventSchema, stripNulls(req.body));
+      const result = await runCommand({
+        operationCode: 'OPERATING_EVENT_REVISE',
+        idempotencyKey: req.idempotencyKey!,
+        body,
+        ctx,
+        resourceType: 'OPERATING_EVENT',
+        execute: async (client, b) => {
+          const r = await operatingService.reviseOperatingEvent(
+            client,
+            ctx,
+            momentId,
+            eventId,
+            b as operatingService.RecordOperatingEventInput
+          );
+          return { result: r, resourceId: r.eventId };
+        },
+      });
+      res.json(commandEnvelope(result, ctx.correlationId));
+    } catch (e) {
+      next(e);
+    }
+  }
+);
 
 v1Router.post(
   '/business/moments/:momentId/operating-events/:eventId/decision',

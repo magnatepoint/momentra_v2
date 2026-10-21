@@ -3,6 +3,7 @@ import SwiftUI
 struct AppShellView: View {
     let identity: ShellIdentity
     @ObservedObject var model: AppShellModel
+    @ObservedObject private var operatingChrome = OperatingChromeState.shared
     var onSignOut: () -> Void
     var onSessionExpired: () -> Void = {}
     var onDisplayNameSaved: (String) -> Void = { _ in }
@@ -1256,7 +1257,8 @@ struct AppShellView: View {
                             }
                         },
                         selectedIsCompleted: selectedMomentIsCompleted,
-                        startExpanded: false
+                        startExpanded: false,
+                        participantNames: model.selectedContext == .business ? operatingChrome.participantNames : []
                     )
             }
         }
@@ -1387,13 +1389,6 @@ struct AppShellView: View {
                     }
                 )
             case .ready(let detail):
-                let personalTypeCode = model.selectedMomentTypeCode
-                    ?? model.moments.first(where: { $0.momentId == model.selectedMomentId })?.momentTypeCode
-                let personalFamily = PersonalPulseFamily.forTypeCode(personalTypeCode)
-                let isLifeOps = personalFamily == .lifeOperations
-                let isFutureBuilding = personalFamily == .futureBuilding
-                let isLifestyle = personalFamily == .lifestyle
-                let isRelationships = personalFamily == .relationships
                 let groupTypeCode = model.selectedMomentTypeCode
                     ?? model.moments.first(where: { $0.momentId == model.selectedMomentId })?.momentTypeCode
                 let groupFamily = GroupExperienceFamily.forTypeCode(groupTypeCode)
@@ -1793,7 +1788,7 @@ struct AppShellView: View {
                         momentTypeCode: model.selectedMomentTypeCode,
                         momentTitle: model.selectedMomentTitle,
                         tab: tab,
-                        refreshToken: model.businessTabRefreshToken,
+                        refreshToken: Int(model.businessTabRefreshToken),
                         onCreateMoment: { newMomentOpen = true },
                         onOpenQuickAdd: { model.selectBottomDestination(.create) }
                     )

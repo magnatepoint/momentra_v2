@@ -327,7 +327,6 @@ struct PersonalLifeSummaryModel: Equatable {
         let body = drift.body.trimmingCharacters(in: .whitespacesAndNewlines)
         if headline.isEmpty || headline.localizedCaseInsensitiveContains("not available") { return nil }
         if body.isEmpty { return nil }
-        let cta = drift.ctaLabel.trimmingCharacters(in: .whitespacesAndNewlines)
         // No stable ctaAction on drift yet — never show a dead CTA button.
         return PersonalLifeInsight(headline: headline, body: body, ctaLabel: nil, ctaAction: nil)
     }

@@ -4,6 +4,8 @@ import com.example.momentra.data.api.ApiClient
 import com.example.momentra.data.api.ApiService
 import com.example.momentra.data.api.DecideOperatingEventBody
 import com.example.momentra.data.api.OperatingProjectionDto
+import com.example.momentra.data.api.OperatingLineBody
+import com.example.momentra.data.api.OperatingMasterBody
 import com.example.momentra.data.api.RecordOperatingEventBody
 import com.example.momentra.data.api.BusinessFacetDto
 import com.example.momentra.data.api.BusinessFinancePayloadDto
@@ -115,20 +117,34 @@ class BusinessSliceRepository(
         channelName: String? = null,
         counterpartyName: String? = null,
         paymentStatus: String? = null,
+        occurredAt: String? = null,
+        parentEventId: String? = null,
+        quantity: String? = null,
+        unit: String? = null,
+        lines: List<OperatingLineBody>? = null,
+        master: OperatingMasterBody? = null,
+        revisesEventId: String? = null,
     ): Result<Unit> = runCatching {
-        api.recordOperatingEvent(
-            momentId = momentId,
-            idempotencyKey = UUID.randomUUID().toString(),
-            body = RecordOperatingEventBody(
-                eventType = eventType,
-                title = title,
-                amount = amount,
-                note = note,
-                counterpartyName = counterpartyName,
-                channelName = channelName,
-                paymentStatus = paymentStatus,
-            ),
+        val body = RecordOperatingEventBody(
+            eventType = eventType,
+            title = title,
+            amount = amount,
+            note = note,
+            counterpartyName = counterpartyName,
+            channelName = channelName,
+            paymentStatus = paymentStatus,
+            occurredAt = occurredAt,
+            parentEventId = parentEventId,
+            quantity = quantity,
+            unit = unit,
+            lines = lines,
+            master = master,
         )
+        if (revisesEventId.isNullOrBlank()) {
+            api.recordOperatingEvent(momentId, UUID.randomUUID().toString(), body)
+        } else {
+            api.reviseOperatingEvent(momentId, revisesEventId, UUID.randomUUID().toString(), body)
+        }
         Unit
     }.recoverCatching { e -> throw mapError(e) }
 

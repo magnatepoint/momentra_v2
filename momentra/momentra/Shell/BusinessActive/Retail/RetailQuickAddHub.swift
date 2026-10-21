@@ -9,6 +9,7 @@ struct RetailQuickAddHub: View {
     @State private var sheet: RetailSheetKind?
     @State private var approvalOpen = false
     @State private var errorText: String?
+    @State private var mastersOpen = false
 
     private var allowed: Set<String> { Set((model.quickAdds ?? []).map(\.code)) }
     private var owner: Bool { model.role == "OWNER_ADMIN" }
@@ -46,7 +47,7 @@ struct RetailQuickAddHub: View {
             .background(RetailStoreChrome.notice)
             .clipShape(RoundedRectangle(cornerRadius: 18))
             HStack(spacing: 10) {
-                Image("qa_search").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
+                Image("biz_qa_search").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
                     .foregroundStyle(RetailStoreChrome.secondary)
                 TextField("Search actions", text: $query).font(.plusJakarta(size: 14))
             }
@@ -71,17 +72,80 @@ struct RetailQuickAddHub: View {
                     }
                 }
             }
+            Button("Masters") { mastersOpen = true }.font(.plusJakarta(size: 15, weight: .semibold))
             Text("Support & management").font(.plusJakarta(size: 12)).foregroundStyle(RetailStoreChrome.secondary)
             supportGrid
             if let errorText { Text(errorText).foregroundStyle(Color(hex: "#F87171")) }
         }
+        .sheet(isPresented: $mastersOpen) {
+            OperatingCaptureSheet(
+                title: "Masters",
+                icon: "qa_shield",
+                eventType: "UPDATE",
+                mode: "MASTERS",
+                model: model,
+                onSubmit: { draft in
+                    try await onRecord(RetailEventDraft(
+                        eventType: draft.eventType,
+                        title: draft.title,
+                        amount: draft.amount,
+                        note: draft.note,
+                        channelName: draft.channelName,
+                        counterpartyName: draft.counterpartyName,
+                        paymentStatus: draft.paymentStatus,
+                        occurredAt: draft.occurredAt,
+                        quantity: draft.quantity,
+                        unit: draft.unit,
+                        unitPrice: draft.unitPrice,
+                        itemName: draft.itemName,
+                        parentEventId: draft.parentEventId,
+                        revisesEventId: draft.revisesEventId,
+                        masterKind: draft.masterKind
+                    ))
+                },
+                onDecide: onDecide
+            )
+        }
         .sheet(item: $sheet) { kind in
-            RetailEventSheet(kind: kind, model: model) { draft in
-                try await onRecord(draft)
-            }
+            OperatingCaptureSheet(
+                title: kind.title,
+                icon: kind.icon,
+                eventType: kind.eventType,
+                mode: operatingCaptureMode(eventType: kind.eventType, title: kind.title),
+                model: model,
+                channelLabel: "Sales channel",
+                onSubmit: { draft in
+                    try await onRecord(RetailEventDraft(
+                        eventType: draft.eventType,
+                        title: draft.title,
+                        amount: draft.amount,
+                        note: draft.note,
+                        channelName: draft.channelName,
+                        counterpartyName: draft.counterpartyName,
+                        paymentStatus: draft.paymentStatus,
+                        occurredAt: draft.occurredAt,
+                        quantity: draft.quantity,
+                        unit: draft.unit,
+                        unitPrice: draft.unitPrice,
+                        itemName: draft.itemName,
+                        parentEventId: draft.parentEventId,
+                        revisesEventId: draft.revisesEventId,
+                        masterKind: draft.masterKind
+                    ))
+                },
+                onDecide: onDecide
+            )
         }
         .sheet(isPresented: $approvalOpen) {
-            ApprovalList(model: model, onDecide: onDecide)
+            OperatingCaptureSheet(
+                title: "Review Approval",
+                icon: "qa_shield",
+                eventType: "APPROVAL",
+                mode: "APPROVAL",
+                model: model,
+                onSubmit: { _ in },
+                onDecide: onDecide
+            )
         }
     }
 
@@ -160,7 +224,7 @@ enum RetailSheetKind: String, Identifiable {
     var icon: String {
         switch self {
         case .sale, .spend: return "qa_receipt"
-        case .purchase, .reimburse: return "qa_wallet"
+        case .purchase, .reimburse: return "biz_qa_wallet"
         case .payment: return "qa_credit_card"
         case .collection: return "qa_arrow_left_right"
         case .budget: return "qa_budget"
@@ -168,7 +232,7 @@ enum RetailSheetKind: String, Identifiable {
         case .issue: return "qa_alert"
         case .stock: return "qa_package"
         case .person: return "qa_user_plus"
-        case .role: return "qa_users"
+        case .role: return "biz_qa_users"
         case .invite: return "qa_qr"
         case .supplier: return "qa_network"
         }
@@ -219,115 +283,4 @@ enum RetailSheetKind: String, Identifiable {
         }
     }
     static let core: [RetailSheetKind] = [.sale, .purchase, .spend, .payment, .collection, .update, .issue, .stock, .supplier]
-}
-
-private struct RetailEventSheet: View {
-    let kind: RetailSheetKind
-    let model: OperatingProjectionPayload
-    var onSubmit: (RetailEventDraft) async throws -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var title = ""
-    @State private var amount = ""
-    @State private var channel = ""
-    @State private var party = ""
-    @State private var note = ""
-    @State private var errorText: String?
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text(kind.title).font(.plusJakarta(size: 20, weight: .semibold)).foregroundStyle(.white)
-                    Spacer()
-                    Button("Close") { dismiss() }.foregroundStyle(RetailStoreChrome.secondary)
-                }
-                Text("\(OperatingMomentCatalog.roles.first { $0.0 == model.role }?.1 ?? "Retail") · \(model.title ?? "")")
-                    .font(.plusJakarta(size: 12)).foregroundStyle(RetailStoreChrome.secondary)
-                field("Title", text: $title, placeholder: "What happened")
-                if kind.needsAmount { field("Amount", text: $amount, placeholder: "0") }
-                if kind.needsChannel {
-                    Text("Channel").font(.plusJakarta(size: 12)).foregroundStyle(RetailStoreChrome.secondary)
-                    ForEach(model.life?.channels ?? [], id: \.self) { name in
-                        Button(name) { channel = name }
-                            .foregroundStyle(channel == name ? RetailStoreChrome.bg : RetailStoreChrome.secondary)
-                    }
-                }
-                if kind.needsParty { field(kind == .person || kind == .role || kind == .invite ? "Person" : "Name", text: $party, placeholder: "Name") }
-                field("Note", text: $note, placeholder: "Optional")
-                if let errorText { Text(errorText).foregroundStyle(Color(hex: "#F87171")) }
-                Button("Save") { Task { await save() } }
-                    .font(.plusJakarta(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(RetailStoreChrome.brand)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .padding(16)
-        }
-        .background(RetailStoreChrome.bg)
-        .onAppear { channel = model.life?.channels?.first ?? "" }
-    }
-
-    private func field(_ label: String, text: Binding<String>, placeholder: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.plusJakarta(size: 12)).foregroundStyle(RetailStoreChrome.secondary)
-            TextField(placeholder, text: text)
-                .font(.plusJakarta(size: 14))
-                .padding(12)
-                .background(RetailStoreChrome.field)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-    }
-
-    private func save() async {
-        let trimmed = title.trimmingCharacters(in: .whitespaces).isEmpty ? party.trimmingCharacters(in: .whitespaces) : title.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty { errorText = "A title is required."; return }
-        if kind.needsAmount, (Double(amount) ?? 0) <= 0 { errorText = "Amount must be positive."; return }
-        do {
-            try await onSubmit(RetailEventDraft(
-                eventType: kind.eventType,
-                title: trimmed,
-                amount: amount.isEmpty ? nil : amount,
-                note: note.isEmpty ? nil : note,
-                channelName: channel.isEmpty ? nil : channel,
-                counterpartyName: party.isEmpty ? nil : party,
-                paymentStatus: kind.paymentStatus
-            ))
-            dismiss()
-        } catch {
-            errorText = error.localizedDescription
-        }
-    }
-}
-
-private struct ApprovalList: View {
-    let model: OperatingProjectionPayload
-    var onDecide: (String, String) async throws -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Review Approval").font(.plusJakarta(size: 20, weight: .semibold)).foregroundStyle(.white)
-                Spacer()
-                Button("Close") { dismiss() }.foregroundStyle(RetailStoreChrome.secondary)
-            }
-            let pending = (model.attention ?? []).filter { $0.kind == "APPROVAL" }
-            if pending.isEmpty { Text("Nothing is waiting.").foregroundStyle(RetailStoreChrome.secondary) }
-            ForEach(pending) { item in
-                Text(item.title).foregroundStyle(.white)
-                HStack {
-                    Button("Approve") { Task { try? await onDecide(item.id, "APPROVED"); dismiss() } }
-                        .foregroundStyle(RetailStoreChrome.success)
-                    Button("Reject") { Task { try? await onDecide(item.id, "REJECTED"); dismiss() } }
-                        .foregroundStyle(Color(hex: "#F87171"))
-                }
-            }
-            Spacer()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(RetailStoreChrome.bg)
-    }
 }

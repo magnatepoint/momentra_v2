@@ -3,9 +3,13 @@ package com.example.momentra.ui.shell.business.trading
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,7 +36,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.momentra.R
 import com.example.momentra.data.api.OperatingProjectionDto
+import com.example.momentra.ui.shell.business.shared.OperatingCaptureDraft
+import com.example.momentra.ui.shell.business.shared.OperatingCaptureSheet
 import com.example.momentra.ui.shell.business.shared.OperatingMomentCatalog
+import com.example.momentra.ui.shell.business.shared.OperatingSheetScrim
 import com.example.momentra.ui.theme.PlusJakartaSans
 import kotlinx.coroutines.launch
 
@@ -44,6 +51,14 @@ data class TradingEventDraft(
     val channelName: String?,
     val counterpartyName: String?,
     val paymentStatus: String?,
+    val occurredAt: String? = null,
+    val quantity: String? = null,
+    val unit: String? = null,
+    val unitPrice: String? = null,
+    val itemName: String? = null,
+    val parentEventId: String? = null,
+    val revisesEventId: String? = null,
+    val masterKind: String? = null,
 )
 
 private enum class TradingSheet(
@@ -62,14 +77,14 @@ private enum class TradingSheet(
     BUDGET("Revise Budget", "BUDGET", true, false, false, null),
     UPDATE("Post Update", "UPDATE", false, false, false, null),
     ISSUE("Report Issue", "ISSUE", false, false, false, null),
-    STOCK("Stock Update", "STOCK", false, false, false, null),
-    ORDER("Order Update", "ORDER", false, false, false, null),
-    SHIPMENT("Shipment Update", "SHIPMENT", false, false, false, null),
+    STOCK("Stock / Availability Update", "STOCK", false, false, false, null),
+    ORDER("Order / Dispatch Update", "ORDER", false, false, false, null),
+    SHIPMENT("Shipment / Delivery Update", "SHIPMENT", false, false, false, null),
     REIMBURSE("Record Reimbursement", "PAYMENT", true, false, true, "PENDING"),
-    PERSON("Add person", "UPDATE", false, false, true, null),
-    ROLE("Role & access", "UPDATE", false, false, true, null),
-    INVITE("Invite & QR", "UPDATE", false, false, true, null),
-    SUPPLIER("Add supplier", "UPDATE", false, false, true, null),
+    PERSON("Add or invite person", "UPDATE", false, false, true, null),
+    ROLE("Add or invite person", "UPDATE", false, false, true, null),
+    INVITE("Add or invite person", "UPDATE", false, false, true, null),
+    SUPPLIER("Add Supplier", "UPDATE", false, false, true, null),
 }
 
 @Composable
@@ -82,9 +97,19 @@ fun TradingQuickAddHub(
     var query by remember { mutableStateOf("") }
     var sheet by remember { mutableStateOf<TradingSheet?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var approvalOpen by remember { mutableStateOf(false) }
+    var mastersOpen by remember { mutableStateOf(false) }
     val role = model.role.orEmpty()
     val owner = role == "OWNER_ADMIN"
     val approver = role == "APPROVER" || owner
+    Box(Modifier.fillMaxSize()) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 17.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
     Text("Quick Adds", color = TradeInk, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 28.sp)
     Text("Record what happened · ${model.title.orEmpty()}", color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 13.sp)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -162,6 +187,13 @@ fun TradingQuickAddHub(
             }
         }
     }
+    Text(
+        "Masters",
+        color = Color.White,
+        fontFamily = PlusJakartaSans,
+        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+        modifier = Modifier.clickable { mastersOpen = true }.padding(vertical = 8.dp),
+    )
     Text("Support & management", color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
     val support = listOf(
         Triple(TradingSheet.REIMBURSE, "Reimbursement", if ("PAYMENT" in allowed) null else "Finance only"),
@@ -171,7 +203,6 @@ fun TradingQuickAddHub(
         Triple(TradingSheet.SUPPLIER, "Suppliers & channels", if ("UPDATE" in allowed) null else "View only"),
         Triple(TradingSheet.INVITE, "Invite & QR", if (owner && "UPDATE" in allowed) null else "Owner only"),
     ).filter { (_, label, _) -> label.contains(query, ignoreCase = true) }
-    var approvalOpen by remember { mutableStateOf(false) }
     support.chunked(3).forEach { row ->
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             row.forEach { (kind, label, lock) ->
@@ -192,17 +223,64 @@ fun TradingQuickAddHub(
         Text("Some support actions stay with the Owner or Approver.", color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
     }
     if (error != null) Text(error ?: "", color = Color(0xFFF87171), fontFamily = PlusJakartaSans, fontSize = 13.sp)
+    }
     val open = sheet
     if (open != null) {
-        TradingEventSheet(open, model, onDismiss = { sheet = null }) { draft ->
-            onRecord(draft)
-            sheet = null
+        OperatingSheetScrim(onDismiss = { sheet = null }) {
+            OperatingCaptureSheet(
+                title = open.title,
+                icon = open.hubIcon,
+                eventType = open.eventType,
+                mode = open.captureMode,
+                model = model,
+                channelLabel = when (open.captureMode) {
+                    "SALE" -> "Sales channel"
+                    "COLLECTION" -> "Received from"
+                    else -> "Channel"
+                },
+                variant = "trading",
+                onDismiss = { sheet = null },
+                onSubmit = { draft ->
+                    onRecord(draft.toTrading())
+                    sheet = null
+                },
+                onDecide = onDecide,
+            )
         }
     }
+    if (mastersOpen) {
+        OperatingCaptureSheet(
+            title = "Masters",
+            icon = R.drawable.qa_shield,
+            eventType = "UPDATE",
+            mode = "MASTERS",
+            model = model,
+            onDismiss = { mastersOpen = false },
+            onSubmit = { draft ->
+                onRecord(draft.toTrading())
+                mastersOpen = false
+            },
+        )
+    }
     if (approvalOpen) {
-        ApprovalSheet(model, onDismiss = { approvalOpen = false }, onDecide = onDecide)
+        OperatingSheetScrim(onDismiss = { approvalOpen = false }) {
+            OperatingCaptureSheet(
+                title = "Review Approval",
+                icon = R.drawable.qa_shield,
+                eventType = "APPROVAL",
+                mode = "APPROVAL",
+                model = model,
+                variant = "trading",
+                onDismiss = { approvalOpen = false },
+                onSubmit = {},
+                onDecide = onDecide,
+            )
+        }
+    }
     }
 }
+
+
 
 private val TradingSheet.hubIcon: Int
     get() = when (this) {
@@ -256,155 +334,41 @@ private fun HubChip(text: String, filled: Boolean) {
     )
 }
 
-@Composable
-private fun TradingEventSheet(
-    kind: TradingSheet,
-    model: OperatingProjectionDto,
-    onDismiss: () -> Unit,
-    onSubmit: suspend (TradingEventDraft) -> Unit,
-) {
-    var title by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var channel by remember { mutableStateOf(model.life?.channels?.firstOrNull().orEmpty()) }
-    var party by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-    var localError by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(TradeNotice)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(kind.title, color = TradeInk, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-            Text("Close", color = TradeSecondary, modifier = Modifier.clickable(onClick = onDismiss))
-        }
-        Text("${OperatingMomentCatalog.roles.firstOrNull { it.first == model.role }?.second ?: "Trading"} · ${model.title.orEmpty()}", color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
-        Field("Title", title, "What happened") { title = it }
-        if (kind.needsAmount) Field("Amount", amount, "0") { amount = it.filter { ch -> ch.isDigit() || ch == '.' } }
-        if (kind.needsChannel) {
-            Text("Channel", color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                (model.life?.channels ?: emptyList()).forEach { name ->
-                    Text(
-                        name,
-                        color = if (name == channel) TradeBg else TradeSecondary,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(if (name == channel) TradeBrand else Color.Transparent)
-                            .border(1.dp, TradeBorder, RoundedCornerShape(999.dp))
-                            .clickable { channel = name }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                    )
-                }
-            }
-        }
-        if (kind.needsParty) {
-            Field(
-                if (kind == TradingSheet.PERSON || kind == TradingSheet.ROLE || kind == TradingSheet.INVITE) "Person" else "Name",
-                party,
-                "Name",
-            ) { party = it }
-        }
-        Field("Note", note, "Optional") { note = it }
-        if (localError != null) Text(localError ?: "", color = Color(0xFFF87171), fontSize = 12.sp)
-        Text(
-            "Save",
-            color = TradeBg,
-            fontFamily = PlusJakartaSans,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(TradeBrand)
-                .clickable {
-                    val trimmed = title.trim().ifBlank { party.trim() }
-                    if (trimmed.isEmpty()) {
-                        localError = "A title is required."
-                        return@clickable
-                    }
-                    if (kind.needsAmount && amount.toDoubleOrNull()?.let { it > 0 } != true) {
-                        localError = "Amount must be positive."
-                        return@clickable
-                    }
-                    localError = null
-                    scope.launch {
-                        onSubmit(
-                            TradingEventDraft(
-                                eventType = kind.eventType,
-                                title = trimmed,
-                                amount = amount.ifBlank { null },
-                                note = note.ifBlank { null },
-                                channelName = channel.ifBlank { null },
-                                counterpartyName = party.ifBlank { null },
-                                paymentStatus = kind.paymentStatus,
-                            )
-                        )
-                    }
-                }
-                .padding(vertical = 14.dp),
-        )
-    }
-}
 
-@Composable
-private fun ApprovalSheet(
-    model: OperatingProjectionDto,
-    onDismiss: () -> Unit,
-    onDecide: suspend (String, String) -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    val pending = model.attention.filter { it.kind == "APPROVAL" }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(TradeNotice)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Review Approval", color = TradeInk, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-            Text("Close", color = TradeSecondary, modifier = Modifier.clickable(onClick = onDismiss))
-        }
-        if (pending.isEmpty()) Text("Nothing is waiting.", color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 14.sp)
-        pending.forEach { item ->
-            Text(item.title, color = TradeInk, fontFamily = PlusJakartaSans, fontSize = 14.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Approve", color = TradeSuccess, modifier = Modifier.clickable {
-                    scope.launch { onDecide(item.id, "APPROVED"); onDismiss() }
-                })
-                Text("Reject", color = Color(0xFFF87171), modifier = Modifier.clickable {
-                    scope.launch { onDecide(item.id, "REJECTED"); onDismiss() }
-                })
-            }
-        }
+private val TradingSheet.captureMode: String
+    get() = when (this) {
+        TradingSheet.SALE -> "SALE"
+        TradingSheet.PURCHASE -> "PURCHASE"
+        TradingSheet.SPEND -> "SPEND"
+        TradingSheet.PAYMENT -> "PAYMENT"
+        TradingSheet.COLLECTION -> "COLLECTION"
+        TradingSheet.BUDGET -> "BUDGET"
+        TradingSheet.UPDATE -> "UPDATE"
+        TradingSheet.ISSUE -> "ISSUE"
+        TradingSheet.STOCK -> "STOCK"
+        TradingSheet.ORDER -> "ORDER"
+        TradingSheet.SHIPMENT -> "SHIPMENT"
+        TradingSheet.REIMBURSE -> "REIMBURSE"
+        TradingSheet.PERSON -> "PERSON"
+        TradingSheet.ROLE -> "ROLE"
+        TradingSheet.INVITE -> "INVITE"
+        TradingSheet.SUPPLIER -> "SUPPLIER"
     }
-}
 
-@Composable
-private fun Field(label: String, value: String, placeholder: String, onValue: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
-        BasicTextField(
-            value = value,
-            onValueChange = onValue,
-            textStyle = TextStyle(color = TradeInk, fontFamily = PlusJakartaSans, fontSize = 14.sp),
-            cursorBrush = SolidColor(TradeBrand),
-            decorationBox = { inner ->
-                if (value.isEmpty()) Text(placeholder, color = TradeSecondary, fontFamily = PlusJakartaSans, fontSize = 14.sp)
-                inner()
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(TradeField)
-                .border(1.dp, TradeBorder, RoundedCornerShape(8.dp))
-                .padding(12.dp),
-        )
-    }
-}
+private fun OperatingCaptureDraft.toTrading() = TradingEventDraft(
+    eventType = eventType,
+    title = title,
+    amount = amount,
+    note = note,
+    channelName = channelName,
+    counterpartyName = counterpartyName,
+    paymentStatus = paymentStatus,
+    occurredAt = occurredAt,
+    quantity = quantity,
+    unit = unit,
+    unitPrice = unitPrice,
+    itemName = itemName,
+    parentEventId = parentEventId,
+    revisesEventId = revisesEventId,
+    masterKind = masterKind,
+)

@@ -9,6 +9,7 @@ struct TradingQuickAddHub: View {
     @State private var sheet: TradingSheetKind?
     @State private var approvalOpen = false
     @State private var errorText: String?
+    @State private var mastersOpen = false
 
     private var allowed: Set<String> { Set((model.quickAdds ?? []).map(\.code)) }
     private var owner: Bool { model.role == "OWNER_ADMIN" }
@@ -46,7 +47,7 @@ struct TradingQuickAddHub: View {
             .background(TradingChrome.notice)
             .clipShape(RoundedRectangle(cornerRadius: 18))
             HStack(spacing: 10) {
-                Image("qa_search").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
+                Image("biz_qa_search").renderingMode(.template).resizable().scaledToFit().frame(width: 18, height: 18)
                     .foregroundStyle(TradingChrome.secondary)
                 TextField("Search actions", text: $query).font(.plusJakarta(size: 14))
             }
@@ -71,17 +72,82 @@ struct TradingQuickAddHub: View {
                     }
                 }
             }
+            Button("Masters") { mastersOpen = true }.font(.plusJakarta(size: 15, weight: .semibold))
             Text("Support & management").font(.plusJakarta(size: 12)).foregroundStyle(TradingChrome.secondary)
             supportGrid
             if let errorText { Text(errorText).foregroundStyle(Color(hex: "#F87171")) }
         }
+        .sheet(isPresented: $mastersOpen) {
+            OperatingCaptureSheet(
+                title: "Masters",
+                icon: "qa_shield",
+                eventType: "UPDATE",
+                mode: "MASTERS",
+                model: model,
+                onSubmit: { draft in
+                    try await onRecord(TradingEventDraft(
+                        eventType: draft.eventType,
+                        title: draft.title,
+                        amount: draft.amount,
+                        note: draft.note,
+                        channelName: draft.channelName,
+                        counterpartyName: draft.counterpartyName,
+                        paymentStatus: draft.paymentStatus,
+                        occurredAt: draft.occurredAt,
+                        quantity: draft.quantity,
+                        unit: draft.unit,
+                        unitPrice: draft.unitPrice,
+                        itemName: draft.itemName,
+                        parentEventId: draft.parentEventId,
+                        revisesEventId: draft.revisesEventId,
+                        masterKind: draft.masterKind
+                    ))
+                },
+                onDecide: onDecide
+            )
+        }
         .sheet(item: $sheet) { kind in
-            TradingEventSheet(kind: kind, model: model) { draft in
-                try await onRecord(draft)
-            }
+            OperatingCaptureSheet(
+                title: kind.title,
+                icon: kind.icon,
+                eventType: kind.eventType,
+                mode: operatingCaptureMode(eventType: kind.eventType, title: kind.title),
+                model: model,
+                channelLabel: kind == .sale ? "Sales channel" : (kind == .collection ? "Received from" : "Channel"),
+                variant: "trading",
+                onSubmit: { draft in
+                    try await onRecord(TradingEventDraft(
+                        eventType: draft.eventType,
+                        title: draft.title,
+                        amount: draft.amount,
+                        note: draft.note,
+                        channelName: draft.channelName,
+                        counterpartyName: draft.counterpartyName,
+                        paymentStatus: draft.paymentStatus,
+                        occurredAt: draft.occurredAt,
+                        quantity: draft.quantity,
+                        unit: draft.unit,
+                        unitPrice: draft.unitPrice,
+                        itemName: draft.itemName,
+                        parentEventId: draft.parentEventId,
+                        revisesEventId: draft.revisesEventId,
+                        masterKind: draft.masterKind
+                    ))
+                },
+                onDecide: onDecide
+            )
         }
         .sheet(isPresented: $approvalOpen) {
-            ApprovalList(model: model, onDecide: onDecide)
+            OperatingCaptureSheet(
+                title: "Review Approval",
+                icon: "qa_shield",
+                eventType: "APPROVAL",
+                mode: "APPROVAL",
+                model: model,
+                variant: "trading",
+                onSubmit: { _ in },
+                onDecide: onDecide
+            )
         }
     }
 
@@ -162,7 +228,7 @@ enum TradingSheetKind: String, Identifiable {
     var icon: String {
         switch self {
         case .sale, .spend: return "qa_receipt"
-        case .purchase: return "qa_wallet"
+        case .purchase: return "biz_qa_wallet"
         case .payment, .reimburse: return "qa_credit_card"
         case .collection: return "qa_arrow_left_right"
         case .budget: return "qa_budget"
@@ -172,7 +238,7 @@ enum TradingSheetKind: String, Identifiable {
         case .order: return "qa_clipboard"
         case .shipment: return "qa_shipment"
         case .person: return "qa_user_plus"
-        case .role: return "qa_users"
+        case .role: return "biz_qa_users"
         case .invite: return "qa_qr"
         case .supplier: return "qa_network"
         }
@@ -187,14 +253,12 @@ enum TradingSheetKind: String, Identifiable {
         case .budget: return "Revise Budget"
         case .update: return "Post Update"
         case .issue: return "Report Issue"
-        case .stock: return "Stock Update"
-        case .order: return "Order Update"
-        case .shipment: return "Shipment Update"
+        case .stock: return "Stock / Availability Update"
+        case .order: return "Order / Dispatch Update"
+        case .shipment: return "Shipment / Delivery Update"
         case .reimburse: return "Record Reimbursement"
-        case .person: return "Add person"
-        case .role: return "Role & access"
-        case .invite: return "Invite & QR"
-        case .supplier: return "Add supplier"
+        case .person, .role, .invite: return "Add or invite person"
+        case .supplier: return "Add Supplier"
         }
     }
     var eventType: String {
@@ -227,115 +291,4 @@ enum TradingSheetKind: String, Identifiable {
         }
     }
     static let core: [TradingSheetKind] = [.sale, .purchase, .spend, .payment, .collection, .budget, .update, .issue, .stock, .order, .shipment]
-}
-
-private struct TradingEventSheet: View {
-    let kind: TradingSheetKind
-    let model: OperatingProjectionPayload
-    var onSubmit: (TradingEventDraft) async throws -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var title = ""
-    @State private var amount = ""
-    @State private var channel = ""
-    @State private var party = ""
-    @State private var note = ""
-    @State private var errorText: String?
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text(kind.title).font(.plusJakarta(size: 20, weight: .semibold)).foregroundStyle(TradingChrome.ink)
-                    Spacer()
-                    Button("Close") { dismiss() }.foregroundStyle(TradingChrome.secondary)
-                }
-                Text("\(OperatingMomentCatalog.roles.first { $0.0 == model.role }?.1 ?? "Trading") · \(model.title ?? "")")
-                    .font(.plusJakarta(size: 12)).foregroundStyle(TradingChrome.secondary)
-                field("Title", text: $title, placeholder: "What happened")
-                if kind.needsAmount { field("Amount", text: $amount, placeholder: "0") }
-                if kind.needsChannel {
-                    Text("Channel").font(.plusJakarta(size: 12)).foregroundStyle(TradingChrome.secondary)
-                    ForEach(model.life?.channels ?? [], id: \.self) { name in
-                        Button(name) { channel = name }
-                            .foregroundStyle(channel == name ? TradingChrome.bg : TradingChrome.secondary)
-                    }
-                }
-                if kind.needsParty { field(kind == .person || kind == .role || kind == .invite ? "Person" : "Name", text: $party, placeholder: "Name") }
-                field("Note", text: $note, placeholder: "Optional")
-                if let errorText { Text(errorText).foregroundStyle(Color(hex: "#F87171")) }
-                Button("Save") { Task { await save() } }
-                    .font(.plusJakarta(size: 15, weight: .semibold))
-                    .foregroundStyle(TradingChrome.bg)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(TradingChrome.brand)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .padding(16)
-        }
-        .background(TradingChrome.bg)
-        .onAppear { channel = model.life?.channels?.first ?? "" }
-    }
-
-    private func field(_ label: String, text: Binding<String>, placeholder: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.plusJakarta(size: 12)).foregroundStyle(TradingChrome.secondary)
-            TextField(placeholder, text: text)
-                .font(.plusJakarta(size: 14))
-                .padding(12)
-                .background(TradingChrome.field)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-    }
-
-    private func save() async {
-        let trimmed = title.trimmingCharacters(in: .whitespaces).isEmpty ? party.trimmingCharacters(in: .whitespaces) : title.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty { errorText = "A title is required."; return }
-        if kind.needsAmount, (Double(amount) ?? 0) <= 0 { errorText = "Amount must be positive."; return }
-        do {
-            try await onSubmit(TradingEventDraft(
-                eventType: kind.eventType,
-                title: trimmed,
-                amount: amount.isEmpty ? nil : amount,
-                note: note.isEmpty ? nil : note,
-                channelName: channel.isEmpty ? nil : channel,
-                counterpartyName: party.isEmpty ? nil : party,
-                paymentStatus: kind.paymentStatus
-            ))
-            dismiss()
-        } catch {
-            errorText = error.localizedDescription
-        }
-    }
-}
-
-private struct ApprovalList: View {
-    let model: OperatingProjectionPayload
-    var onDecide: (String, String) async throws -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Review Approval").font(.plusJakarta(size: 20, weight: .semibold)).foregroundStyle(TradingChrome.ink)
-                Spacer()
-                Button("Close") { dismiss() }.foregroundStyle(TradingChrome.secondary)
-            }
-            let pending = (model.attention ?? []).filter { $0.kind == "APPROVAL" }
-            if pending.isEmpty { Text("Nothing is waiting.").foregroundStyle(TradingChrome.secondary) }
-            ForEach(pending) { item in
-                Text(item.title).foregroundStyle(TradingChrome.ink)
-                HStack {
-                    Button("Approve") { Task { try? await onDecide(item.id, "APPROVED"); dismiss() } }
-                        .foregroundStyle(TradingChrome.success)
-                    Button("Reject") { Task { try? await onDecide(item.id, "REJECTED"); dismiss() } }
-                        .foregroundStyle(Color(hex: "#F87171"))
-                }
-            }
-            Spacer()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(TradingChrome.bg)
-    }
 }

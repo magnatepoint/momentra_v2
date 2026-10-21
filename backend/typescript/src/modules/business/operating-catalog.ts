@@ -145,7 +145,7 @@ export const OPERATING_FAMILIES: OperatingFamily[] = [
         code: 'CLIENT_CAMPAIGN',
         label: 'Client Campaign',
         partyLabel: 'Client',
-        quickAdds: [...MARKETING_ADDS, 'COLLECTION'],
+        quickAdds: [...MARKETING_ADDS, 'SALE', 'COLLECTION'],
         targetMetrics: ['REVENUE', 'LEADS', 'ORDERS', 'CUSTOM_COUNT', 'CLIENT_BILLING'],
         requiresChannel: true,
       },
@@ -178,7 +178,7 @@ export const OPERATING_FAMILIES: OperatingFamily[] = [
         code: 'DISTRIBUTION_DEALERSHIP',
         label: 'Distribution / Dealership',
         partyLabel: 'Principal',
-        quickAdds: ['SALE', 'PURCHASE', 'SPEND', 'PAYMENT', 'COLLECTION', 'BUDGET', 'UPDATE', 'ISSUE', 'APPROVAL', 'STOCK', 'ORDER', 'SHIPMENT'],
+        quickAdds: ['SALE', 'PURCHASE', 'SPEND', 'PAYMENT', 'COLLECTION', 'BUDGET', 'UPDATE', 'ISSUE', 'APPROVAL', 'STOCK', 'ORDER', 'SHIPMENT', 'DELIVERY'],
         targetMetrics: ['REVENUE', 'ORDERS', 'CUSTOM_COUNT'],
         requiresChannel: false,
       },
@@ -331,6 +331,7 @@ export interface OperatingPreferences {
   description: string;
   currency: string;
   startDate: string;
+  endDate: string;
   location: string;
   activationPolicy: ActivationPolicy;
   participants: OperatingParticipant[];
@@ -428,6 +429,7 @@ export function normalizeOperatingPreferences(
     description: String(prefs.description ?? '').trim(),
     currency: String(prefs.currency ?? 'INR').toUpperCase(),
     startDate: String(prefs.startDate ?? ''),
+    endDate: String(prefs.endDate ?? ''),
     location: String(prefs.location ?? '').trim(),
     activationPolicy: String(prefs.activationPolicy ?? '').toUpperCase() === 'APPROVAL_REQUIRED'
       ? 'APPROVAL_REQUIRED'
@@ -457,6 +459,27 @@ export interface OperatingEventRow {
   submittedByUserId: string;
   decidedByUserId: string | null;
   occurredAt: string;
+  parentEventId?: string | null;
+  quantity?: string | null;
+  unit?: string | null;
+  lines?: OperatingLine[];
+  dueAt?: string | null;
+  master?: OperatingMaster | null;
+  metric?: 'LEADS' | 'CONVERSIONS' | null;
+  rejectedQuantity?: string | null;
+}
+
+export interface OperatingLine {
+  itemName: string;
+  quantity?: string | null;
+  unit?: string | null;
+  unitPrice?: string | null;
+}
+
+export interface OperatingMaster {
+  kind: string;
+  name: string;
+  unit?: string | null;
 }
 
 export interface OperatingProjection {
@@ -470,12 +493,24 @@ export interface OperatingProjection {
   financeVisible: boolean;
   currency: string;
   startDate: string;
+  endDate: string;
+  participants: string[];
+  masters: Array<{ id: string; kind: string; name: string; unit: string | null }>;
   location: string;
   budget: { amount: string; spent: string; remaining: string } | null;
   target: { metric: string; value: string; progress: string } | null;
   finance: OperatingFinanceTotals | null;
+  continuity: OperatingContinuity;
   attention: Array<{ id: string; title: string; kind: string }>;
-  paymentReadiness: Array<{ id: string; title: string; amount: string; relevance: string; status: string }>;
+  paymentReadiness: Array<{
+    id: string;
+    title: string;
+    amount: string;
+    relevance: string;
+    status: string;
+    counterpartyName: string | null;
+    dueAt: string | null;
+  }>;
   activity: Array<{
     id: string;
     title: string;
@@ -487,6 +522,9 @@ export interface OperatingProjection {
     paymentStatus: string | null;
     approvalStatus: string | null;
     note: string | null;
+    quantity: string | null;
+    unit: string | null;
+    parentEventId: string | null;
   }>;
   life: { channels: string[]; openCommitments: number; resultProgress: string };
   memory: { revisions: Array<{ id: string; title: string; occurredAt: string }> };
@@ -515,8 +553,31 @@ export interface OperatingFinanceTotals {
   sales: string;
   received: string;
   outstanding: string;
+  payable: string;
   eligibleCost: string;
   cashPaid: string;
+}
+
+export interface OperatingContinuity {
+  payable: string | null;
+  receivable: string | null;
+  ordered: string;
+  dispatched: string;
+  delivered: string;
+  pendingDelivery: string;
+  planned: string;
+  produced: string;
+  rejected: string;
+  accepted: string;
+  unsoldAccepted: string;
+  pendingProduction: string;
+  approved: string | null;
+  approvedUnspent: string | null;
+  openBookings: string | null;
+  leads: string;
+  conversions: string;
+  costPerLead: string | null;
+  conversionRate: string | null;
 }
 
 export interface OperatingBoardSection {
@@ -558,6 +619,243 @@ function effective(row: OperatingEventRow): boolean {
   return row.approvalStatus !== 'PENDING' && row.approvalStatus !== 'REJECTED' && row.paymentStatus !== 'CANCELLED';
 }
 
+const PAYABLE_TYPES = new Set(['PURCHASE', 'SPEND', 'VENDOR_COST']);
+const SETTLED_STATUSES = new Set(['COLLECTED', 'PAID', 'SETTLED', 'CANCELLED']);
+const REQUIRED_PARENT: Record<string, readonly string[]> = {
+  PAYMENT: ['PURCHASE', 'SPEND', 'VENDOR_COST'],
+  COLLECTION: ['SALE', 'SERVICE', 'CUSTOMER_ORDER'],
+  SHIPMENT: ['ORDER', 'CUSTOMER_ORDER'],
+  DELIVERY: ['ORDER', 'CUSTOMER_ORDER'],
+};
+const OPTIONAL_PARENT: Record<string, readonly string[]> = {
+  SERVICE: ['APPOINTMENT'],
+  PRODUCTION: ['CUSTOMER_ORDER', 'TARGET'],
+  SALE: ['CUSTOMER_ORDER'],
+};
+const QUANTITY_CHILDREN = new Set(['SHIPMENT', 'DELIVERY', 'PRODUCTION']);
+
+function settled(row: OperatingEventRow): boolean {
+  return SETTLED_STATUSES.has(row.paymentStatus);
+}
+
+function countsTowardAllocation(row: OperatingEventRow): boolean {
+  return row.approvalStatus !== 'REJECTED' && row.paymentStatus !== 'CANCELLED';
+}
+
+function childAmount(
+  events: OperatingEventRow[],
+  parentId: string,
+  types: Set<string>,
+  onlyEffective: boolean
+): number {
+  return events.reduce((total, row) => {
+    if (row.parentEventId !== parentId || !types.has(row.eventType)) return total;
+    if (onlyEffective ? !effective(row) : !countsTowardAllocation(row)) return total;
+    return total + num(row.amount);
+  }, 0);
+}
+
+function childQuantity(events: OperatingEventRow[], parentId: string, types: Set<string>): number {
+  return events.reduce((total, row) => {
+    if (row.parentEventId !== parentId || !types.has(row.eventType) || !effective(row)) return total;
+    return total + num(row.quantity);
+  }, 0);
+}
+
+function obligationRemaining(row: OperatingEventRow, events: OperatingEventRow[], childTypes: Set<string>): number {
+  if (!effective(row) || settled(row)) return 0;
+  return Math.max(0, num(row.amount) - childAmount(events, row.operatingEventId, childTypes, true));
+}
+
+function producedUnits(row: OperatingEventRow): number {
+  if (row.quantity != null && row.quantity !== '') return num(row.quantity);
+  return num(row.amount);
+}
+
+function countedUnits(row: OperatingEventRow): number {
+  if (row.quantity != null && row.quantity !== '') return num(row.quantity);
+  return num(row.amount);
+}
+
+function ratio(value: number): string {
+  return value.toFixed(2);
+}
+
+export function operatingContinuity(
+  events: OperatingEventRow[],
+  familyCode: string,
+  visible: boolean
+): OperatingContinuity {
+  const rows = events.filter(effective);
+  let payable = 0;
+  let receivable = 0;
+  for (const row of rows) {
+    if (PAYABLE_TYPES.has(row.eventType)) {
+      payable += obligationRemaining(row, events, new Set(['PAYMENT']));
+    }
+    if (row.eventType === 'SALE' || row.eventType === 'SERVICE') {
+      receivable += obligationRemaining(row, events, new Set(['COLLECTION']));
+    }
+    if (row.eventType === 'CUSTOMER_ORDER') {
+      const invoiced = events.some(
+        (child) => child.parentEventId === row.operatingEventId && child.eventType === 'SALE' && effective(child)
+      );
+      if (!invoiced) receivable += obligationRemaining(row, events, new Set(['COLLECTION']));
+    }
+  }
+
+  const orders = rows.filter((row) => row.eventType === 'ORDER' || row.eventType === 'CUSTOMER_ORDER');
+  const ordered = orders.reduce((total, row) => total + num(row.quantity), 0);
+  const dispatched = rows.filter((row) => row.eventType === 'SHIPMENT').reduce((total, row) => total + num(row.quantity), 0);
+  const delivered = rows.filter((row) => row.eventType === 'DELIVERY').reduce((total, row) => total + num(row.quantity), 0);
+  let pendingDelivery = 0;
+  for (const order of orders) {
+    pendingDelivery += Math.max(0, num(order.quantity) - childQuantity(events, order.operatingEventId, new Set(['DELIVERY'])));
+  }
+
+  let planned = 0;
+  for (const row of rows) {
+    if (row.eventType === 'TARGET' && row.quantity != null && row.quantity !== '') planned = num(row.quantity);
+  }
+  const produced = rows
+    .filter((row) => row.eventType === 'PRODUCTION')
+    .reduce((total, row) => total + producedUnits(row), 0);
+  const rejected = rows
+    .filter((row) => row.eventType === 'PRODUCTION')
+    .reduce((total, row) => total + num(row.rejectedQuantity), 0);
+  const accepted = Math.max(0, produced - rejected);
+  const sold = rows.filter((row) => row.eventType === 'SALE').reduce((total, row) => total + num(row.quantity), 0);
+  const unsoldAccepted = Math.max(0, accepted - sold);
+
+  let pendingProduction = 0;
+  if (familyCode === 'MANUFACTURING_PRODUCTION') {
+    if (orders.length > 0) {
+      for (const order of orders) {
+        const linked = events
+          .filter((row) => row.parentEventId === order.operatingEventId && row.eventType === 'PRODUCTION' && effective(row))
+          .reduce((total, row) => total + producedUnits(row), 0);
+        pendingProduction += Math.max(0, num(order.quantity) - linked);
+      }
+    } else {
+      pendingProduction = Math.max(0, planned - produced);
+    }
+  }
+
+  const approved = rows.filter((row) => row.eventType === 'APPROVAL').reduce((total, row) => total + num(row.amount), 0);
+  const spent = rows.reduce(
+    (total, row) => total + (quickAddDef(row.eventType)?.consumesBudget ? num(row.amount) : 0),
+    0
+  );
+  const appointments = rows.filter((row) => row.eventType === 'APPOINTMENT');
+  let openBookings = 0;
+  for (const appointment of appointments) {
+    openBookings += Math.max(
+      0,
+      num(appointment.amount) - childAmount(events, appointment.operatingEventId, new Set(['SERVICE']), true)
+    );
+  }
+
+  let leads = 0;
+  let conversions = 0;
+  for (const row of rows) {
+    if (row.eventType !== 'RESULT') continue;
+    if (row.metric === 'LEADS') leads += countedUnits(row);
+    if (row.metric === 'CONVERSIONS') conversions += countedUnits(row);
+  }
+
+  return {
+    payable: visible ? money(payable) : null,
+    receivable: visible ? money(receivable) : null,
+    ordered: money(ordered),
+    dispatched: money(dispatched),
+    delivered: money(delivered),
+    pendingDelivery: money(pendingDelivery),
+    planned: money(planned),
+    produced: money(produced),
+    rejected: money(rejected),
+    accepted: money(accepted),
+    unsoldAccepted: money(unsoldAccepted),
+    pendingProduction: money(pendingProduction),
+    approved: visible ? money(approved) : null,
+    approvedUnspent: visible ? money(Math.max(0, approved - spent)) : null,
+    openBookings: visible ? money(openBookings) : null,
+    leads: money(leads),
+    conversions: money(conversions),
+    costPerLead: visible && leads > 0 ? ratio(spent / leads) : null,
+    conversionRate: leads > 0 ? ratio((conversions / leads) * 100) : null,
+  };
+}
+
+export function validateOperatingAllocation(input: {
+  eventType: string;
+  parent: OperatingEventRow | null;
+  siblings: OperatingEventRow[];
+  amount: string | null;
+  quantity: string | null;
+  allowUnlinked?: boolean;
+}): { ok: true } | { ok: false; message: string } {
+  const required = REQUIRED_PARENT[input.eventType];
+  const optional = OPTIONAL_PARENT[input.eventType];
+  if (required && !input.parent) {
+    if (input.allowUnlinked) return { ok: true };
+    return { ok: false, message: 'Choose the record this settles.' };
+  }
+  if (!input.parent) return { ok: true };
+  const allowed = required ?? optional;
+  if (!allowed?.includes(input.parent.eventType)) {
+    return { ok: false, message: 'That record cannot be linked here.' };
+  }
+  if (input.parent.approvalStatus === 'REJECTED' || settled(input.parent)) {
+    return { ok: false, message: 'That record is no longer open.' };
+  }
+  if (QUANTITY_CHILDREN.has(input.eventType)) {
+    if (input.eventType !== 'PRODUCTION' && !(num(input.quantity) > 0)) {
+      return { ok: false, message: 'Quantity is required.' };
+    }
+    if (input.eventType === 'PRODUCTION' && !(num(input.quantity) > 0)) return { ok: true };
+    if (!(num(input.parent.quantity) > 0)) {
+      return { ok: false, message: 'The order has no quantity.' };
+    }
+    const used = input.siblings
+      .filter((row) => countsTowardAllocation(row) && row.eventType === input.eventType)
+      .reduce((total, row) => total + num(row.quantity), 0);
+    if (used + num(input.quantity) - num(input.parent.quantity) > 0.00005) {
+      return { ok: false, message: 'That is more than the quantity still open.' };
+    }
+    return { ok: true };
+  }
+  if (!(num(input.amount) > 0)) {
+    return { ok: false, message: 'Amount is required.' };
+  }
+  if (!(num(input.parent.amount) > 0)) {
+    return { ok: false, message: 'That record has no amount.' };
+  }
+  const used = input.siblings
+    .filter((row) => countsTowardAllocation(row) && row.eventType === input.eventType)
+    .reduce((total, row) => total + num(row.amount), 0);
+  if (used + num(input.amount) - num(input.parent.amount) > 0.00005) {
+    return { ok: false, message: 'That is more than the amount still open.' };
+  }
+  return { ok: true };
+}
+
+function readinessAmount(row: OperatingEventRow, events: OperatingEventRow[]): number | null {
+  if (PAYABLE_TYPES.has(row.eventType)) {
+    return obligationRemaining(row, events, new Set(['PAYMENT']));
+  }
+  if (row.eventType === 'SALE' || row.eventType === 'SERVICE') {
+    return obligationRemaining(row, events, new Set(['COLLECTION']));
+  }
+  if (row.eventType === 'CUSTOMER_ORDER') {
+    const invoiced = events.some(
+      (child) => child.parentEventId === row.operatingEventId && child.eventType === 'SALE' && effective(child)
+    );
+    if (invoiced) return null;
+    return obligationRemaining(row, events, new Set(['COLLECTION']));
+  }
+  return num(row.amount);
+}
+
 export function projectOperatingMoment(args: {
   familyCode: string;
   prefs: OperatingPreferences;
@@ -566,12 +864,13 @@ export function projectOperatingMoment(args: {
 }): OperatingProjection {
   const sub = subtypeDef(args.familyCode, args.prefs.subtype);
   const visible = financeVisibleFor(args.role);
+  const pulseEvents = eventsInRange(args.events, args.prefs);
   let budget = num(args.prefs.monthlyBudget);
   let target = num(args.prefs.monthlyTarget);
   let spent = 0;
   let progress = 0;
   const revisions: OperatingProjection['memory']['revisions'] = [];
-  for (const row of args.events) {
+  for (const row of pulseEvents) {
     if (!effective(row)) continue;
     const def = quickAddDef(row.eventType);
     const amount = num(row.amount);
@@ -584,14 +883,14 @@ export function projectOperatingMoment(args: {
     }
     if (def?.consumesBudget) spent += amount;
     if (args.familyCode === 'MARKETING_CAMPAIGNS') {
-      if (row.eventType === 'RESULT') progress += amount;
+      if (row.eventType === 'RESULT' && row.metric !== 'LEADS' && row.metric !== 'CONVERSIONS') progress += amount;
     } else if (args.familyCode === 'MANUFACTURING_PRODUCTION') {
       progress += manufacturingTargetAmount(args.prefs.targetMetric, row.eventType, amount);
-    } else if (def?.countsTarget) {
+    } else if (def?.countsTarget && row.eventType !== 'COLLECTION' && row.eventType !== 'PAYMENT') {
       progress += amount;
     }
   }
-  const attention = args.events
+  const attention = pulseEvents
     .filter((row) => row.eventType === 'ISSUE' || row.approvalStatus === 'PENDING')
     .filter((row) => row.approvalStatus !== 'REJECTED')
     .map((row) => ({
@@ -600,7 +899,7 @@ export function projectOperatingMoment(args: {
       kind: row.approvalStatus === 'PENDING' ? 'APPROVAL' : 'ISSUE',
     }));
   const paymentReadiness = visible
-    ? args.events
+    ? pulseEvents
         .filter(
           (row) =>
             row.paymentRelevance !== 'NONE' &&
@@ -608,14 +907,23 @@ export function projectOperatingMoment(args: {
             row.approvalStatus !== 'REJECTED' &&
             row.approvalStatus !== 'PENDING'
         )
-        .map((row) => ({
-          id: row.operatingEventId,
-          title: row.title,
-          amount: row.amount ?? '0.0000',
-          relevance: row.paymentRelevance,
-          status: row.paymentStatus,
-        }))
+        .map((row) => {
+          const remaining = readinessAmount(row, args.events);
+          return remaining == null
+            ? null
+            : {
+                id: row.operatingEventId,
+                title: displayTitle(row),
+                amount: money(remaining),
+                relevance: row.paymentRelevance,
+                status: row.paymentStatus,
+                counterpartyName: row.counterpartyName,
+                dueAt: row.dueAt ?? null,
+              };
+        })
+        .filter((row): row is NonNullable<typeof row> => row != null && num(row.amount) > 0)
     : [];
+  const continuity = operatingContinuity(pulseEvents, args.familyCode, visible);
   const quickAdds = (sub?.quickAdds ?? [])
     .map((code) => QA[code])
     .filter((def) => canSubmit(args.role, def))
@@ -631,19 +939,37 @@ export function projectOperatingMoment(args: {
     financeVisible: visible,
     currency: args.prefs.currency,
     startDate: args.prefs.startDate,
+    endDate: args.prefs.endDate,
+    participants: args.prefs.participants.map((person) => person.displayName),
+    masters: args.events
+      .filter((row) => row.master && row.approvalStatus !== 'REJECTED')
+      .map((row) => ({
+        id: row.operatingEventId,
+        kind: row.master!.kind,
+        name: row.master!.name,
+        unit: row.master!.unit ?? null,
+      })),
     location: args.prefs.location,
-    finance: financeTotals(args.events, visible),
+    finance: financeTotals(pulseEvents, visible, continuity),
+    continuity,
     budget: visible
       ? { amount: money(budget), spent: money(spent), remaining: money(budget - spent) }
       : null,
     target: visible
       ? { metric: args.prefs.targetMetric, value: money(target), progress: money(progress) }
       : null,
-    attention,
+    attention: [
+      ...attention,
+      ...paymentReadiness.map((row) => ({
+        id: `open-${row.id}`,
+        title: `${row.relevance === 'RECEIVABLE' ? 'To collect' : 'To pay'} · ${row.counterpartyName ? `${row.counterpartyName} · ` : ''}${row.title}`,
+        kind: row.relevance === 'RECEIVABLE' ? 'RECEIVABLE' : 'PAYABLE',
+      })),
+    ],
     paymentReadiness,
-    activity: args.events.map((row) => ({
+    activity: pulseEvents.map((row) => ({
       id: row.operatingEventId,
-      title: row.title,
+      title: displayTitle(row),
       eventType: row.eventType,
       occurredAt: row.occurredAt,
       amount: visible ? row.amount : null,
@@ -652,10 +978,13 @@ export function projectOperatingMoment(args: {
       paymentStatus: row.paymentStatus,
       approvalStatus: row.approvalStatus,
       note: row.note,
+      quantity: row.quantity ?? null,
+      unit: row.unit ?? row.lines?.[0]?.unit ?? null,
+      parentEventId: row.parentEventId ?? null,
     })),
     life: {
       channels: args.prefs.channels,
-      openCommitments: args.events.filter(
+      openCommitments: pulseEvents.filter(
         (row) =>
           (row.eventType === 'ORDER' || row.eventType === 'CUSTOMER_ORDER' || row.eventType === 'DELIVERABLE') &&
           row.approvalStatus !== 'REJECTED'
@@ -668,6 +997,7 @@ export function projectOperatingMoment(args: {
       subtype: args.prefs.subtype,
       prefs: args.prefs,
       events: args.events,
+      pulseEvents,
       visible,
       revisions,
     }),
@@ -685,34 +1015,76 @@ function emptyFacts(): Pick<OperatingBoardRow, 'channelName' | 'counterpartyName
   };
 }
 
-function financeTotals(events: OperatingEventRow[], visible: boolean): OperatingFinanceTotals | null {
+function financeTotals(
+  events: OperatingEventRow[],
+  visible: boolean,
+  continuity: OperatingContinuity
+): OperatingFinanceTotals | null {
   if (!visible) return null;
   const rows = events.filter(effective);
   const sum = (match: (row: OperatingEventRow) => boolean) =>
     money(rows.filter(match).reduce((total, row) => total + num(row.amount), 0));
   return {
     sales: sum((row) => row.eventType === 'SALE' || row.eventType === 'SERVICE'),
-    received: sum(
-      (row) =>
-        (row.eventType === 'COLLECTION' || row.eventType === 'SALE' || row.eventType === 'SERVICE') &&
-        row.paymentStatus === 'COLLECTED'
+    received: money(
+      rows.reduce((total, row) => {
+        if (row.eventType === 'COLLECTION' && row.paymentStatus === 'COLLECTED') return total + num(row.amount);
+        if ((row.eventType === 'SALE' || row.eventType === 'SERVICE') && row.paymentStatus === 'COLLECTED') {
+          const linked = events.some(
+            (child) => child.parentEventId === row.operatingEventId && child.eventType === 'COLLECTION' && effective(child)
+          );
+          if (!linked) return total + num(row.amount);
+        }
+        return total;
+      }, 0)
     ),
-    outstanding: sum(
-      (row) =>
-        row.paymentRelevance === 'RECEIVABLE' &&
-        row.paymentStatus !== 'COLLECTED' &&
-        row.paymentStatus !== 'PAID' &&
-        row.paymentStatus !== 'CANCELLED'
-    ),
+    outstanding: continuity.receivable ?? money(0),
+    payable: continuity.payable ?? money(0),
     eligibleCost: sum((row) => quickAddDef(row.eventType)?.consumesBudget === true),
-    cashPaid: sum((row) => row.eventType === 'PAYMENT' && row.paymentStatus === 'PAID'),
+    cashPaid: money(
+      rows.reduce((total, row) => {
+        if (row.eventType === 'PAYMENT' && row.paymentStatus === 'PAID') return total + num(row.amount);
+        if (PAYABLE_TYPES.has(row.eventType) && row.paymentStatus === 'PAID') {
+          const linked = events.some(
+            (child) => child.parentEventId === row.operatingEventId && child.eventType === 'PAYMENT' && effective(child)
+          );
+          if (!linked) return total + num(row.amount);
+        }
+        return total;
+      }, 0)
+    ),
   };
+}
+
+function displayTitle(row: OperatingEventRow): string {
+  const lines = row.lines ?? [];
+  if (lines.length > 0) {
+    return lines
+      .map((line) => {
+        const qty = line.quantity ? ` × ${trimNumber(line.quantity)}` : '';
+        const unit = line.unit ? ` ${line.unit}` : '';
+        const price = line.unitPrice ? ` @ ${trimNumber(line.unitPrice)}` : '';
+        return `${line.itemName}${qty}${unit}${price}`;
+      })
+      .join(', ');
+  }
+  if (row.quantity) {
+    const unit = row.unit ? ` ${row.unit}` : '';
+    return `${row.title} · ${trimNumber(row.quantity)}${unit}`;
+  }
+  return row.title;
+}
+
+function trimNumber(value: string): string {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return value;
+  return n.toLocaleString('en-IN', { maximumFractionDigits: 2 });
 }
 
 function boardRow(row: OperatingEventRow, visible: boolean): OperatingBoardRow {
   return {
     id: row.operatingEventId,
-    title: row.title,
+    title: displayTitle(row),
     eventType: row.eventType,
     occurredAt: row.occurredAt,
     amount: visible ? row.amount : null,
@@ -732,7 +1104,9 @@ function eventSection(
   visible: boolean,
   currency: string
 ): OperatingBoardSection {
-  const matched = events.filter((row) => types.includes(row.eventType) && row.approvalStatus !== 'REJECTED');
+  const matched = events.filter(
+    (row) => types.includes(row.eventType) && row.approvalStatus !== 'REJECTED' && !row.master
+  );
   const rows = matched.map((row) => boardRow(row, visible));
   let detail = 'Nothing recorded yet.';
   if (rows.length > 0) {
@@ -762,8 +1136,8 @@ function textSection(code: string, title: string, lines: string[]): OperatingBoa
   };
 }
 
-const MONEY_MOVING_TYPES = ['SALE', 'PAYMENT', 'COLLECTION', 'SPEND', 'VENDOR_COST'];
-const MONEY_HISTORY_TYPES = ['BUDGET', 'TARGET', 'SPEND', 'PAYMENT', 'COLLECTION', 'VENDOR_COST'];
+const MONEY_MOVING_TYPES = ['SALE', 'SERVICE', 'PAYMENT', 'COLLECTION', 'SPEND', 'VENDOR_COST', 'PURCHASE'];
+const MONEY_HISTORY_TYPES = ['SALE', 'SERVICE', 'PURCHASE', 'BUDGET', 'TARGET', 'SPEND', 'PAYMENT', 'COLLECTION', 'VENDOR_COST'];
 
 type WidgetLabels = {
   m1: string;
@@ -829,15 +1203,26 @@ function executionTypes(familyCode: string): string[] {
   return ['ISSUE', 'STOCK', 'UPDATE'];
 }
 
+function eventsInRange(events: OperatingEventRow[], prefs: OperatingPreferences): OperatingEventRow[] {
+  const end = prefs.endDate.slice(0, 10);
+  if (!end) return events;
+  const start = (prefs.startDate || '0000-01-01').slice(0, 10);
+  return events.filter((row) => {
+    const day = row.occurredAt.slice(0, 10);
+    return day >= start && day <= end;
+  });
+}
+
 function operatingBoards(args: {
   familyCode: string;
   subtype: string;
   prefs: OperatingPreferences;
   events: OperatingEventRow[];
+  pulseEvents: OperatingEventRow[];
   visible: boolean;
   revisions: Array<{ id: string; title: string; occurredAt: string }>;
 }): OperatingProjection['boards'] {
-  const { familyCode, prefs, events, visible } = args;
+  const { familyCode, prefs, events, pulseEvents, visible } = args;
   const labels = widgetLabels(familyCode);
   const currency = prefs.currency;
   const section = (code: string, title: string, types: string[]) =>
@@ -849,35 +1234,262 @@ function operatingBoards(args: {
     textSection('M2', 'People', names),
     textSection('M3', labels.m3, network),
     section('M4', 'Open Commitments', commitmentTypes(familyCode)),
+    ...familyMomentSections(familyCode, args.subtype, events, visible, currency, network),
   ];
+  const lifeEvents = pulseEvents;
+  const lifeSection = (code: string, title: string, types: string[]) =>
+    eventSection(code, title, lifeEvents, types, visible, currency);
   const life = [
-    textSection('L1', labels.l1, [prefs.identityName, prefs.partyName, args.subtype]),
+    textSection('L1', labels.l1, [prefs.identityName, prefs.partyName].filter(Boolean)),
     familyCode === 'MANUFACTURING_PRODUCTION'
-      ? section('L2', labels.l2, ['CUSTOMER_ORDER', 'ORDER'])
-      : textSection('L2', labels.l2, prefs.channels),
-    section('L3', 'Money Moving', MONEY_MOVING_TYPES),
-    section('L4', labels.l4, executionTypes(familyCode)),
-    textSection('L5', 'People Today', names),
+      ? lifeSection('L2', labels.l2, ['CUSTOMER_ORDER', 'ORDER'])
+      : channelSection(labels.l2, prefs.channels, lifeEvents, visible, currency, familyCode),
+    lifeSection('L3', 'Money Moving', MONEY_MOVING_TYPES),
+    lifeSection('L4', labels.l4, executionTypes(familyCode)),
+    peopleToday(lifeEvents, prefs),
+    ...familyLifeSections(familyCode, args.subtype, lifeEvents, visible, currency),
   ];
+  const monthly = monthlyHistory(pulseEvents, visible, currency);
+  const revisionRows = args.revisions.map((row) => ({
+    id: row.id,
+    title: row.title,
+    eventType: 'REVISION',
+    occurredAt: row.occurredAt,
+    amount: null,
+    ...emptyFacts(),
+  }));
+  const historyRows = [...monthly, ...revisionRows];
   const memory = [
     {
       code: 'ME1',
       title: 'Monthly History',
-      detail: args.revisions.length > 0 ? `${args.revisions.length} recorded` : 'Nothing recorded yet.',
-      rows: args.revisions.map((row) => ({
-        id: row.id,
-        title: row.title,
-        eventType: 'REVISION',
-        occurredAt: row.occurredAt,
-        amount: null,
-        ...emptyFacts(),
-      })),
+      detail: historyRows.length > 0 ? `${historyRows.length} recorded` : 'Nothing recorded yet.',
+      rows: historyRows,
     },
-    section('ME2', 'Money History', MONEY_HISTORY_TYPES),
-    section('ME3', labels.me3, ['UPDATE']),
-    section('ME4', 'Patterns & Decisions', ['ISSUE', 'APPROVAL']),
+    eventSection('ME2', 'Money History', pulseEvents, MONEY_HISTORY_TYPES, visible, currency),
+    peopleHistory(labels.me3, pulseEvents, prefs, visible),
+    eventSection('ME4', 'Patterns & Decisions', pulseEvents, ['ISSUE', 'APPROVAL'], visible, currency),
+    settlementChains(pulseEvents, visible),
+    ...familyMemorySections(familyCode, pulseEvents, visible, currency),
   ];
   return { moments, life, memory };
+}
+
+function familyMomentSections(
+  familyCode: string,
+  subtype: string,
+  events: OperatingEventRow[],
+  visible: boolean,
+  currency: string,
+  network: string[]
+): OperatingBoardSection[] {
+  const section = (code: string, title: string, types: string[]) =>
+    eventSection(code, title, events, types, visible, currency);
+  if (familyCode === 'RETAIL_CONSUMER' && subtype === 'CONSUMER_SERVICE') {
+    return [
+      section('services', 'Services', ['SERVICE', 'SALE']),
+      section('appointments', 'Appointments / Jobs', ['APPOINTMENT']),
+      section('sales', 'Sales', ['SALE']),
+      section('updates', 'Updates', ['UPDATE']),
+      section('issues', 'Issues', ['ISSUE']),
+      section('expenses', 'Expenses', ['SPEND']),
+      section('payments', 'Payments & Collections', ['PAYMENT', 'COLLECTION']),
+    ];
+  }
+  if (familyCode === 'RETAIL_CONSUMER') {
+    return [
+      section('sales', 'Sales & Orders', ['SALE', 'ORDER']),
+      section('purchases', 'Purchases', ['PURCHASE']),
+      section('updates', 'Updates', ['UPDATE']),
+      section('stock', 'Stock & Supplies', ['STOCK']),
+      section('issues', 'Issues', ['ISSUE']),
+      section('expenses', 'Expenses', ['SPEND']),
+      section('payments', 'Payments & Collections', ['PAYMENT', 'COLLECTION']),
+      textSection('channels', 'People & Network', network),
+    ];
+  }
+  if (familyCode === 'MANUFACTURING_PRODUCTION') {
+    return [
+      section('orders', 'Orders', ['CUSTOMER_ORDER', 'ORDER']),
+      section('production', 'Production', ['PRODUCTION']),
+      section('stock', 'Stock', ['STOCK', 'PURCHASE']),
+      section('commitments', 'Open Commitments', ['CUSTOMER_ORDER', 'PURCHASE', 'SALE']),
+    ];
+  }
+  if (familyCode === 'TRADING_DISTRIBUTION') {
+    return [
+      section('orders', 'Orders & Commitments', ['ORDER', 'CUSTOMER_ORDER', 'SHIPMENT']),
+      section('stock', 'Stock & Products', ['STOCK', 'PURCHASE', 'SALE']),
+      textSection('network', 'People & Network', network),
+      section('commitments', 'Open Commitments', ['ORDER', 'PURCHASE', 'SALE', 'SHIPMENT']),
+    ];
+  }
+  if (familyCode === 'MARKETING_CAMPAIGNS') {
+    return [
+      section('channels', 'Channel Activity', ['RESULT', 'DELIVERABLE']),
+      section('commitments', 'Open Commitments', ['DELIVERABLE', 'SPEND', 'VENDOR_COST']),
+    ];
+  }
+  return [];
+}
+
+function familyLifeSections(
+  familyCode: string,
+  subtype: string,
+  events: OperatingEventRow[],
+  visible: boolean,
+  currency: string
+): OperatingBoardSection[] {
+  if (familyCode === 'TRADING_DISTRIBUTION') {
+    return [
+      eventSection('transit', 'In Transit', events, ['SHIPMENT'], visible, currency),
+      eventSection('onhand', 'On Hand', events, ['STOCK'], visible, currency),
+    ];
+  }
+  if (subtype === 'CONSUMER_SERVICE') {
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = events.filter(
+      (row) => row.eventType === 'APPOINTMENT' && row.occurredAt.slice(0, 10) === today && row.approvalStatus !== 'REJECTED'
+    );
+    return [
+      {
+        code: 'schedule',
+        title: "Today's Schedule",
+        detail: rows.length > 0 ? `${rows.length} recorded` : 'Nothing recorded yet.',
+        rows: rows.map((row) => boardRow(row, visible)),
+      },
+    ];
+  }
+  return [];
+}
+
+function settlementChains(events: OperatingEventRow[], visible: boolean): OperatingBoardSection {
+  const rows = events
+    .filter((row) => (row.eventType === 'COLLECTION' || row.eventType === 'PAYMENT') && row.approvalStatus !== 'REJECTED')
+    .map((row) => {
+      const parent = events.find((item) => item.operatingEventId === row.parentEventId);
+      const verb = row.eventType === 'COLLECTION' ? 'Collected against' : 'Paid against';
+      const base = boardRow(row, visible);
+      return {
+        ...base,
+        title: parent ? `${verb} ${displayTitle(parent)}` : displayTitle(row),
+      };
+    });
+  return {
+    code: 'chains',
+    title: 'Settlement History',
+    detail: rows.length > 0 ? `${rows.length} recorded` : 'Nothing recorded yet.',
+    rows,
+  };
+}
+
+function familyMemorySections(
+  familyCode: string,
+  events: OperatingEventRow[],
+  visible: boolean,
+  currency: string
+): OperatingBoardSection[] {
+  if (familyCode !== 'TRADING_DISTRIBUTION' && familyCode !== 'MANUFACTURING_PRODUCTION') return [];
+  return [eventSection('fulfilment', 'Fulfilment History', events, ['ORDER', 'SHIPMENT', 'DELIVERY', 'PRODUCTION'], visible, currency)];
+}
+
+function channelSection(
+  title: string,
+  channels: string[],
+  events: OperatingEventRow[],
+  visible: boolean,
+  currency: string,
+  familyCode: string
+): OperatingBoardSection {
+  const sales = events.filter((row) => {
+    if (!effective(row)) return false;
+    if (familyCode === 'MARKETING_CAMPAIGNS') return row.eventType === 'RESULT';
+    return row.eventType === 'SALE' || row.eventType === 'SERVICE';
+  });
+  const known = new Set(channels);
+  for (const row of sales) if (row.channelName) known.add(row.channelName);
+  const lines = [...known].map((channel) => {
+    const matched = sales.filter((row) => row.channelName === channel);
+    if (matched.length === 0) return channel;
+    if (familyCode === 'MARKETING_CAMPAIGNS') {
+      const metrics = [...new Set(matched.map((row) => row.metric || 'RESULT'))].join(', ');
+      return `${channel} · ${metrics} · ${matched.length}`;
+    }
+    const total = matched.reduce((sum, row) => sum + num(row.amount), 0);
+    return visible && total > 0 ? `${channel} · ${matched.length} · ${money(total)} ${currency}` : `${channel} · ${matched.length}`;
+  });
+  return textSection('L2', title, lines);
+}
+
+function peopleToday(events: OperatingEventRow[], prefs: OperatingPreferences): OperatingBoardSection {
+  const today = new Date().toISOString().slice(0, 10);
+  const lines = events
+    .filter((row) => row.occurredAt.slice(0, 10) === today && row.approvalStatus !== 'REJECTED')
+    .map((row) => `${actorName(row, prefs)} · ${displayTitle(row)}`);
+  return textSection('L5', 'People Today', lines);
+}
+
+function peopleHistory(
+  title: string,
+  events: OperatingEventRow[],
+  prefs: OperatingPreferences,
+  visible: boolean
+): OperatingBoardSection {
+  const rows = events
+    .filter((row) => row.approvalStatus !== 'REJECTED')
+    .slice(0, 30)
+    .map((row) => ({
+      ...boardRow(row, visible),
+      title: `${actorName(row, prefs)} · ${displayTitle(row)}`,
+    }));
+  return {
+    code: 'ME3',
+    title,
+    detail: rows.length > 0 ? `${rows.length} recorded` : 'Nothing recorded yet.',
+    rows,
+  };
+}
+
+function actorName(row: OperatingEventRow, prefs: OperatingPreferences): string {
+  const match = prefs.participants.find((person) => person.userId && person.userId === row.submittedByUserId);
+  return match?.displayName || row.counterpartyName || 'Recorded';
+}
+
+function monthlyHistory(
+  events: OperatingEventRow[],
+  visible: boolean,
+  currency: string
+): OperatingBoardRow[] {
+  const groups = new Map<string, OperatingEventRow[]>();
+  for (const row of events) {
+    if (!effective(row)) continue;
+    const month = row.occurredAt.slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(month)) continue;
+    const list = groups.get(month) ?? [];
+    list.push(row);
+    groups.set(month, list);
+  }
+  const current = new Date().toISOString().slice(0, 7);
+  return [...groups.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([month, rows]) => {
+      const sales = rows
+        .filter((row) => row.eventType === 'SALE' || row.eventType === 'SERVICE')
+        .reduce((sum, row) => sum + num(row.amount), 0);
+      const costs = rows
+        .filter((row) => quickAddDef(row.eventType)?.consumesBudget)
+        .reduce((sum, row) => sum + num(row.amount), 0);
+      const progress = month === current ? ' · Month in progress' : '';
+      const moneyLine = visible ? ` · Sales ${money(sales)} ${currency} · Costs ${money(costs)} ${currency}` : '';
+      return {
+        id: `month-${month}`,
+        title: `${month}${progress}${moneyLine}`,
+        eventType: 'MONTH',
+        occurredAt: `${month}-01T00:00:00.000Z`,
+        amount: visible ? money(sales) : null,
+        ...emptyFacts(),
+      };
+    });
 }
 
 export function resolveRole(
