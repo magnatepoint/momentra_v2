@@ -28,6 +28,7 @@ import {
   validateRetailWrite,
   type OperatingContract,
 } from './operating-retail-contract';
+import { isTradingSubtype, validateTradingWrite } from './operating-trading-contract';
 
 const amountSchema = z.string().regex(/^\d+(\.\d{1,4})?$/);
 
@@ -89,6 +90,9 @@ export const recordOperatingEventSchema = z
         staffName: z.string().max(120).nullish(),
         followUp: z.boolean().nullish(),
         estimatedAmount: amountSchema.nullish(),
+        ownership: z.enum(['OWNED', 'CONSIGNMENT']).nullish(),
+        shipmentStatus: z.enum(['PLACED', 'IN_TRANSIT', 'DELIVERED', 'CANCELLED']).nullish(),
+        promisedAt: z.string().max(40).nullish(),
       })
       .strict()
       .optional(),
@@ -316,27 +320,47 @@ export async function recordOperatingEvent(
   const retailGoverned =
     isRetailSubtype(prefs.subtype) &&
     ['SALE', 'SERVICE', 'PURCHASE', 'SPEND', 'PAYMENT', 'COLLECTION', 'STOCK', 'ORDER', 'APPOINTMENT'].includes(def.code);
+  const tradingGoverned =
+    isTradingSubtype(prefs.subtype) &&
+    ['SALE', 'PURCHASE', 'SPEND', 'PAYMENT', 'COLLECTION', 'STOCK', 'ORDER', 'SHIPMENT', 'DELIVERY'].includes(def.code);
   let retailContract: OperatingContract | null = null;
   let settleChild: { type: 'COLLECTION' | 'PAYMENT'; amount: string } | null = null;
   let parentEventId = body.parentEventId ?? null;
   let quantity = body.quantity ?? null;
-  if (retailGoverned) {
-    const checked = validateRetailWrite(
-      {
-        eventType: def.code,
-        title: body.title,
-        amount,
-        counterpartyName: body.counterpartyName,
-        channelName: body.channelName,
-        occurredAt: body.occurredAt,
-        parentEventId,
-        quantity: body.quantity,
-        dueAt: body.dueAt,
-        lines: body.lines,
-        contract: body.contract,
-      },
-      existing
-    );
+  if (retailGoverned || tradingGoverned) {
+    const checked = retailGoverned
+      ? validateRetailWrite(
+          {
+            eventType: def.code,
+            title: body.title,
+            amount,
+            counterpartyName: body.counterpartyName,
+            channelName: body.channelName,
+            occurredAt: body.occurredAt,
+            parentEventId,
+            quantity: body.quantity,
+            dueAt: body.dueAt,
+            lines: body.lines,
+            contract: body.contract,
+          },
+          existing
+        )
+      : validateTradingWrite(
+          {
+            eventType: def.code,
+            title: body.title,
+            amount,
+            counterpartyName: body.counterpartyName,
+            channelName: body.channelName,
+            occurredAt: body.occurredAt,
+            parentEventId,
+            quantity: body.quantity,
+            dueAt: body.dueAt,
+            lines: body.lines,
+            contract: body.contract,
+          },
+          existing
+        );
     if (!checked.ok) throw new AppError(ErrorCode.VALIDATION_FAILED, checked.message, 400);
     paymentStatus = checked.paymentStatus;
     amount = checked.amount;
@@ -594,6 +618,33 @@ export async function reviseOperatingEvent(
     ['SALE', 'SERVICE', 'PURCHASE', 'SPEND', 'PAYMENT', 'COLLECTION', 'STOCK', 'ORDER', 'APPOINTMENT'].includes(current.eventType)
   ) {
     const checked = validateRetailWrite(
+      {
+        eventType: current.eventType,
+        title: body.title,
+        amount: body.amount ?? current.amount,
+        counterpartyName: body.counterpartyName ?? current.counterpartyName,
+        channelName: body.channelName ?? current.channelName,
+        occurredAt: body.occurredAt ?? current.occurredAt,
+        parentEventId: body.parentEventId ?? current.parentEventId,
+        quantity: body.quantity ?? current.quantity,
+        dueAt: body.dueAt ?? current.dueAt,
+        lines: body.lines ?? current.lines,
+        contract: body.contract ?? current.contract,
+        revisingId: eventId,
+      },
+      existing
+    );
+    if (!checked.ok) throw new AppError(ErrorCode.VALIDATION_FAILED, checked.message, 400);
+    revisedAmount = checked.amount;
+    revisedStatus = checked.paymentStatus;
+    revisedQuantity = checked.quantity;
+    payload.contract = checked.contract;
+  } else if (
+    isTradingSubtype(prefs.subtype) &&
+    (body.contract || current.contract) &&
+    ['SALE', 'PURCHASE', 'SPEND', 'PAYMENT', 'COLLECTION', 'STOCK', 'ORDER', 'SHIPMENT', 'DELIVERY'].includes(current.eventType)
+  ) {
+    const checked = validateTradingWrite(
       {
         eventType: current.eventType,
         title: body.title,
