@@ -265,23 +265,29 @@ describe('operating moment catalog', () => {
     assert.equal(finance.boards.moments.some((section) => section.code === 'purchases'), false);
   });
 
-  it('rejects a retail store without a positive budget', () => {
-    assert.throws(
-      () =>
-        normalizeOperatingPreferences(
-          'RETAIL_CONSUMER',
-          {
-            subtype: 'RETAIL_STORE',
-            identityName: 'Store',
-            partyName: 'Store',
-            monthlyBudget: '0',
-            monthlyTarget: '10',
-            targetMetric: 'REVENUE',
-          },
-          { userId: 'u', displayName: 'Asha' }
-        ),
-      /Monthly budget/
+  it('allows a retail store without a budget or target', () => {
+    const prefs = normalizeOperatingPreferences(
+      'RETAIL_CONSUMER',
+      {
+        subtype: 'RETAIL_STORE',
+        identityName: 'Store',
+        partyName: 'Store',
+        monthlyBudget: '0',
+        monthlyTarget: '',
+        targetMetric: 'REVENUE',
+      },
+      { userId: 'u', displayName: 'Asha' }
     );
+    assert.equal(prefs.monthlyBudget, '');
+    assert.equal(prefs.monthlyTarget, '');
+    const view = projectOperatingMoment({
+      familyCode: 'RETAIL_CONSUMER',
+      prefs,
+      role: 'FINANCE',
+      events: [],
+    });
+    assert.equal(view.target?.configured, false);
+    assert.equal(view.budget?.configured, false);
   });
 
   it('keeps trade reach and shows a trading shipment on the dispatches board', () => {

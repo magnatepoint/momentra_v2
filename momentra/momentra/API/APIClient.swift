@@ -5,18 +5,50 @@ struct OperatingMoneyPayload: Decodable {
     let amount: String
     let spent: String
     let remaining: String
+    var configured: Bool? = nil
 }
 
 struct OperatingTargetPayload: Decodable {
     let metric: String
     let value: String
     let progress: String
+    var configured: Bool? = nil
+}
+
+struct OperatingContractInput: Encodable {
+    var entryMode: String? = nil
+    var paymentState: String? = nil
+    var receiptState: String? = nil
+    var receivedAmount: String? = nil
+    var quantityReceived: String? = nil
+    var stockAction: String? = nil
+    var stockReason: String? = nil
+    var expenseCategory: String? = nil
+    var appointmentAction: String? = nil
+    var orderStatus: String? = nil
+    var clientKey: String? = nil
+    var reorderPoint: String? = nil
+    var staffName: String? = nil
+    var estimatedAmount: String? = nil
+    var followUp: Bool? = nil
+    var allocations: [OperatingAllocationInput]? = nil
+}
+
+struct OperatingAllocationInput: Encodable {
+    var sourceId: String
+    var amount: String
 }
 
 struct OperatingAttentionPayload: Decodable, Identifiable {
     let id: String
     let title: String
     let kind: String
+    var severity: String? = nil
+    var amount: String? = nil
+    var dueAt: String? = nil
+    var counterpartyName: String? = nil
+    var sourceEventId: String? = nil
+    var cta: String? = nil
 }
 
 struct OperatingPaymentPayload: Decodable, Identifiable {
@@ -52,6 +84,7 @@ struct OperatingActivityPayload: Decodable, Identifiable {
     let quantity: String?
     let unit: String?
     let parentEventId: String?
+    var status: String? = nil
 }
 
 struct OperatingLifePayload: Decodable {
@@ -83,6 +116,7 @@ struct OperatingBoardSectionPayload: Decodable, Identifiable {
     let title: String
     let detail: String
     let rows: [OperatingActivityPayload]?
+    var coverage: String? = nil
     var id: String { code }
 }
 
@@ -5232,7 +5266,10 @@ final class APIClient {
         itemName: String? = nil,
         unitPrice: String? = nil,
         masterKind: String? = nil,
-        revisesEventId: String? = nil
+        revisesEventId: String? = nil,
+        dueAt: String? = nil,
+        contract: OperatingContractInput? = nil,
+        lineItems: [(itemName: String, quantity: String?, unit: String?, unitPrice: String?)]? = nil
     ) async throws -> RecordOperatingEventResult {
         struct Line: Encodable {
             let itemName: String
@@ -5259,10 +5296,13 @@ final class APIClient {
             let unit: String?
             let lines: [Line]?
             let master: Master?
+            let dueAt: String?
+            let contract: OperatingContractInput?
         }
-        let lines = itemName?.trimmingCharacters(in: .whitespaces).isEmpty == false
+        let lines = lineItems?.map { Line(itemName: $0.itemName, quantity: $0.quantity, unit: $0.unit, unitPrice: $0.unitPrice) }
+            ?? (itemName?.trimmingCharacters(in: .whitespaces).isEmpty == false
             ? [Line(itemName: itemName!.trimmingCharacters(in: .whitespaces), quantity: quantity, unit: unit, unitPrice: unitPrice)]
-            : nil
+            : nil)
         let master = masterKind?.isEmpty == false
             ? Master(kind: masterKind!, name: title, unit: unit)
             : nil
@@ -5279,7 +5319,9 @@ final class APIClient {
             quantity: quantity,
             unit: unit,
             lines: lines,
-            master: master
+            master: master,
+            dueAt: dueAt,
+            contract: contract
         )
         if let revisesEventId, !revisesEventId.isEmpty {
             return try await authorizedPatch(

@@ -3,6 +3,21 @@
  * which Pulse figures a role may see.
  */
 
+import {
+  appointmentSummary,
+  budgetAttention,
+  customersNetworkDetail,
+  isRetailSubtype,
+  moneyMovingDetail,
+  outcomeCoverage,
+  postedSalesSummary,
+  retailAttention,
+  salesCoverage,
+  serviceFlowSummary,
+  stockPositions,
+  type OperatingContract,
+} from './operating-retail-contract';
+
 export const OPERATING_FAMILY_CODES = [
   'MARKETING_CAMPAIGNS',
   'TRADING_DISTRIBUTION',
@@ -211,7 +226,7 @@ export const OPERATING_FAMILIES: OperatingFamily[] = [
         code: 'CONSUMER_SERVICE',
         label: 'Consumer Service',
         partyLabel: 'Service',
-        quickAdds: ['SERVICE', 'APPOINTMENT', 'SALE', 'SPEND', 'PAYMENT', 'COLLECTION', 'BUDGET', 'UPDATE', 'ISSUE', 'APPROVAL'],
+        quickAdds: ['SERVICE', 'APPOINTMENT', 'SALE', 'PURCHASE', 'SPEND', 'PAYMENT', 'COLLECTION', 'BUDGET', 'UPDATE', 'ISSUE', 'APPROVAL', 'STOCK'],
         targetMetrics: ['REVENUE', 'ORDERS', 'CUSTOM_COUNT'],
         requiresChannel: false,
       },
@@ -372,10 +387,12 @@ export function normalizeOperatingPreferences(
   const partyName = String(prefs.partyName ?? '').trim();
   if (!identityName) throw new Error('Moment name is required.');
   if (!partyName) throw new Error(`${sub.partyLabel} name is required.`);
-  const monthlyBudget = positiveAmount(prefs.monthlyBudget);
-  const monthlyTarget = positiveAmount(prefs.monthlyTarget);
-  if (!monthlyBudget) throw new Error('Monthly budget must be a positive amount.');
-  if (!monthlyTarget) throw new Error('Monthly target must be a positive amount.');
+  const monthlyBudget = positiveAmount(prefs.monthlyBudget) ?? '';
+  const monthlyTarget = positiveAmount(prefs.monthlyTarget) ?? '';
+  if (familyCode !== 'RETAIL_CONSUMER') {
+    if (!monthlyBudget) throw new Error('Monthly budget must be a positive amount.');
+    if (!monthlyTarget) throw new Error('Monthly target must be a positive amount.');
+  }
   const targetMetric = String(prefs.targetMetric ?? sub.targetMetrics[0]).toUpperCase();
   if (!sub.targetMetrics.includes(targetMetric)) {
     throw new Error(`Target measure must be one of ${sub.targetMetrics.join(', ')}.`);
@@ -467,6 +484,7 @@ export interface OperatingEventRow {
   master?: OperatingMaster | null;
   metric?: 'LEADS' | 'CONVERSIONS' | null;
   rejectedQuantity?: string | null;
+  contract?: OperatingContract | null;
 }
 
 export interface OperatingLine {
@@ -497,11 +515,21 @@ export interface OperatingProjection {
   participants: string[];
   masters: Array<{ id: string; kind: string; name: string; unit: string | null }>;
   location: string;
-  budget: { amount: string; spent: string; remaining: string } | null;
-  target: { metric: string; value: string; progress: string } | null;
+  budget: { amount: string; spent: string; remaining: string; configured: boolean } | null;
+  target: { metric: string; value: string; progress: string; configured: boolean } | null;
   finance: OperatingFinanceTotals | null;
   continuity: OperatingContinuity;
-  attention: Array<{ id: string; title: string; kind: string }>;
+  attention: Array<{
+    id: string;
+    title: string;
+    kind: string;
+    severity?: string | null;
+    amount?: string | null;
+    dueAt?: string | null;
+    counterpartyName?: string | null;
+    sourceEventId?: string | null;
+    cta?: string | null;
+  }>;
   paymentReadiness: Array<{
     id: string;
     title: string;
@@ -525,6 +553,7 @@ export interface OperatingProjection {
     quantity: string | null;
     unit: string | null;
     parentEventId: string | null;
+    status: string | null;
   }>;
   life: { channels: string[]; openCommitments: number; resultProgress: string };
   memory: { revisions: Array<{ id: string; title: string; occurredAt: string }> };
@@ -585,6 +614,7 @@ export interface OperatingBoardSection {
   title: string;
   detail: string;
   rows: OperatingBoardRow[];
+  coverage?: string | null;
 }
 
 function num(value: string | null | undefined): number {
@@ -630,7 +660,7 @@ const REQUIRED_PARENT: Record<string, readonly string[]> = {
 const OPTIONAL_PARENT: Record<string, readonly string[]> = {
   SERVICE: ['APPOINTMENT'],
   PRODUCTION: ['CUSTOMER_ORDER', 'TARGET'],
-  SALE: ['CUSTOMER_ORDER'],
+  SALE: ['CUSTOMER_ORDER', 'ORDER', 'APPOINTMENT'],
 };
 const QUANTITY_CHILDREN = new Set(['SHIPMENT', 'DELIVERY', 'PRODUCTION']);
 
@@ -649,8 +679,13 @@ function childAmount(
   onlyEffective: boolean
 ): number {
   return events.reduce((total, row) => {
-    if (row.parentEventId !== parentId || !types.has(row.eventType)) return total;
+    if (!types.has(row.eventType)) return total;
     if (onlyEffective ? !effective(row) : !countsTowardAllocation(row)) return total;
+    const parts = row.contract?.allocations ?? [];
+    if (parts.length > 0) {
+      return total + parts.reduce((sum, part) => (part.sourceId === parentId ? sum + num(part.amount) : sum), 0);
+    }
+    if (row.parentEventId !== parentId) return total;
     return total + num(row.amount);
   }, 0);
 }
@@ -805,6 +840,12 @@ export function validateOperatingAllocation(input: {
   if (!allowed?.includes(input.parent.eventType)) {
     return { ok: false, message: 'That record cannot be linked here.' };
   }
+  if (
+    (input.parent.eventType === 'ORDER' || input.parent.eventType === 'APPOINTMENT') &&
+    (input.eventType === 'SALE' || input.eventType === 'SERVICE')
+  ) {
+    return { ok: true };
+  }
   if (input.parent.approvalStatus === 'REJECTED' || settled(input.parent)) {
     return { ok: false, message: 'That record is no longer open.' };
   }
@@ -861,12 +902,16 @@ export function projectOperatingMoment(args: {
   prefs: OperatingPreferences;
   role: OperatingRole;
   events: OperatingEventRow[];
+  asOf?: Date;
 }): OperatingProjection {
   const sub = subtypeDef(args.familyCode, args.prefs.subtype);
   const visible = financeVisibleFor(args.role);
+  const asOf = args.asOf ?? new Date();
   const pulseEvents = eventsInRange(args.events, args.prefs);
   let budget = num(args.prefs.monthlyBudget);
   let target = num(args.prefs.monthlyTarget);
+  let budgetConfigured = budget > 0;
+  let targetConfigured = target > 0;
   let spent = 0;
   let progress = 0;
   const revisions: OperatingProjection['memory']['revisions'] = [];
@@ -876,9 +921,11 @@ export function projectOperatingMoment(args: {
     const amount = num(row.amount);
     if (row.eventType === 'BUDGET' && amount > 0) {
       budget = amount;
+      budgetConfigured = true;
       revisions.push({ id: row.operatingEventId, title: row.title, occurredAt: row.occurredAt });
     } else if (row.eventType === 'TARGET' && amount > 0) {
       target = amount;
+      targetConfigured = true;
       revisions.push({ id: row.operatingEventId, title: row.title, occurredAt: row.occurredAt });
     }
     if (def?.consumesBudget) spent += amount;
@@ -890,14 +937,26 @@ export function projectOperatingMoment(args: {
       progress += amount;
     }
   }
-  const attention = pulseEvents
+  const legacyAttention = pulseEvents
     .filter((row) => row.eventType === 'ISSUE' || row.approvalStatus === 'PENDING')
     .filter((row) => row.approvalStatus !== 'REJECTED')
     .map((row) => ({
       id: row.operatingEventId,
       title: row.title,
       kind: row.approvalStatus === 'PENDING' ? 'APPROVAL' : 'ISSUE',
+      severity: row.approvalStatus === 'PENDING' ? 'MEDIUM' : 'LOW',
+      amount: null,
+      dueAt: row.dueAt ?? null,
+      counterpartyName: row.counterpartyName ?? null,
+      sourceEventId: row.operatingEventId,
+      cta: row.approvalStatus === 'PENDING' ? 'approval' : null,
     }));
+  const attention = isRetailSubtype(args.prefs.subtype)
+    ? sortRetailAttention([
+        ...retailAttention(pulseEvents, visible, canApprove(args.role), asOf),
+        ...budgetAttention(spent, budget, budgetConfigured, visible),
+      ])
+    : legacyAttention;
   const paymentReadiness = visible
     ? pulseEvents
         .filter(
@@ -953,18 +1012,20 @@ export function projectOperatingMoment(args: {
     finance: financeTotals(pulseEvents, visible, continuity),
     continuity,
     budget: visible
-      ? { amount: money(budget), spent: money(spent), remaining: money(budget - spent) }
+      ? { amount: money(budget), spent: money(spent), remaining: money(budget - spent), configured: budgetConfigured }
       : null,
     target: visible
-      ? { metric: args.prefs.targetMetric, value: money(target), progress: money(progress) }
+      ? { metric: args.prefs.targetMetric, value: money(target), progress: money(progress), configured: targetConfigured }
       : null,
     attention: [
       ...attention,
-      ...paymentReadiness.map((row) => ({
-        id: `open-${row.id}`,
-        title: `${row.relevance === 'RECEIVABLE' ? 'To collect' : 'To pay'} · ${row.counterpartyName ? `${row.counterpartyName} · ` : ''}${row.title}`,
-        kind: row.relevance === 'RECEIVABLE' ? 'RECEIVABLE' : 'PAYABLE',
-      })),
+      ...(isRetailSubtype(args.prefs.subtype)
+        ? []
+        : paymentReadiness.map((row) => ({
+            id: `open-${row.id}`,
+            title: `${row.relevance === 'RECEIVABLE' ? 'To collect' : 'To pay'} · ${row.counterpartyName ? `${row.counterpartyName} · ` : ''}${row.title}`,
+            kind: row.relevance === 'RECEIVABLE' ? 'RECEIVABLE' : 'PAYABLE',
+          }))),
     ],
     paymentReadiness,
     activity: pulseEvents.map((row) => ({
@@ -981,6 +1042,7 @@ export function projectOperatingMoment(args: {
       quantity: row.quantity ?? null,
       unit: row.unit ?? row.lines?.[0]?.unit ?? null,
       parentEventId: row.parentEventId ?? null,
+      status: row.contract?.appointmentStatus ?? row.contract?.orderStatus ?? null,
     })),
     life: {
       channels: args.prefs.channels,
@@ -1000,6 +1062,7 @@ export function projectOperatingMoment(args: {
       pulseEvents,
       visible,
       revisions,
+      asOf,
     }),
     quickAdds,
   };
@@ -1221,6 +1284,7 @@ function operatingBoards(args: {
   pulseEvents: OperatingEventRow[];
   visible: boolean;
   revisions: Array<{ id: string; title: string; occurredAt: string }>;
+  asOf: Date;
 }): OperatingProjection['boards'] {
   const { familyCode, prefs, events, pulseEvents, visible } = args;
   const labels = widgetLabels(familyCode);
@@ -1272,7 +1336,97 @@ function operatingBoards(args: {
     settlementChains(pulseEvents, visible),
     ...familyMemorySections(familyCode, pulseEvents, visible, currency),
   ];
+  if (isRetailSubtype(args.subtype)) decorateRetailBoards(moments, life, memory, args.events, visible, currency, args.asOf);
   return { moments, life, memory };
+}
+
+function decorateRetailBoards(
+  moments: OperatingBoardSection[],
+  life: OperatingBoardSection[],
+  memory: OperatingBoardSection[],
+  events: OperatingEventRow[],
+  visible: boolean,
+  currency: string,
+  asOf: Date
+): void {
+  const sales = moments.find((section) => section.code === 'sales');
+  if (sales && (events.some((row) => row.eventType === 'SALE' || row.eventType === 'SERVICE' || row.eventType === 'ORDER'))) {
+    sales.detail = postedSalesSummary(events, visible, currency);
+    sales.coverage = salesCoverage(events);
+  }
+  const stock = moments.find((section) => section.code === 'stock');
+  const positions = stockPositions(events);
+  if (stock && positions.length > 0) {
+    stock.detail = positions
+      .map((position) => {
+        const unit = position.unit ? ` ${position.unit}` : '';
+        const low = position.reorderPoint != null && position.onHand <= position.reorderPoint ? ' · low' : '';
+        return `${position.item} · ${Number(position.onHand.toFixed(2))}${unit} on hand${low}`;
+      })
+      .join(' · ');
+  }
+  const appointments = moments.find((section) => section.code === 'appointments');
+  const appointmentDetail = appointmentSummary(events);
+  if (appointments && appointmentDetail) appointments.detail = appointmentDetail;
+  const customers = moments.find((section) => section.code === 'customers');
+  if (customers) {
+    const channelNames = events
+      .map((row) => row.channelName)
+      .filter((name): name is string => Boolean(name && name.trim()));
+    customers.detail = customersNetworkDetail(events, [...new Set(channelNames)]);
+  }
+  const services = moments.find((section) => section.code === 'services');
+  if (services) {
+    const charges = events.filter((row) => (row.eventType === 'SERVICE' || row.eventType === 'SALE') && effective(row));
+    const pending = events.filter(
+      (row) =>
+        row.eventType === 'APPOINTMENT' &&
+        effective(row) &&
+        row.contract?.appointmentStatus === 'COMPLETED' &&
+        !charges.some((charge) => charge.parentEventId === row.operatingEventId)
+    ).length;
+    const total = charges.reduce((sum, row) => sum + num(row.amount), 0);
+    services.detail = visible
+      ? `Finalized ${charges.length} · ${money(total)} ${currency} · Charge pending ${pending}`
+      : `Finalized ${charges.length} · Charge pending ${pending}`;
+    services.coverage = salesCoverage(events);
+  }
+  const moving = life.find((section) => section.code === 'L3');
+  const movingDetail = moneyMovingDetail(events, visible, currency, asOf);
+  if (moving && movingDetail) moving.detail = movingDetail;
+  const flow = life.find((section) => section.code === 'service-flow');
+  if (flow) flow.detail = serviceFlowSummary(events);
+  const patterns = memory.find((section) => section.code === 'ME4');
+  const outcomes = outcomeCoverage(events, asOf);
+  if (patterns && outcomes) {
+    patterns.coverage = outcomes;
+    patterns.detail = outcomes;
+  }
+  const commitments = moments.find((section) => section.code === 'M4');
+  if (commitments) {
+    const rows = events.flatMap((row) => {
+      if (!effective(row)) return [];
+      if (row.eventType === 'SALE' || row.eventType === 'SERVICE') {
+        const open = obligationRemaining(row, events, new Set(['COLLECTION']));
+        if (!(open > 0)) return [];
+        return [{ ...boardRow(row, visible), title: `To collect · ${row.counterpartyName || row.title}`, amount: visible ? money(open) : null }];
+      }
+      if (PAYABLE_TYPES.has(row.eventType)) {
+        const open = obligationRemaining(row, events, new Set(['PAYMENT']));
+        if (!(open > 0)) return [];
+        return [{ ...boardRow(row, visible), title: `To pay · ${row.counterpartyName || row.title}`, amount: visible ? money(open) : null }];
+      }
+      if (row.eventType === 'ORDER' && row.contract?.orderStatus !== 'COMPLETED' && row.contract?.orderStatus !== 'CANCELLED') {
+        return [{ ...boardRow(row, visible), title: `Open order · ${displayTitle(row)}` }];
+      }
+      if (row.eventType === 'APPOINTMENT' && (row.contract?.appointmentStatus === 'BOOKED' || row.contract?.appointmentStatus === 'IN_PROGRESS')) {
+        return [{ ...boardRow(row, visible), title: `Open booking · ${row.title}` }];
+      }
+      return [];
+    });
+    commitments.detail = rows.length > 0 ? `${rows.length} open` : 'Nothing recorded yet.';
+    commitments.rows = rows;
+  }
 }
 
 function familyMomentSections(
@@ -1292,8 +1446,9 @@ function familyMomentSections(
       section('sales', 'Sales', ['SALE']),
       section('updates', 'Updates', ['UPDATE']),
       section('issues', 'Issues', ['ISSUE']),
-      section('expenses', 'Expenses', ['SPEND']),
+      section('expenses', 'Expenses', ['SPEND', 'PURCHASE']),
       section('payments', 'Payments & Collections', ['PAYMENT', 'COLLECTION']),
+      textSection('customers', 'Customers & Network', network),
     ];
   }
   if (familyCode === 'RETAIL_CONSUMER') {
@@ -1358,9 +1513,32 @@ function familyLifeSections(
         detail: rows.length > 0 ? `${rows.length} recorded` : 'Nothing recorded yet.',
         rows: rows.map((row) => boardRow(row, visible)),
       },
+      {
+        code: 'service-flow',
+        title: 'Service Flow',
+        detail: serviceFlowSummary(events),
+        rows: [],
+      },
     ];
   }
   return [];
+}
+
+function sortRetailAttention<T extends { severity?: string | null; kind: string }>(cards: T[]): T[] {
+  const severityRank: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+  const kindRank = (kind: string): number => {
+    if (kind.startsWith('OVERDUE')) return 0;
+    if (kind.startsWith('DUE')) return 1;
+    if (kind === 'CONFLICT' || kind === 'CHARGE_PENDING' || kind === 'BOOKING_OVERDUE' || kind === 'STUCK') return 2;
+    if (kind === 'LOW_STOCK' || kind === 'UNASSIGNED' || kind === 'BUDGET_WARNING' || kind === 'BUDGET_OVERRUN') return 3;
+    if (kind === 'APPROVAL') return 4;
+    return 5;
+  };
+  return [...cards].sort((a, b) => {
+    const sev = (severityRank[a.severity ?? ''] ?? 9) - (severityRank[b.severity ?? ''] ?? 9);
+    if (sev !== 0) return sev;
+    return kindRank(a.kind) - kindRank(b.kind);
+  });
 }
 
 function settlementChains(events: OperatingEventRow[], visible: boolean): OperatingBoardSection {

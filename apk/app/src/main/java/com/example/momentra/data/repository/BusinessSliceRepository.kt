@@ -124,6 +124,8 @@ class BusinessSliceRepository(
         lines: List<OperatingLineBody>? = null,
         master: OperatingMasterBody? = null,
         revisesEventId: String? = null,
+        dueAt: String? = null,
+        contract: com.example.momentra.data.api.OperatingContractBody? = null,
     ): Result<Unit> = runCatching {
         val body = RecordOperatingEventBody(
             eventType = eventType,
@@ -139,6 +141,8 @@ class BusinessSliceRepository(
             unit = unit,
             lines = lines,
             master = master,
+            dueAt = dueAt,
+            contract = contract,
         )
         if (revisesEventId.isNullOrBlank()) {
             api.recordOperatingEvent(momentId, UUID.randomUUID().toString(), body)

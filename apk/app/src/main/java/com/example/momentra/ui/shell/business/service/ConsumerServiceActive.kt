@@ -73,7 +73,7 @@ fun ConsumerServiceActive(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         when (tab) {
-            OperatingTab.PULSE -> ServicePulse(model, onViewAll = { activityOpen = true })
+            OperatingTab.PULSE -> ServicePulse(model, onViewAll = { activityOpen = true }, onOpenQuickAdd = onOpenQuickAdd)
             OperatingTab.MOMENTS -> ServiceMoments(model, onOpenQuickAdd)
             OperatingTab.LIFE -> ServiceLife(model)
             OperatingTab.MEMORY -> ServiceMemory(model)
@@ -89,43 +89,35 @@ fun ConsumerServiceActive(
 }
 
 @Composable
-private fun ServicePulse(model: OperatingProjectionDto, onViewAll: () -> Unit) {
-    Header(model, "Pulse", "Your sales plan, service commitments and ready money.")
+private fun ServicePulse(model: OperatingProjectionDto, onViewAll: () -> Unit, onOpenQuickAdd: () -> Unit = {}) {
+    Header(model, "Pulse", "Your service plan, bookings and ready money.")
     if (model.financeVisible) {
         SectionTitle("Target & Budget")
         SvcCard {
             val target = model.target
             val budget = model.budget
-            Text("Recorded sales", color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
+            Text("Service revenue", color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
             Text(money(model, target?.progress), color = SvcInk, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 28.sp)
-            Text("of ${money(model, target?.value)} sales target", color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 13.sp)
-            Meter("Sales progress", fraction(target?.progress, target?.value), SvcBrand)
-            Meter("Budget used", fraction(budget?.spent, budget?.amount), SvcSuccess)
-            Line("Budget remaining", money(model, budget?.remaining), SvcSuccess)
-            Text("Validated sales count toward the target. Eligible purchase and expense facts count once toward budget.", color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
+            if (target?.configured == true) {
+                Text("of ${money(model, target.value)} service target", color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 13.sp)
+                Meter("Revenue progress", fraction(target.progress, target.value), SvcBrand)
+            } else {
+                Text("No service target set for this period.", color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 13.sp)
+            }
+            if (budget?.configured == true) {
+                Meter("Budget used", fraction(budget.spent, budget.amount), SvcSuccess)
+                Line("Budget remaining", money(model, budget.remaining), SvcSuccess)
+            } else {
+                Text("No period budget set.", color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 13.sp)
+            }
+            Text("Finalized charges count toward the target. Bookings alone do not.", color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
         }
         SectionTitle("Needs Attention")
         if (model.attention.isEmpty()) {
             SvcCard { Text("Nothing is waiting.", color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 14.sp) }
         }
         model.attention.forEach { item ->
-            SvcCard {
-                Text(item.kind, color = SvcAccent, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
-                Text(item.title, color = SvcInk, fontFamily = PlusJakartaSans, fontSize = 15.sp)
-
-                if (item.id.startsWith("open-")) {
-                    val payment = model.paymentReadiness.firstOrNull { it.id == item.id.removePrefix("open-") }
-                    if (payment != null) {
-                        Text(
-                            "Open",
-                            color = Color.White,
-                            fontFamily = PlusJakartaSans,
-                            fontSize = 13.sp,
-                            modifier = Modifier.clickable { com.example.momentra.ui.shell.business.shared.OperatingChromeState.settling = payment },
-                        )
-                    }
-                }
-            }
+            AttentionCard(item, model, onOpenQuickAdd)
         }
         SectionTitle("Payment Readiness")
         val toCollect = model.paymentReadiness.filter { it.relevance == "RECEIVABLE" }
@@ -138,7 +130,7 @@ private fun ServicePulse(model: OperatingProjectionDto, onViewAll: () -> Unit) {
         SectionTitle("Finance")
         SvcCard {
             val finance = model.finance
-            Line("Recorded sales", money(model, finance?.sales), SvcAccent)
+            Line("Service revenue", money(model, finance?.sales), SvcAccent)
             Line("Received", money(model, finance?.received), SvcSuccess)
             Line("Still to collect", money(model, finance?.outstanding), Color(0xFFFBBF24))
             Line("Eligible cost", money(model, finance?.eligibleCost), SvcInk)
@@ -146,7 +138,7 @@ private fun ServicePulse(model: OperatingProjectionDto, onViewAll: () -> Unit) {
             Line("Still to pay", money(model, finance?.payable), Color(0xFFFBBF24))
         }
     } else {
-        StaffPulse(model)
+        StaffPulse(model, onOpenQuickAdd)
     }
     SectionTitle("Activity")
     val recent = model.activity.take(5)
@@ -170,20 +162,49 @@ private fun ServicePulse(model: OperatingProjectionDto, onViewAll: () -> Unit) {
 }
 
 @Composable
-private fun StaffPulse(model: OperatingProjectionDto) {
+private fun StaffPulse(model: OperatingProjectionDto, onOpenQuickAdd: () -> Unit = {}) {
     Pill(roleLabel(model.role))
     SvcCard {
         Text("Your view", color = SvcInk, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
         Text("Assigned work stays visible. Protected amounts stay hidden.", color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 13.sp)
     }
     model.attention.forEach { item ->
-        SvcCard {
-            Text(item.title, color = SvcInk, fontFamily = PlusJakartaSans, fontSize = 15.sp)
-            Text(item.kind, color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
-        }
+        AttentionCard(item, model, onOpenQuickAdd)
     }
     SvcCard {
         Text("Finance totals stay with Finance, Approver, and Owner.", color = SvcInk, fontFamily = PlusJakartaSans, fontSize = 15.sp, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+@Composable
+private fun AttentionCard(
+    item: com.example.momentra.data.api.OperatingAttentionDto,
+    model: OperatingProjectionDto,
+    onOpenQuickAdd: () -> Unit,
+) {
+    SvcCard {
+        Text(item.kind, color = SvcAccent, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
+        Text(item.title, color = SvcInk, fontFamily = PlusJakartaSans, fontSize = 15.sp)
+        val meta = listOfNotNull(
+            item.counterpartyName,
+            item.dueAt?.take(10),
+            if (model.financeVisible) money(model, item.amount).takeIf { it != "—" } else null,
+        ).filter { it.isNotBlank() }
+        if (meta.isNotEmpty()) {
+            Text(meta.joinToString(" · "), color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
+        }
+        if (item.cta != null || item.id.startsWith("open-") || item.sourceEventId != null) {
+            Text(
+                com.example.momentra.ui.shell.business.shared.operatingAttentionCtaLabel(item),
+                color = SvcAccent,
+                fontFamily = PlusJakartaSans,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                modifier = Modifier.clickable {
+                    com.example.momentra.ui.shell.business.shared.openOperatingAttention(item, model, onOpenQuickAdd)
+                },
+            )
+        }
     }
 }
 
@@ -194,17 +215,18 @@ private fun ServiceMoments(model: OperatingProjectionDto, onOpenQuickAdd: () -> 
         Text(periodLabel(model.startDate), color = SvcAccent, fontFamily = PlusJakartaSans, fontSize = 12.sp)
         Text("This month, in motion", color = SvcInk, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 22.sp)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Metric("Sales", money(model, model.finance?.sales ?: model.target?.progress), Modifier.weight(1f))
-            Metric("Target", money(model, model.target?.value), Modifier.weight(1f))
+            Metric("Revenue", money(model, model.finance?.sales ?: model.target?.progress), Modifier.weight(1f))
+            Metric("Target", if (model.target?.configured == true) money(model, model.target?.value) else "—", Modifier.weight(1f))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Metric("Spent", money(model, model.budget?.spent), Modifier.weight(1f))
-            Metric("Remaining", money(model, model.budget?.remaining), Modifier.weight(1f))
+            Metric("Spent", if (model.budget?.configured == true) money(model, model.budget?.spent) else "—", Modifier.weight(1f))
+            Metric("Remaining", if (model.budget?.configured == true) money(model, model.budget?.remaining) else "—", Modifier.weight(1f))
         }
-        Meter("Sales toward target", fraction(model.target?.progress, model.target?.value), SvcBrand)
+        if (model.target?.configured == true) {
+            Meter("Revenue toward target", fraction(model.target?.progress, model.target?.value), SvcBrand)
+        }
     }
-    listOf("services", "appointments", "sales", "updates", "issues", "expenses", "payments").forEach { code ->
-        val section = model.boards?.moments?.firstOrNull { it.code == code } ?: return@forEach
+    (model.boards?.moments ?: emptyList()).forEach { section ->
         BoardBlock(section, model)
     }
     SvcCard {
@@ -289,6 +311,9 @@ private fun BoardBlock(section: OperatingBoardSectionDto, model: OperatingProjec
     SectionTitle(section.title)
     SvcCard {
         Text(com.example.momentra.ui.shell.business.shared.formatOperatingDetail(section.detail.ifBlank { "Nothing recorded yet." }, model.currency), color = SvcSecondary, fontFamily = PlusJakartaSans, fontSize = 12.sp)
+        if (!section.coverage.isNullOrBlank()) {
+            Text(section.coverage, color = SvcAccent, fontFamily = PlusJakartaSans, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
+        }
         section.rows.forEach { row ->
             Column(Modifier.padding(vertical = 6.dp)) {
                 Text(row.title, color = SvcInk, fontFamily = PlusJakartaSans, fontSize = 14.sp)

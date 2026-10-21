@@ -89,6 +89,8 @@ data class OperatingCaptureDraft(
     val parentEventId: String? = null,
     val revisesEventId: String? = null,
     val masterKind: String? = null,
+    val dueAt: String? = null,
+    val contract: com.example.momentra.data.api.OperatingContractBody? = null,
 )
 
 private val dayFormat = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH)
@@ -1094,6 +1096,9 @@ fun OperatingCaptureSheet(
                             occurredAtValue(eventDate), trading, distribution, client, own, detail,
                             standard, job, link, itemName, quantity, unit, unitPrice, parentId,
                             seed?.id, masterKind, model.paymentReadiness,
+                            retail = model.subtype in setOf("RETAIL_STORE", "RESTAURANT_FOOD", "CONSUMER_SERVICE"),
+                            restaurant = restaurant,
+                            service = service,
                         )
                         if (draft == null) {
                             error = requiredMessage(mode)
@@ -1320,6 +1325,9 @@ private fun buildDraft(
     revisesEventId: String? = null,
     masterKind: String = "",
     readiness: List<OperatingPaymentDto> = emptyList(),
+    retail: Boolean = false,
+    restaurant: Boolean = false,
+    service: Boolean = false,
 ): OperatingCaptureDraft? {
     if (mode == "MASTERS") {
         if (itemName.isBlank()) return null
@@ -1438,6 +1446,67 @@ private fun buildDraft(
         note.takeIf { it.isNotBlank() },
         choice.takeIf { it.isNotBlank() && mode in setOf("ISSUE", "STOCK", "ORDER", "SHIPMENT", "APPOINTMENT", "SPEND", "PERSON", "ROLE", "INVITE", "SUPPLIER", "PARTNER") },
     ).joinToString(" · ").ifBlank { null }
+    val retailContract = if (retail || restaurant || service) {
+        val itemized = itemName.isNotBlank() && quantity.isNotBlank() && unitPrice.isNotBlank()
+        val salePay = when {
+            choice.equals("Received", ignoreCase = true) || choice.equals("Paid", ignoreCase = true) -> "RECEIVED"
+            else -> "PAY_LATER"
+        }
+        val purchasePay = when {
+            choice.equals("Paid", ignoreCase = true) -> "PAID"
+            else -> "PAY_LATER"
+        }
+        val stockAction = when (choice.lowercase()) {
+            "set current stock", "set" -> "SET"
+            "add" -> "ADD"
+            "reduce" -> "REDUCE"
+            else -> if (mode == "STOCK") "SET" else null
+        }
+        val stockReason = when (choice.lowercase()) {
+            "opening count", "opening" -> "opening"
+            "stocktake" -> "stocktake"
+            "damage" -> "damage"
+            "waste" -> "waste"
+            "return" -> "return"
+            "correction" -> "correction"
+            else -> if (mode == "STOCK") "stocktake" else null
+        }
+        val orderStatus = when (choice.lowercase()) {
+            "placed" -> "PLACED"
+            "preparing", "scheduled" -> "PREPARING"
+            "completed" -> "COMPLETED"
+            "cancelled" -> "CANCELLED"
+            else -> if (mode == "ORDER") "PLACED" else null
+        }
+        val appointmentAction = when (choice.lowercase()) {
+            "reschedule" -> "RESCHEDULE"
+            "cancel" -> "CANCEL"
+            "no-show", "no show" -> "NO_SHOW"
+            "start" -> "START"
+            "complete" -> "COMPLETE"
+            else -> null
+        }
+        val allocations = if (mode in setOf("COLLECTION", "PAYMENT", "REIMBURSE") && parentId.isNotBlank() && resolvedAmount.isNotBlank()) {
+            listOf(com.example.momentra.data.api.OperatingAllocationBody(parentId, resolvedAmount))
+        } else null
+        com.example.momentra.data.api.OperatingContractBody(
+            entryMode = if (mode in setOf("SALE", "SERVICE")) if (itemized) "ITEMIZED" else "QUICK" else null,
+            paymentState = when (mode) {
+                "SALE", "SERVICE" -> salePay
+                "PURCHASE", "SPEND" -> purchasePay
+                else -> null
+            },
+            receiptState = if (mode == "PURCHASE") "RECEIVED" else null,
+            receivedAmount = if (mode in setOf("SALE", "SERVICE") && salePay == "RECEIVED") resolvedAmount.ifBlank { null } else null,
+            stockAction = stockAction,
+            stockReason = stockReason,
+            appointmentAction = appointmentAction,
+            orderStatus = orderStatus,
+            staffName = if (mode == "APPOINTMENT") detail.ifBlank { null } else null,
+            estimatedAmount = if (mode in setOf("ORDER", "APPOINTMENT")) resolvedAmount.ifBlank { null } else null,
+            allocations = allocations,
+        )
+    } else null
     return OperatingCaptureDraft(
         eventType = if (production && mode == "BUDGET" && choice == "Target") "TARGET" else eventType,
         title = savedTitle.ifBlank { title },
@@ -1454,6 +1523,7 @@ private fun buildDraft(
         parentEventId = parentId.ifBlank { null },
         revisesEventId = revisesEventId?.takeIf { it.isNotBlank() },
         masterKind = if (mode == "MASTERS") masterKind.ifBlank { null } else null,
+        contract = retailContract,
     )
 }
 

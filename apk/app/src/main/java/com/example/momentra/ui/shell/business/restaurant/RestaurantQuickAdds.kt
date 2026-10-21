@@ -59,6 +59,8 @@ data class RestaurantEventDraft(
     val parentEventId: String? = null,
     val revisesEventId: String? = null,
     val masterKind: String? = null,
+    val dueAt: String? = null,
+    val contract: com.example.momentra.data.api.OperatingContractBody? = null,
 )
 
 private enum class RestaurantSheet(
@@ -363,4 +365,6 @@ private fun OperatingCaptureDraft.toRestaurant() = RestaurantEventDraft(
     parentEventId = parentEventId,
     revisesEventId = revisesEventId,
     masterKind = masterKind,
+    dueAt = dueAt,
+    contract = contract,
 )

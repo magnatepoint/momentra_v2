@@ -16,6 +16,17 @@ struct OperatingCaptureDraft {
     var parentEventId: String? = nil
     var revisesEventId: String? = nil
     var masterKind: String? = nil
+    var dueAt: String? = nil
+    var contract: OperatingContractInput? = nil
+    var lineItems: [(itemName: String, quantity: String?, unit: String?, unitPrice: String?)]? = nil
+}
+
+private struct RetailDraftLine: Identifiable {
+    let id = UUID()
+    var itemName: String
+    var quantity: String
+    var unit: String
+    var unitPrice: String
 }
 
 func operatingCaptureMode(eventType: String, title: String) -> String {
@@ -62,6 +73,16 @@ struct OperatingCaptureSheet: View {
     @State private var unitPrice = ""
     @State private var parentId = ""
     @State private var masterKind = ""
+    @State private var entryMode = "Quick amount"
+    @State private var receivedAmount = ""
+    @State private var receiptState = "Received"
+    @State private var stockAction = "Set current stock"
+    @State private var stockReason = "Stocktake"
+    @State private var expenseCategory = "Miscellaneous"
+    @State private var orderStatus = "Placed"
+    @State private var bookingAction = "Book"
+    @State private var clientKey = UUID().uuidString
+    @State private var savedLines: [RetailDraftLine] = []
 
     private var restaurant: Bool { variant == "restaurant" }
     private var service: Bool { variant == "service" }
@@ -97,6 +118,11 @@ struct OperatingCaptureSheet: View {
         return name.isEmpty ? role : "\(role) · \(name)"
     }
     private var channels: [String] { model.life?.channels ?? [] }
+    private var retailFamily: Bool {
+        ["RETAIL_STORE", "RESTAURANT_FOOD", "CONSUMER_SERVICE"].contains(model.subtype ?? "")
+    }
+    private var retailModes: Set<String> { ["SALE", "SERVICE", "PURCHASE", "SPEND", "STOCK", "ORDER", "APPOINTMENT", "COLLECTION", "PAYMENT"] }
+    private let expenseCategories = ["Rent/lease", "Utilities", "Wages/salaries", "Advertising", "Packaging", "Delivery/shipping", "Marketplace/platform fees", "Consumables", "Kitchen supplies", "Software/subscriptions", "Insurance", "Bank charges", "Gas/fuel", "Aggregator fees", "Miscellaneous"]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -120,7 +146,7 @@ struct OperatingCaptureSheet: View {
                     }
                     Text(actor).font(.plusJakarta(size: 12)).foregroundStyle(Color(hex: "#B7B8FF"))
                     Text(statusLine).font(.plusJakarta(size: 12)).foregroundStyle(Color(hex: "#C9C4D8"))
-                    fields
+                    if retailFamily && retailModes.contains(mode) { retailFields } else { fields }
                     if let errorText { Text(errorText).font(.plusJakarta(size: 12)).foregroundStyle(Color(hex: "#F87171")) }
                 }
                 .padding(.horizontal, 17)
@@ -640,6 +666,8 @@ struct OperatingCaptureSheet: View {
 
     private var actorName: String { actor.split(separator: "·").first.map { String($0).trimmingCharacters(in: .whitespaces) } ?? actor }
     private var defaultChoice: String {
+        if retailFamily && (mode == "SALE" || mode == "SERVICE") { return "Received" }
+        if retailFamily && (mode == "PURCHASE" || mode == "SPEND") { return "Pay later" }
         if production && mode == "SALE" { return "Pending" }
         if production && mode == "ORDER" { return "In production" }
         if production && mode == "DELIVERY" { return "Delivered" }
@@ -901,7 +929,120 @@ struct OperatingCaptureSheet: View {
         }
     }
 
+    @ViewBuilder private var retailFields: some View {
+        switch mode {
+        case "SALE", "SERVICE":
+            choiceBlock("Entry", options: ["Quick amount", "Itemized"], selected: entryMode) { entryMode = $0 }
+            if entryMode == "Itemized" {
+                lineEditor
+                Button("Add another item") {
+                    let name = itemName.trimmingCharacters(in: .whitespaces)
+                    if !name.isEmpty {
+                        savedLines.append(RetailDraftLine(itemName: name, quantity: quantity, unit: unit, unitPrice: unitPrice))
+                        itemName = ""; quantity = ""; unitPrice = ""
+                    }
+                }
+                .font(.plusJakarta(size: 13, weight: .semibold)).foregroundStyle(Color(hex: "#B7B8FF"))
+                ForEach(savedLines) { line in
+                    Text("\(line.itemName) · \(line.quantity) \(line.unit)").font(.plusJakarta(size: 12)).foregroundStyle(Color(hex: "#C9C4D8"))
+                }
+            }
+            if entryMode == "Quick amount" { amountBlock("Sale amount", hint: "Positive amount · 2 decimal places") }
+            if channels.isEmpty { editField(mode == "SERVICE" ? "Service channel" : "Sales channel", text: $channel, placeholder: "Required") }
+            else { choiceBlock(mode == "SERVICE" ? "Service channel" : "Sales channel", options: channels, selected: channel) { channel = $0 } }
+            dateField(mode == "SERVICE" ? "Charge date" : "Sale date")
+            choiceBlock("Payment state", options: ["Received", "Part paid", "Pay later"], selected: choice) { choice = $0 }
+            if choice == "Part paid" { editField("Received amount", text: $receivedAmount, placeholder: "Less than the total") }
+            if choice != "Received" { editField("Customer", text: $party, placeholder: "Required when a balance remains") }
+            if mode == "SERVICE" {
+                let bookings = (model.activity ?? []).filter { $0.eventType == "APPOINTMENT" }
+                if !bookings.isEmpty {
+                    Text("Link a booking").font(.plusJakarta(size: 12)).foregroundStyle(Color(hex: "#C9C4D8"))
+                    ForEach(bookings.prefix(6)) { row in
+                        Button(row.title) { parentId = row.id }
+                            .font(.plusJakarta(size: 13))
+                            .foregroundStyle(parentId == row.id ? Color(hex: "#2F009C") : Color(hex: "#E5E0EE"))
+                    }
+                }
+            }
+            Text(mode == "SERVICE" ? "A finalized charge is the sale. A booking is not revenue." : "A quick amount does not change stock. Itemized lines do.")
+                .font(.plusJakarta(size: 12)).foregroundStyle(Color(hex: "#C9C4D8"))
+            moreButton("Due date, note, and reference. Optional.")
+            if moreOpen {
+                editField("Due date", text: $link, placeholder: "YYYY-MM-DD")
+                editField("Note", text: $note, placeholder: "Optional")
+            }
+        case "PURCHASE":
+            lineEditor
+            amountBlock("Amount", hint: "Positive amount, or leave blank when items have prices")
+            editField("Supplier", text: $party, placeholder: "Required")
+            dateField("Purchase date")
+            choiceBlock("Goods receipt", options: ["Received", "Part received", "Awaiting receipt"], selected: receiptState) { receiptState = $0 }
+            if receiptState == "Part received" { editField("Quantity received", text: $quantity, placeholder: "Required") }
+            choiceBlock("Payment state", options: ["Paid", "Part paid", "Pay later"], selected: choice) { choice = $0 }
+            if choice == "Part paid" { editField("Amount paid", text: $receivedAmount, placeholder: "Less than the total") }
+            moreButton("Due date and note. Optional.")
+            if moreOpen {
+                editField("Due date", text: $link, placeholder: "YYYY-MM-DD")
+                editField("Note", text: $note, placeholder: "Optional")
+            }
+        case "SPEND":
+            choiceBlock("Category", options: expenseCategories, selected: expenseCategory) { expenseCategory = $0 }
+            amountBlock("Amount", hint: "Positive amount")
+            dateField("Expense date")
+            choiceBlock("Payment state", options: ["Paid", "Part paid", "Pay later"], selected: choice) { choice = $0 }
+            if choice != "Paid" { editField("Payee", text: $party, placeholder: "Required") }
+            if choice == "Part paid" { editField("Amount paid", text: $receivedAmount, placeholder: "Less than the total") }
+            moreButton("Note. Optional.")
+            if moreOpen { editField("Note", text: $note, placeholder: "Optional") }
+        case "COLLECTION", "PAYMENT":
+            obligationPicker
+            amountBlock(mode == "COLLECTION" ? "Collection amount" : "Payment amount", hint: "Cannot exceed the open balance")
+            editField(mode == "COLLECTION" ? "Customer or platform" : "Supplier or payee", text: $party, placeholder: "Name")
+            dateField(mode == "COLLECTION" ? "Collection date" : "Payment date")
+            Text(mode == "COLLECTION" ? "This reduces what is owed. It does not increase sales." : "This reduces what you owe. It does not repeat the cost.")
+                .font(.plusJakarta(size: 12)).foregroundStyle(Color(hex: "#C9C4D8"))
+            moreButton("Reference. Optional.")
+            if moreOpen { editField("Reference", text: $note, placeholder: "Optional") }
+        case "STOCK":
+            editField("Item", text: $purpose, placeholder: "Product, ingredient, or supply")
+            choiceBlock("Action", options: ["Set current stock", "Add", "Reduce"], selected: stockAction) { stockAction = $0 }
+            editField("Quantity", text: $quantity, placeholder: "Required")
+            editField("Unit", text: $unit, placeholder: "pcs, kg, L")
+            choiceBlock("Reason", options: ["Opening count", "Stocktake", "Damage", "Waste", "Return", "Correction"], selected: stockReason) { stockReason = $0 }
+            editField("Reorder point", text: $detail, placeholder: "Optional")
+            Text("Set replaces the count. Add and reduce move it. This is not a purchase.")
+                .font(.plusJakarta(size: 12)).foregroundStyle(Color(hex: "#C9C4D8"))
+        case "ORDER":
+            if channels.isEmpty { editField("Order channel", text: $channel, placeholder: "Required") }
+            else { choiceBlock("Order channel", options: channels, selected: channel) { channel = $0 } }
+            choiceBlock("Status", options: ["Placed", "Preparing", "Completed", "Cancelled"], selected: orderStatus) { orderStatus = $0 }
+            editField("Guest or customer", text: $party, placeholder: "Optional")
+            editField("Estimated amount", text: $amount, placeholder: "Pipeline only")
+            dateField("Order time")
+            Text("An order is not a sale until you bill it.")
+                .font(.plusJakarta(size: 12)).foregroundStyle(Color(hex: "#C9C4D8"))
+            moreButton("Note. Optional.")
+            if moreOpen { editField("Note", text: $note, placeholder: "Optional") }
+        case "APPOINTMENT":
+            editField("Service", text: $purpose, placeholder: "Required")
+            dateField("Appointment time")
+            editField("Guest or customer", text: $party, placeholder: "Optional for a walk-in")
+            editField("Assigned person", text: $detail, placeholder: "Optional")
+            if seed != nil {
+                choiceBlock("Action", options: ["Reschedule", "Cancel", "No-show", "Start", "Complete"], selected: bookingAction) { bookingAction = $0 }
+            }
+            Text("Booking, starting, and completing do not post revenue. Finalize a charge separately.")
+                .font(.plusJakarta(size: 12)).foregroundStyle(Color(hex: "#C9C4D8"))
+            moreButton("Reason. Optional.")
+            if moreOpen { editField("Reason", text: $note, placeholder: "Optional") }
+        default:
+            EmptyView()
+        }
+    }
+
     private func buildDraft() -> OperatingCaptureDraft? {
+        if retailFamily && retailModes.contains(mode) { return retailDraft() }
         if mode == "MASTERS" {
             let name = itemName.trimmingCharacters(in: .whitespaces)
             if name.isEmpty { return nil }
@@ -1031,6 +1172,142 @@ struct OperatingCaptureSheet: View {
             counterpartyName: party.trimmingCharacters(in: .whitespaces).isEmpty ? nil : party.trimmingCharacters(in: .whitespaces),
             payment: payment
         )
+    }
+
+    private func retailDraft() -> OperatingCaptureDraft? {
+        let rawAmount = amount.trimmingCharacters(in: .whitespaces)
+        let lines = retailLines()
+        switch mode {
+        case "SALE", "SERVICE":
+            if channel.trimmingCharacters(in: .whitespaces).isEmpty { return nil }
+            if entryMode == "Quick amount", (Decimal(string: rawAmount) ?? 0) <= 0 { return nil }
+            if entryMode == "Itemized", lines.isEmpty { return nil }
+            if choice == "Part paid", (Decimal(string: receivedAmount) ?? 0) <= 0 { return nil }
+            if choice != "Received", party.trimmingCharacters(in: .whitespaces).isEmpty { return nil }
+        case "PURCHASE":
+            if party.trimmingCharacters(in: .whitespaces).isEmpty { return nil }
+            if lines.isEmpty, (Decimal(string: rawAmount) ?? 0) <= 0 { return nil }
+            if receiptState == "Part received", quantity.trimmingCharacters(in: .whitespaces).isEmpty { return nil }
+        case "SPEND":
+            if (Decimal(string: rawAmount) ?? 0) <= 0 { return nil }
+            if choice != "Paid", party.trimmingCharacters(in: .whitespaces).isEmpty { return nil }
+        case "COLLECTION", "PAYMENT":
+            if (Decimal(string: rawAmount) ?? 0) <= 0 || parentId.isEmpty { return nil }
+        case "STOCK":
+            if purpose.trimmingCharacters(in: .whitespaces).isEmpty || quantity.trimmingCharacters(in: .whitespaces).isEmpty { return nil }
+        case "ORDER":
+            if channel.trimmingCharacters(in: .whitespaces).isEmpty { return nil }
+        case "APPOINTMENT":
+            if purpose.trimmingCharacters(in: .whitespaces).isEmpty { return nil }
+        default:
+            return nil
+        }
+        let paymentState: String? = {
+            switch choice {
+            case "Received": return "RECEIVED"
+            case "Part paid": return "PART_PAID"
+            case "Pay later": return "PAY_LATER"
+            case "Paid": return "PAID"
+            default: return nil
+            }
+        }()
+        let receipt: String? = {
+            switch receiptState {
+            case "Received": return "RECEIVED"
+            case "Part received": return "PART_RECEIVED"
+            case "Awaiting receipt": return "AWAITING"
+            default: return nil
+            }
+        }()
+        let stockCode: String? = stockAction == "Add" ? "ADD" : (stockAction == "Reduce" ? "REDUCE" : "SET")
+        let reasonCode: String = {
+            switch stockReason {
+            case "Opening count": return "opening"
+            case "Damage": return "damage"
+            case "Waste": return "waste"
+            case "Return": return "return"
+            case "Correction": return "correction"
+            default: return "stocktake"
+            }
+        }()
+        let orderCode: String = {
+            switch orderStatus {
+            case "Preparing": return "PREPARING"
+            case "Completed": return "COMPLETED"
+            case "Cancelled": return "CANCELLED"
+            default: return "PLACED"
+            }
+        }()
+        let actionCode: String? = {
+            switch bookingAction {
+            case "Reschedule": return "RESCHEDULE"
+            case "Cancel": return "CANCEL"
+            case "No-show": return "NO_SHOW"
+            case "Start": return "START"
+            case "Complete": return "COMPLETE"
+            default: return nil
+            }
+        }()
+        let titleText: String = {
+            switch mode {
+            case "STOCK", "APPOINTMENT": return purpose.trimmingCharacters(in: .whitespaces)
+            case "SALE", "SERVICE": return lines.first?.itemName ?? title
+            default: return title
+            }
+        }()
+        let allocation = parentId.isEmpty || rawAmount.isEmpty ? nil : [OperatingAllocationInput(sourceId: parentId, amount: rawAmount)]
+        let contract = OperatingContractInput(
+            entryMode: mode == "SALE" || mode == "SERVICE" ? (entryMode == "Itemized" ? "ITEMIZED" : "QUICK") : nil,
+            paymentState: ["SALE", "SERVICE", "PURCHASE", "SPEND"].contains(mode) ? paymentState : nil,
+            receiptState: mode == "PURCHASE" ? receipt : nil,
+            receivedAmount: receivedAmount.isEmpty ? nil : receivedAmount,
+            quantityReceived: mode == "PURCHASE" && receiptState == "Part received" ? quantity : nil,
+            stockAction: mode == "STOCK" ? stockCode : nil,
+            stockReason: mode == "STOCK" ? reasonCode : nil,
+            expenseCategory: mode == "SPEND" ? expenseCategory : nil,
+            appointmentAction: mode == "APPOINTMENT" && seed != nil ? actionCode : nil,
+            orderStatus: mode == "ORDER" ? orderCode : nil,
+            clientKey: clientKey,
+            reorderPoint: mode == "STOCK" && !detail.trimmingCharacters(in: .whitespaces).isEmpty ? detail : nil,
+            staffName: mode == "APPOINTMENT" && !detail.trimmingCharacters(in: .whitespaces).isEmpty ? detail : nil,
+            estimatedAmount: mode == "ORDER" && !rawAmount.isEmpty ? rawAmount : nil,
+            allocations: allocation
+        )
+        return OperatingCaptureDraft(
+            eventType: eventType,
+            title: titleText.isEmpty ? title : titleText,
+            amount: rawAmount.isEmpty ? nil : rawAmount,
+            note: note.trimmingCharacters(in: .whitespaces).isEmpty ? nil : note,
+            channelName: channel.trimmingCharacters(in: .whitespaces).isEmpty ? nil : channel,
+            counterpartyName: party.trimmingCharacters(in: .whitespaces).isEmpty ? nil : party,
+            paymentStatus: nil,
+            occurredAt: mode == "APPOINTMENT" || mode == "ORDER" ? isoDay(eventDate) : occurredAtValue,
+            quantity: quantity.trimmingCharacters(in: .whitespaces).isEmpty ? nil : quantity,
+            unit: unit.trimmingCharacters(in: .whitespaces).isEmpty ? nil : unit,
+            parentEventId: parentId.isEmpty ? nil : parentId,
+            revisesEventId: seed?.id,
+            dueAt: link.trimmingCharacters(in: .whitespaces).isEmpty ? nil : link,
+            contract: contract,
+            lineItems: lines.isEmpty ? nil : lines
+        )
+    }
+
+    private func retailLines() -> [(itemName: String, quantity: String?, unit: String?, unitPrice: String?)] {
+        var rows = savedLines.map { (itemName: $0.itemName, quantity: $0.quantity, unit: $0.unit, unitPrice: $0.unitPrice) }
+        let name = itemName.trimmingCharacters(in: .whitespaces)
+        if !name.isEmpty { rows.append((itemName: name, quantity: quantity, unit: unit, unitPrice: unitPrice)) }
+        return rows
+    }
+
+    private func isoDay(_ date: Date) -> String {
+        var parts = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        parts.hour = 12
+        parts.minute = 0
+        parts.second = 0
+        let start = Calendar.current.date(from: parts) ?? date
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime]
+        return iso.string(from: start)
     }
 
     private func captured(

@@ -29,37 +29,38 @@ struct ConsumerServiceActiveView: View {
 
     private var pulse: some View {
         VStack(alignment: .leading, spacing: 16) {
-            header("Pulse", "Your sales plan, service commitments and ready money.")
+            header("Pulse", "Your service plan, bookings and ready money.")
             if model.financeVisible == true {
                 sectionTitle("Target & Budget")
                 card {
-                    Text("Recorded sales").font(.plusJakarta(size: 12)).foregroundStyle(ServiceChrome.secondary)
+                    Text("Service revenue").font(.plusJakarta(size: 12)).foregroundStyle(ServiceChrome.secondary)
                     Text(money(model.target?.progress)).font(.plusJakarta(size: 28, weight: .semibold)).foregroundStyle(ServiceChrome.ink)
-                    Text("of \(money(model.target?.value)) sales target").font(.plusJakarta(size: 13)).foregroundStyle(ServiceChrome.secondary)
-                    meter("Sales progress", fraction(model.target?.progress, model.target?.value), ServiceChrome.brand)
-                    meter("Budget used", fraction(model.budget?.spent, model.budget?.amount), ServiceChrome.success)
-                    line("Budget remaining", money(model.budget?.remaining), ServiceChrome.success)
+                    if model.target?.configured == true {
+                        Text("of \(money(model.target?.value)) service target").font(.plusJakarta(size: 13)).foregroundStyle(ServiceChrome.secondary)
+                        meter("Revenue progress", fraction(model.target?.progress, model.target?.value), ServiceChrome.brand)
+                    } else {
+                        Text("No service target set for this period.").font(.plusJakarta(size: 13)).foregroundStyle(ServiceChrome.secondary)
+                    }
+                    if model.budget?.configured == true {
+                        meter("Budget used", fraction(model.budget?.spent, model.budget?.amount), ServiceChrome.success)
+                        line("Budget remaining", money(model.budget?.remaining), ServiceChrome.success)
+                    } else {
+                        Text("No period budget set.").font(.plusJakarta(size: 13)).foregroundStyle(ServiceChrome.secondary)
+                    }
                 }
                 sectionTitle("Needs Attention")
                 if (model.attention ?? []).isEmpty {
                     card { Text("Nothing is waiting.").foregroundStyle(ServiceChrome.secondary) }
                 }
                 ForEach(model.attention ?? []) { item in
-                    card {
-                        Text(item.kind).font(.plusJakarta(size: 11, weight: .semibold)).foregroundStyle(ServiceChrome.accent)
-                        Text(item.title).foregroundStyle(ServiceChrome.ink)
-                        if item.id.hasPrefix("open-"), let payment = (model.paymentReadiness ?? []).first(where: { $0.id == String(item.id.dropFirst(5)) }) {
-                            Button("Open") { OperatingChromeState.shared.settling = payment }
-                                .font(.plusJakarta(size: 13, weight: .semibold))
-                        }
-                    }
+                    attentionCard(item)
                 }
                 sectionTitle("Payment Readiness")
                 readiness("To collect", (model.paymentReadiness ?? []).filter { $0.relevance == "RECEIVABLE" })
                 readiness("To pay", (model.paymentReadiness ?? []).filter { $0.relevance != "RECEIVABLE" })
                 sectionTitle("Finance")
                 card {
-                    line("Recorded sales", money(model.finance?.sales), ServiceChrome.accent)
+                    line("Service revenue", money(model.finance?.sales), ServiceChrome.accent)
                     line("Received", money(model.finance?.received), ServiceChrome.success)
                     line("Still to collect", money(model.finance?.outstanding), Color(hex: "#FBBF24"))
                     line("Eligible cost", money(model.finance?.eligibleCost), ServiceChrome.ink)
@@ -72,7 +73,7 @@ struct ConsumerServiceActiveView: View {
                         .foregroundStyle(ServiceChrome.ink)
                 }
                 ForEach(model.attention ?? []) { item in
-                    card { Text(item.title).foregroundStyle(ServiceChrome.ink) }
+                    attentionCard(item)
                 }
             }
             sectionTitle("Activity")
@@ -96,19 +97,19 @@ struct ConsumerServiceActiveView: View {
                 Text(period).font(.plusJakarta(size: 12)).foregroundStyle(ServiceChrome.accent)
                 Text("This month, in motion").font(.plusJakarta(size: 22, weight: .semibold)).foregroundStyle(ServiceChrome.ink)
                 HStack {
-                    metric("Sales", money(model.finance?.sales ?? model.target?.progress))
-                    metric("Target", money(model.target?.value))
+                    metric("Revenue", money(model.finance?.sales ?? model.target?.progress))
+                    metric("Target", model.target?.configured == true ? money(model.target?.value) : "—")
                 }
                 HStack {
-                    metric("Spent", money(model.budget?.spent))
-                    metric("Remaining", money(model.budget?.remaining))
+                    metric("Spent", model.budget?.configured == true ? money(model.budget?.spent) : "—")
+                    metric("Remaining", model.budget?.configured == true ? money(model.budget?.remaining) : "—")
                 }
-                meter("Sales toward target", fraction(model.target?.progress, model.target?.value), ServiceChrome.brand)
+                if model.target?.configured == true {
+                    meter("Revenue toward target", fraction(model.target?.progress, model.target?.value), ServiceChrome.brand)
+                }
             }
-            ForEach(["services", "appointments", "sales", "updates", "issues", "expenses", "payments"], id: \.self) { code in
-                if let section = model.boards?.moments?.first(where: { $0.code == code }) {
-                    board(section)
-                }
+            ForEach(model.boards?.moments ?? []) { section in
+                board(section)
             }
             card {
                 Text("Create the next service moment").font(.plusJakarta(size: 16, weight: .semibold)).foregroundStyle(ServiceChrome.ink)
@@ -171,12 +172,37 @@ struct ConsumerServiceActiveView: View {
         }
     }
 
+    private func attentionCard(_ item: OperatingAttentionPayload) -> some View {
+        card {
+            Text(item.kind).font(.plusJakarta(size: 11, weight: .semibold)).foregroundStyle(ServiceChrome.accent)
+            Text(item.title).foregroundStyle(ServiceChrome.ink)
+            let meta = [
+                item.counterpartyName,
+                item.dueAt.map { String($0.prefix(10)) },
+                model.financeVisible == true ? money(item.amount) : nil,
+            ].compactMap { $0 }.filter { !$0.isEmpty && $0 != "—" }
+            if !meta.isEmpty {
+                Text(meta.joined(separator: " · ")).font(.plusJakarta(size: 12)).foregroundStyle(ServiceChrome.secondary)
+            }
+            if item.cta != nil || item.id.hasPrefix("open-") || item.sourceEventId != nil {
+                Button(operatingAttentionCtaLabel(item)) {
+                    openOperatingAttention(item, model: model, onOpenQuickAdd: onOpenQuickAdd)
+                }
+                .font(.plusJakarta(size: 13, weight: .semibold))
+                .foregroundStyle(ServiceChrome.accent)
+            }
+        }
+    }
+
     private func board(_ section: OperatingBoardSectionPayload) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionTitle(section.title)
             card {
                 Text(section.detail.isEmpty ? "Nothing recorded yet." : formatOperatingDetail(section.detail, currency: model.currency))
                     .font(.plusJakarta(size: 12)).foregroundStyle(ServiceChrome.secondary)
+                if let coverage = section.coverage, !coverage.isEmpty {
+                    Text(coverage).font(.plusJakarta(size: 11, weight: .semibold)).foregroundStyle(ServiceChrome.accent)
+                }
                 ForEach(section.rows ?? []) { row in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(row.title).foregroundStyle(ServiceChrome.ink)
@@ -349,4 +375,7 @@ struct ServiceEventDraft {
     var parentEventId: String? = nil
     var revisesEventId: String? = nil
     var masterKind: String? = nil
+    var dueAt: String? = nil
+    var contract: OperatingContractInput? = nil
+    var lineItems: [(itemName: String, quantity: String?, unit: String?, unitPrice: String?)]? = nil
 }
